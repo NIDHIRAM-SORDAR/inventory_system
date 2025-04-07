@@ -1,155 +1,46 @@
-"""The overview page of the app."""
-
-import datetime
-
 import reflex as rx
+from inventory_system.templates import template
+from inventory_system import routes  # Import the routes module
 
-from .. import styles
-from ..components.card import card
-from ..components.notification import notification
-from ..templates import template
-from ..views.acquisition_view import acquisition
-from ..views.charts import (
-    StatsState,
-    area_toggle,
-    orders_chart,
-    pie_chart,
-    revenue_chart,
-    timeframe_select,
-    users_chart,
-)
-from ..views.stats_cards import stats_cards
-from ..state import AuthState
-from inventory_system import routes
-
-
-def _time_data() -> rx.Component:
-    return rx.hstack(
-        rx.tooltip(
-            rx.icon("info", size=20),
-            content=f"{(datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%b %d, %Y')} - {datetime.datetime.now().strftime('%b %d, %Y')}",
-        ),
-        rx.text("Last 30 days", size="4", weight="medium"),
-        align="center",
-        spacing="2",
-        display=["none", "none", "flex"],
-    )
-
-
-def tab_content_header() -> rx.Component:
-    return rx.hstack(
-        _time_data(),
-        area_toggle(),
-        align="center",
-        width="100%",
-        spacing="4",
-    )
-
-
-@template(route=routes.OVERVIEW_ROUTE, title="Overview", on_load=StatsState.randomize_data)
+@template(route=routes.INDEX_ROUTE, title="Telecom Inventory System")
 def index() -> rx.Component:
-    """The overview page.
-
-    Returns:
-        The UI for the overview page.
-
-    """
     return rx.vstack(
-        rx.cond(
-            AuthState.is_authenticated,  # Use is_authenticated first
-            rx.heading(
-                rx.cond(
-                    AuthState.authenticated_user_info,
-                    f"Welcome, {AuthState.authenticated_user.username}",
-                    "Welcome, User"
-                ),
-                size="5"
-            ),
-            rx.heading("Please log in", size="5")
+        # Header Section
+        rx.heading(
+            "Telecom Inventory System",
+            size="3",
+            color="white",
+            margin_bottom="10px",
         ),
-        
-        rx.flex(
-            rx.input(
-                rx.input.slot(rx.icon("search"), padding_left="0"),
-                placeholder="Search here...",
-                size="3",
-                width="100%",
-                max_width="450px",
-                radius="large",
-                style=styles.ghost_input_style,
-            ),
-            rx.flex(
-                notification("bell", "cyan", 12),
-                notification("message-square-text", "plum", 6),
-                spacing="4",
-                width="100%",
-                wrap="nowrap",
-                justify="end",
-            ),
-            justify="between",
-            align="center",
-            width="100%",
+        rx.text(
+            "Efficiently manage your telecom inventory, orders, and stores.",
+            color="gray",
+            font_size="1.2em",
+            margin_bottom="20px",
         ),
-        stats_cards(),
-        card(
-            rx.hstack(
-                tab_content_header(),
-                rx.segmented_control.root(
-                    rx.segmented_control.item("Users", value="users"),
-                    rx.segmented_control.item("Revenue", value="revenue"),
-                    rx.segmented_control.item("Orders", value="orders"),
-                    margin_bottom="1.5em",
-                    default_value="users",
-                    on_change=StatsState.set_selected_tab,
-                ),
-                width="100%",
-                justify="between",
-            ),
-            rx.match(
-                StatsState.selected_tab,
-                ("users", users_chart()),
-                ("revenue", revenue_chart()),
-                ("orders", orders_chart()),
-            ),
+
+        # Call to Action
+        rx.button(
+            "Get Started",
+            size="3",
+            background_color="#6B46C1",
+            color="white",
+            _hover={"background_color": "#553C9A"},
+            on_click=rx.redirect(routes.LOGIN_ROUTE),  # Use the route constant
         ),
-        rx.grid(
-            card(
-                rx.hstack(
-                    rx.hstack(
-                        rx.icon("user-round-search", size=20),
-                        rx.text("Visitors Analytics", size="4", weight="medium"),
-                        align="center",
-                        spacing="2",
-                    ),
-                    timeframe_select(),
-                    align="center",
-                    width="100%",
-                    justify="between",
-                ),
-                pie_chart(),
-            ),
-            card(
-                rx.hstack(
-                    rx.icon("globe", size=20),
-                    rx.text("Acquisition Overview", size="4", weight="medium"),
-                    align="center",
-                    spacing="2",
-                    margin_bottom="2.5em",
-                ),
-                rx.vstack(
-                    acquisition(),
-                ),
-            ),
-            gap="1rem",
-            grid_template_columns=[
-                "1fr",
-                "repeat(1, 1fr)",
-                "repeat(2, 1fr)",
-                "repeat(2, 1fr)",
-                "repeat(2, 1fr)",
-            ],
-            width="100%",
+
+        # Optional: Key Features (minimal)
+        rx.text(
+            "Track products, manage orders, and oversee stores with ease.",
+            color="gray",
+            font_size="0.9em",
+            margin_top="30px",
         ),
-        spacing="8",
-        width="100%",
+
+        # Styling for the entire stack
+        align_items="center",
+        justify_content="center",
+        min_height="100vh",
+        background_color="#1A202C",
+        padding="20px",
     )
