@@ -5,6 +5,7 @@ from inventory_system.models import UserInfo
 from sqlmodel import select
 from typing import List, Dict, Any, Optional
 from ..state import AuthState
+from inventory_system import routes
 
 class AdminManagementState(AuthState):
     users_data: List[Dict[str, Any]] = []
@@ -156,7 +157,7 @@ def admin_management() -> rx.Component:
         rx.hstack(
             rx.heading("Admin Management", size="3"),
             rx.spacer(),
-            rx.button("Logout", on_click=rx.redirect("/logout"), color="red"),
+            rx.button("Logout", on_click=rx.redirect(routes.LOGOUT_ROUTE), color="red"),
             width="100%",
         ),
         rx.cond(

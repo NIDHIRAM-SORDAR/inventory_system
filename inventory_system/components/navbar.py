@@ -4,6 +4,8 @@ import reflex as rx
 
 from inventory_system import styles
 
+from inventory_system import routes
+
 
 def menu_item_icon(icon: str) -> rx.Component:
     return rx.icon(icon, size=20)
@@ -22,7 +24,7 @@ def menu_item(text: str, url: str) -> rx.Component:
     """
     # Whether the item is active.
     active = (rx.State.router.page.path == url.lower()) | (
-        (rx.State.router.page.path == "/") & text == "Overview"
+        (rx.State.router.page.path == routes.OVERVIEW_ROUTE) & text == "Overview"
     )
 
     return rx.link(
@@ -109,11 +111,11 @@ def menu_button() -> rx.Component:
 
     # The ordered page routes.
     ordered_page_routes = [
-        "/",
-        "/table",
-        "/about",
-        "/profile",
-        "/settings",
+        routes.OVERVIEW_ROUTE,
+        routes.TABLE_ROUTE,
+        routes.ABOUT_ROUTE,
+        routes.PROFILE_ROUTE,
+        routes.SETTINGS_ROUTE,
     ]
 
     # Get the decorated pages.

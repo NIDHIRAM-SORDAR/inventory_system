@@ -6,6 +6,7 @@ from sqlmodel import select
 from typing import List, Dict, Any
 from ..state import AuthState
 from ..utils.register_supplier import register_supplier
+from inventory_system import routes
 
 
 class SupplierApprovalState(AuthState):  # Inherit from CustomRegisterState instead of AuthState
@@ -91,7 +92,7 @@ class SupplierApprovalState(AuthState):  # Inherit from CustomRegisterState inst
             self.check_auth_and_load()
         self.is_loading = False
 
-@template(route="/supplier_approval", title="Supplier Approval", on_load=SupplierApprovalState.check_auth_and_load)
+@template(route=routes.SUPPLIER_APPROV_ROUTE, title="Supplier Approval", on_load=SupplierApprovalState.check_auth_and_load)
 @reflex_local_auth.require_login
 def supplier_approval() -> rx.Component:
     def action_buttons(user: rx.Var) -> rx.Component:
@@ -118,7 +119,7 @@ def supplier_approval() -> rx.Component:
         rx.hstack(
             rx.heading("Supplier Approval", size="3"),
             rx.spacer(),
-            rx.button("Logout", on_click=rx.redirect("/logout"), color="red"),
+            rx.button("Logout", on_click=rx.redirect(routes.LOGOUT_ROUTE), color="red"),
             width="100%",
         ),
         rx.cond(

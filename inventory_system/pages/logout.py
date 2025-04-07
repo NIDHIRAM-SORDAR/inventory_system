@@ -2,6 +2,7 @@
 import reflex as rx
 from ..state import AuthState
 from ..templates import template
+from inventory_system import routes
 
 class LogoutState(AuthState):
     async def confirm_logout(self):
@@ -9,9 +10,9 @@ class LogoutState(AuthState):
         self.do_logout()  # Clear the auth session
         self.auth_token = ""  # Explicitly clear the token
         self.reset()
-        yield rx.redirect("/")  # Redirect to home page
+        yield rx.redirect(routes.INDEX_ROUTE)  # Redirect to home page
 
-@template(route="/logout", title="Logout")
+@template(route=routes.LOGOUT_ROUTE, title="Logout")
 def logout_page() -> rx.Component:
     """Render a minimal logout confirmation page."""
     return rx.center(
@@ -24,7 +25,7 @@ def logout_page() -> rx.Component:
             ),
             rx.button(
                 "Cancel",
-                on_click=lambda: rx.redirect("/"),  # Simple redirect for cancel
+                on_click=lambda: rx.redirect(routes.OVERVIEW_ROUTE),  # Simple redirect for cancel
                 color_scheme="gray",
             ),
             spacing="4",

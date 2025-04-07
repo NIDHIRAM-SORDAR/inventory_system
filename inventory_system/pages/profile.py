@@ -6,6 +6,7 @@ from ..models import UserInfo
 from ..state import AuthState
 from sqlmodel import select
 import reflex_local_auth
+from inventory_system import routes
 
 class ProfileState(AuthState):  # Inherit from AuthState matching the declaration style
     
@@ -14,7 +15,7 @@ class ProfileState(AuthState):  # Inherit from AuthState matching the declaratio
     def handle_submit(self, form_data: dict):
         """Update the LocalUser and UserInfo models with form data."""
         if not self.is_authenticated:
-            return rx.redirect("/login")
+            return rx.redirect(routes.LOGIN_ROUTE)
         
         # Update AuthState variables using setters
         self.set_username(form_data["username"])
@@ -56,7 +57,7 @@ class ProfileState(AuthState):  # Inherit from AuthState matching the declaratio
         """Toggle the notifications setting."""
         self.set_notifications(not self.notifications)
 
-@template(route="/profile", title="Profile")
+@template(route=routes.PROFILE_ROUTE, title="Profile")
 def profile() -> rx.Component:
     return rx.vstack(
         rx.cond(
@@ -147,7 +148,7 @@ def profile() -> rx.Component:
             ),
             rx.vstack(
                 rx.heading("Please log in to view your profile", size="5"),
-                rx.link("Go to Login", href="/login"),
+                rx.link("Go to Login", href=routes.LOGIN_ROUTE),
                 spacing="4",
                 align="center",
             )

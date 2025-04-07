@@ -5,6 +5,7 @@ from inventory_system.models import UserInfo
 import json
 import os
 from ..templates import template
+from inventory_system import routes
 
 # Load user data from JSON file
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -94,7 +95,7 @@ def register_form() -> rx.Component:
         ),
         on_submit=CustomRegisterState.handle_registration_with_email,
     )
-@template(route="/register", title="Signin")
+@template(route=routes.REGISTER_ROUTE, title="Signup")
 def register_page() -> rx.Component:
     """Render the registration page."""
     return rx.center(

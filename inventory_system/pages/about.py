@@ -6,9 +6,10 @@ import reflex as rx
 
 from .. import styles
 from ..templates import template
+from inventory_system import routes
 
 
-@template(route="/about", title="About")
+@template(route=routes.ABOUT_ROUTE, title="About")
 def about() -> rx.Component:
     """The about page.
 

@@ -5,6 +5,7 @@ from sqlmodel import select
 from ..templates import template
 from ..models import UserInfo
 from ..state import AuthState  # Import your custom AuthState
+from inventory_system import routes
 
 class CustomLoginState(AuthState):  # Inherit from your AuthState instead
     """Custom login state to redirect based on user role."""
@@ -33,8 +34,8 @@ class CustomLoginState(AuthState):  # Inherit from your AuthState instead
                 select(UserInfo).where(UserInfo.user_id == self.authenticated_user.id)
             ).one_or_none()
             if user_info and user_info.is_admin:
-                return rx.redirect("/admin_management")
-            return rx.redirect("/")
+                return rx.redirect(routes.ADMIN_MGMT)
+            return rx.redirect(routes.OVERVIEW_ROUTE)
 
 def login_error() -> rx.Component:
     """Render the login error message."""
@@ -88,7 +89,7 @@ def login_form() -> rx.Component:
         width="100%",
     )
 
-@template(route="/login", title="Login")
+@template(route=routes.LOGIN_ROUTE, title="Login")
 def login_page() -> rx.Component:
     """Render the login page."""
     return rx.center(

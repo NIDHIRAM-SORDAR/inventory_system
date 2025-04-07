@@ -5,9 +5,10 @@ import reflex as rx
 from ..backend.table_state import TableState
 from ..templates import template
 from ..views.table import main_table
+from inventory_system import routes
 
 
-@template(route="/table", title="Table", on_load=TableState.load_entries)
+@template(route=routes.TABLE_ROUTE, title="Table", on_load=TableState.load_entries)
 def table() -> rx.Component:
     """The table page.
 

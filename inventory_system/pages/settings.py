@@ -6,9 +6,10 @@ from ..templates import template
 from ..views.color_picker import primary_color_picker, secondary_color_picker
 from ..views.radius_picker import radius_picker
 from ..views.scaling_picker import scaling_picker
+from inventory_system import routes
 
 
-@template(route="/settings", title="Settings")
+@template(route=routes.SETTINGS_ROUTE, title="Settings")
 def settings() -> rx.Component:
     """The settings page.
 

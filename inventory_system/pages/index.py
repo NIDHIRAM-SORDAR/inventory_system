@@ -20,6 +20,7 @@ from ..views.charts import (
 )
 from ..views.stats_cards import stats_cards
 from ..state import AuthState
+from inventory_system import routes
 
 
 def _time_data() -> rx.Component:
@@ -45,7 +46,7 @@ def tab_content_header() -> rx.Component:
     )
 
 
-@template(route="/", title="Overview", on_load=StatsState.randomize_data)
+@template(route=routes.OVERVIEW_ROUTE, title="Overview", on_load=StatsState.randomize_data)
 def index() -> rx.Component:
     """The overview page.
 

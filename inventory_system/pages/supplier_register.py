@@ -1,11 +1,11 @@
 # inventory_system/pages/supplier_register.py
 import reflex as rx
-from inventory_system.layouts.auth_layout import auth_layout
 from inventory_system.templates.template import template
 from inventory_system.models import Supplier
 from sqlmodel import select
 import reflex_local_auth
 from email_validator import validate_email, EmailNotValidError
+from inventory_system import routes
 
 class SupplierRegisterState(rx.State):
     company_name: str = ""
@@ -164,7 +164,7 @@ def supplier_registration_form() -> rx.Component:
         ),
         on_submit=SupplierRegisterState.register_supplier,
     ),
-@template(route="/supplier_register", title="Supplier Registration")
+@template(route=routes.SUPPLIER_REGISTER_ROUTE, title="Supplier Registration")
 def supplier_register() -> rx.Component:
     """The supplier registration page."""
     return rx.center(
