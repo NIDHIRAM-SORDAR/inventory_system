@@ -1,4 +1,3 @@
-# inventory_system/pages/register.py
 import reflex as rx
 import reflex_local_auth
 from inventory_system.models import UserInfo
@@ -6,6 +5,7 @@ import json
 import os
 from ..templates import template
 from inventory_system import routes
+from inventory_system.state.login_state import LoginState  # Import LoginState for transition
 
 # Load user data from JSON file
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -95,9 +95,15 @@ def register_form() -> rx.Component:
         ),
         on_submit=CustomRegisterState.handle_registration_with_email,
     )
-@template(route=routes.REGISTER_ROUTE, title="Signup")
+
+@template(
+    route=routes.REGISTER_ROUTE, 
+    title="Signup", 
+    show_nav=False,
+    on_load=[LoginState.reset_transition, LoginState.start_transition],
+)
 def register_page() -> rx.Component:
-    """Render the registration page."""
+    """Render the registration page with a fade-in transition."""
     return rx.center(
         rx.cond(
             reflex_local_auth.RegistrationState.success,
@@ -105,7 +111,24 @@ def register_page() -> rx.Component:
                 rx.text("Registration successful!"),
                 rx.link("Go to Login", href=reflex_local_auth.routes.LOGIN_ROUTE),
             ),
-            rx.card(register_form()),
+            rx.card(
+                register_form(),
+                width="50%",
+                # Apply futuristic styling to match the app's theme
+                background="#2D3748",
+                border="1px solid #4A5568",
+                border_radius="12px",
+                padding="20px",
+                box_shadow="0 4px 12px rgba(0, 0, 0, 0.3)",
+            ),
         ),
         padding_top="2em",
+        height="85vh",
+        align="center",
+        justify="center",
+        # Apply the fade-in transition using LoginState
+        opacity=rx.cond(LoginState.show_login, "1.0", "0.0"),  # Map boolean to opacity
+        transition="opacity 0.5s ease-in-out",
+        # Ensure the page matches the app's futuristic design
+        background="linear-gradient(135deg, #1A202C, #2D3748)",
     )

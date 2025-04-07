@@ -1,4 +1,3 @@
-# inventory_system/pages/login.py
 import reflex as rx
 import reflex_local_auth
 from sqlmodel import select
@@ -6,6 +5,7 @@ from ..templates import template
 from ..models import UserInfo
 from ..state import AuthState  # Import your custom AuthState
 from inventory_system import routes
+from inventory_system.state.login_state import LoginState  # Import LoginState for transition
 
 class CustomLoginState(AuthState):  # Inherit from your AuthState instead
     """Custom login state to redirect based on user role."""
@@ -89,17 +89,33 @@ def login_form() -> rx.Component:
         width="100%",
     )
 
-@template(route=routes.LOGIN_ROUTE, title="Login")
+@template(
+    route=routes.LOGIN_ROUTE,
+    title="Login",
+    show_nav=False,
+    on_load=[LoginState.reset_transition, LoginState.start_transition]
+)
 def login_page() -> rx.Component:
-    """Render the login page."""
+    """Render the login page with a fade-in transition."""
     return rx.center(
         rx.card(
             login_form(),
             width="400px",
+            # Apply futuristic styling to match the app's theme
+            background="#2D3748",
+            border="1px solid #4A5568",
+            border_radius="12px",
+            padding="20px",
+            box_shadow="0 4px 12px rgba(0, 0, 0, 0.3)",
         ),
         padding_top="2em",
         width="100%",
-        height="100vh",
+        height="85vh",
         align="center",
         justify="center",
+        # Apply the fade-in transition using LoginState
+        opacity=rx.cond(LoginState.show_login, "1.0", "0.0"),  # Map boolean to opacity
+        transition="opacity 0.5s ease-in-out",
+        # Ensure the page matches the app's futuristic design
+        background="linear-gradient(135deg, #1A202C, #2D3748)",
     )

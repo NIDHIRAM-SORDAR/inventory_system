@@ -53,6 +53,7 @@ def template(
     meta: str | None = None,
     script_tags: list[rx.Component] | None = None,
     on_load: rx.EventHandler | list[rx.EventHandler] | None = None,
+    show_nav: bool = True,  # Add the show_nav parameter
 ) -> Callable[[Callable[[], rx.Component]], rx.Component]:
     """The template for each page of the app.
 
@@ -63,10 +64,10 @@ def template(
         meta: Additional meta to add to the page.
         on_load: The event handler(s) called when the page load.
         script_tags: Scripts to attach to the page.
+        show_nav: Whether to show the navbar and sidebar (default: True).
 
     Returns:
         The template with the page content.
-
     """
 
     def decorator(page_content: Callable[[], rx.Component]) -> rx.Component:
@@ -77,12 +78,33 @@ def template(
 
         Returns:
             The template with the page content.
-
         """
         # Get the meta tags for the page.
         all_meta = [*default_meta, *(meta or [])]
 
         def templated_page():
+            # If show_nav is False, render only the page content without navbar and sidebar
+            if not show_nav:
+                return rx.flex(
+                    rx.vstack(
+                        page_content(),
+                        width="100%",
+                        **styles.template_content_style,
+                    ),
+                    width="100%",
+                    **styles.template_page_style,
+                    max_width=[
+                        "100%",
+                        "100%",
+                        "100%",
+                        "100%",
+                        "100%",
+                        styles.max_width,
+                    ],
+                    margin="auto",
+                    position="relative",
+                )
+            # Otherwise, include the navbar and sidebar
             return rx.flex(
                 navbar(),
                 sidebar(),
