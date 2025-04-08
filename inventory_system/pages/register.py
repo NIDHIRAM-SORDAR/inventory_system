@@ -74,7 +74,7 @@ def register_form() -> rx.Component:
     """Render the registration form."""
     return rx.form(
         rx.vstack(
-            rx.heading("Create an Account", size="7"),
+            rx.heading("Create an Account", size="6"),
             register_error(),
             rx.text("ID"),
             rx.input(name="id", width="100%"),
@@ -92,6 +92,7 @@ def register_form() -> rx.Component:
                 width="100%",
             ),
             min_width="300px",
+            spacing="1",
         ),
         on_submit=CustomRegisterState.handle_registration_with_email,
     )
@@ -119,16 +120,17 @@ def register_page() -> rx.Component:
                 background="#2D3748",
                 border="1px solid #4A5568",
                 border_radius="12px",
-                padding="20px",
+                padding="10px",
                 box_shadow="0 4px 12px rgba(0, 0, 0, 0.3)",
             ),
         ),
-        padding_top="2em",
-        height="85vh",
+        padding="10px",  # Add padding to all sides
+        min_height="85vh",  # Use full viewport height
         width="100%",  # Ensure the center container takes full width
         max_width="90%",  # Constrain the maximum width of the center container
         align="center",
         justify="center",
+        overflow="hidden",
         # Apply the fade-in transition using LoginState
         opacity=rx.cond(LoginState.show_login, "1.0", "0.0"),  # Map boolean to opacity
         transition="opacity 0.5s ease-in-out",
