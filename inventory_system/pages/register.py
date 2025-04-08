@@ -54,7 +54,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                 session.refresh(user_info)
 
         else:
-            self.registration_error = reflex_local_auth.RegistrationState.error_message or "Registration failed."
+            self.registration_error = reflex_local_auth.RegistrationState.error_message | "Registration failed."
         return registration_result
 
 def register_error() -> rx.Component:
