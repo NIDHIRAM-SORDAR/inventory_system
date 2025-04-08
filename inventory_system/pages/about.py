@@ -1,7 +1,5 @@
 """The about page."""
 
-from pathlib import Path
-
 import reflex as rx
 
 from .. import styles
@@ -16,6 +14,12 @@ def about() -> rx.Component:
     Returns:
         The UI for the about page.
     """
-    with Path("README.md").open(encoding="utf-8") as readme:
-        content = readme.read()
-    return rx.markdown(content, component_map=styles.markdown_style)
+    return rx.vstack(
+        rx.heading("About Inventory System", size="6"),
+        rx.text("This is a temporary about page for the Inventory System application."),
+        rx.text("More information will be added soon."),
+        spacing="4",
+        padding="6",
+        width="100%",
+        align_items="center",
+    )
