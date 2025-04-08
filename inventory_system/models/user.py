@@ -13,6 +13,7 @@ class UserInfo(rx.Model, table=True):
     is_admin: bool = False
     is_supplier: bool = False
     user_id: int = Field(foreign_key="localuser.id")
+    profile_picture: str | None = None
     supplier: Optional["Supplier"] = Relationship(
         back_populates="user_info",
         cascade_delete=True

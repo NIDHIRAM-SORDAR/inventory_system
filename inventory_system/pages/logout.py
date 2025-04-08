@@ -1,16 +1,8 @@
 # inventory_system/pages/logout.py
 import reflex as rx
-from ..state import AuthState
+from ..state import LogoutState
 from ..templates import template
 from inventory_system import routes
-
-class LogoutState(AuthState):
-    async def confirm_logout(self):
-        """Perform logout and redirect to home page."""
-        self.do_logout()  # Clear the auth session
-        self.auth_token = ""  # Explicitly clear the token
-        self.reset()
-        yield rx.redirect(routes.INDEX_ROUTE)  # Redirect to home page
 
 @template(route=routes.LOGOUT_ROUTE, title="Logout")
 def logout_page() -> rx.Component:

@@ -2,60 +2,78 @@
 import reflex as rx
 from ..components.profile_input import profile_input
 from ..templates import template
-from ..models import UserInfo
-from ..state import AuthState
-from sqlmodel import select
-import reflex_local_auth
+from ..state.profile_state import ProfileState  # Updated import
 from inventory_system import routes
 
-class ProfileState(AuthState):  # Inherit from AuthState matching the declaration style
-    
-    notifications: bool = True  # State-only field for notifications
-
-    def handle_submit(self, form_data: dict):
-        """Update the LocalUser and UserInfo models with form data."""
-        if not self.is_authenticated:
-            return rx.redirect(routes.LOGIN_ROUTE)
-        
-        # Update AuthState variables using setters
-        self.set_username(form_data["username"])
-        self.set_email(form_data["email"])
-        
-        # Update LocalUser (username) and UserInfo (email) in the database
-        with rx.session() as session:
-            # Update LocalUser
-            user = session.exec(
-                select(reflex_local_auth.LocalUser).where(
-                    reflex_local_auth.LocalUser.id == self.authenticated_user.id
-                )
-            ).one()
-            user.username = form_data["username"]
-            session.add(user)
-            
-            # Update UserInfo
-            user_info = session.exec(
-                select(UserInfo).where(
-                    UserInfo.user_id == self.authenticated_user.id
-                )
-            ).one_or_none()
-            if user_info:
-                user_info.email = form_data["email"]
-                session.add(user_info)
-            else:
-                new_user_info = UserInfo(
-                    user_id=self.authenticated_user.id,
-                    email=form_data["email"],
-                    role="employee"
-                )
-                session.add(new_user_info)
-            
-            session.commit()
-        
-        return rx.toast.success("Profile updated successfully", position="top-center")
-
-    def toggle_notifications(self):
-        """Toggle the notifications setting."""
-        self.set_notifications(not self.notifications)
+def profile_upload_section() -> rx.Component:
+    """Render the profile picture upload section."""
+    return rx.vstack(
+        rx.hstack(
+            rx.icon("image"),
+            rx.heading("Profile Picture", size="5"),
+            align="center",
+        ),
+        rx.text("Upload a new profile picture.", size="3"),
+        rx.cond(
+            ProfileState.upload_error,
+            rx.callout(
+                ProfileState.upload_error,
+                icon="triangle_alert",
+                color_scheme="red",
+            ),
+        ),
+        rx.upload(
+            rx.text("Drag and drop an image or click to select"),
+            id="profile_upload",
+            accept={"image/*": [".png", ".jpg", ".jpeg", ".gif"]},
+            max_files=1,
+            disabled=ProfileState.is_uploading,
+            border="2px dashed #4A5568",
+            padding="2em",
+            width="100%",
+        ),
+        rx.hstack(
+            rx.button(
+                "Upload",
+                on_click=ProfileState.handle_profile_picture_upload(
+                    rx.upload_files(
+                        upload_id="profile_upload",
+                        on_upload_progress=ProfileState.handle_upload_progress
+                    )
+                ),
+                disabled=ProfileState.is_uploading,
+                color_scheme="blue",
+            ),
+            rx.button(
+                "Clear",
+                on_click=ProfileState.clear_upload,
+                disabled=ProfileState.is_uploading,
+                color_scheme="gray",
+            ),
+            spacing="2",
+        ),
+        rx.cond(
+            ProfileState.is_uploading,
+            rx.vstack(
+                rx.text("Uploading..."),
+                rx.progress(value=ProfileState.upload_progress, max=100),
+                width="100%",
+            ),
+        ),
+        rx.cond(
+            ProfileState.authenticated_user_info.profile_picture,
+            rx.image(
+                src=ProfileState.authenticated_user_info.profile_picture,
+                alt="Profile Picture",
+                width="100px",
+                height="100px",
+                border_radius="50%",
+            ),
+            rx.text("No profile picture set."),
+        ),
+        width="100%",
+        spacing="4",
+    )
 
 @template(route=routes.PROFILE_ROUTE, title="Profile")
 def profile() -> rx.Component:
@@ -125,6 +143,8 @@ def profile() -> rx.Component:
                     justify="between",
                     flex_direction=["column", "column", "row"],
                 ),
+                rx.divider(),
+                profile_upload_section(),
                 rx.divider(),
                 rx.vstack(
                     rx.hstack(

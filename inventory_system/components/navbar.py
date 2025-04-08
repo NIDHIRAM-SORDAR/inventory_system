@@ -3,8 +3,8 @@
 import reflex as rx
 
 from inventory_system import styles
-
 from inventory_system import routes
+from ..state import AuthState, LogoutState
 
 
 def menu_item_icon(icon: str) -> rx.Component:
@@ -20,9 +20,7 @@ def menu_item(text: str, url: str) -> rx.Component:
 
     Returns:
         rx.Component: The menu item component.
-
     """
-    # Whether the item is active.
     active = (rx.State.router.page.path == url.lower()) | (
         (rx.State.router.page.path == routes.OVERVIEW_ROUTE) & text == "Overview"
     )
@@ -81,7 +79,6 @@ def navbar_footer() -> rx.Component:
 
     Returns:
         The navbar footer component.
-
     """
     return rx.hstack(
         rx.link(
@@ -105,11 +102,34 @@ def navbar_footer() -> rx.Component:
     )
 
 
+def user_avatar() -> rx.Component:
+    """User avatar component with dropdown menu for authenticated users or login button for guests."""
+    default_profile_pic = "/icons/profile.png"
+    return rx.cond(
+        AuthState.authenticated_user.id >= 0,
+        rx.menu.root(
+            rx.menu.trigger(
+                rx.avatar(
+                    src=AuthState.profile_picture_safe,  # Use the safe computed Var
+                    name=AuthState.authenticated_user.username,
+                    size="2",
+                ),
+            ),
+            rx.menu.content(
+                rx.menu.item("Profile", on_click=lambda: rx.redirect(routes.PROFILE_ROUTE)),
+                rx.menu.item("Settings", on_click=lambda: rx.redirect(routes.SETTINGS_ROUTE)),
+                rx.menu.separator(),
+                rx.menu.item("Logout", on_click=LogoutState.confirm_logout),
+            ),
+        ),
+        rx.button("Login", on_click=lambda: rx.redirect(routes.LOGIN_ROUTE), size="3"),
+    )
+
+
 def menu_button() -> rx.Component:
-    # Get all the decorated pages and add them to the menu.
+    """Menu button with drawer for navigation."""
     from reflex.page import get_decorated_pages
 
-    # The ordered page routes.
     ordered_page_routes = [
         routes.OVERVIEW_ROUTE,
         routes.TABLE_ROUTE,
@@ -118,10 +138,7 @@ def menu_button() -> rx.Component:
         routes.SETTINGS_ROUTE,
     ]
 
-    # Get the decorated pages.
     pages = get_decorated_pages()
-
-    # Include all pages even if they are not in the ordered_page_routes.
     ordered_pages = sorted(
         pages,
         key=lambda page: (
@@ -148,9 +165,7 @@ def menu_button() -> rx.Component:
                     rx.divider(),
                     *[
                         menu_item(
-                            text=page.get(
-                                "title", page["route"].strip("/").capitalize()
-                            ),
+                            text=page.get("title", page["route"].strip("/").capitalize()),
                             url=page["route"],
                         )
                         for page in ordered_pages
@@ -178,17 +193,19 @@ def navbar() -> rx.Component:
 
     Returns:
         The navbar component.
-
     """
     return rx.el.nav(
         rx.hstack(
-            # The logo.
             rx.color_mode_cond(
                 rx.image(src="/reflex_black.svg", height="1em"),
                 rx.image(src="/reflex_white.svg", height="1em"),
             ),
             rx.spacer(),
-            menu_button(),
+            rx.hstack(
+                user_avatar(),
+                menu_button(),
+                spacing="2",
+            ),
             align="center",
             width="100%",
             padding_y="1.25em",
