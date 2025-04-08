@@ -95,7 +95,7 @@ class AdminManagementState(AuthState):
         self.user_to_delete = None
         self.is_loading = False
 
-@template(route="/admin_management", title="Admin Management", on_load=AdminManagementState.check_auth_and_load)
+@template(route=routes.ADMIN_MGMT, title="Admin Management", on_load=AdminManagementState.check_auth_and_load)
 @reflex_local_auth.require_login
 def admin_management() -> rx.Component:
     """Admin Management Page with regular Reflex table."""
