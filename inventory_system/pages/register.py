@@ -113,7 +113,8 @@ def register_page() -> rx.Component:
             ),
             rx.card(
                 register_form(),
-                width="400px",
+                width="100%",  # Set width to 100% to make it responsive
+                max_width="400px",  # Constrain the maximum width of the card
                 # Apply futuristic styling to match the app's theme
                 background="#2D3748",
                 border="1px solid #4A5568",
@@ -124,7 +125,8 @@ def register_page() -> rx.Component:
         ),
         padding_top="2em",
         height="85vh",
-        width="90%",
+        width="100%",  # Ensure the center container takes full width
+        max_width="90%",  # Constrain the maximum width of the center container
         align="center",
         justify="center",
         # Apply the fade-in transition using LoginState
