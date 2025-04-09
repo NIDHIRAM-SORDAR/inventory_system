@@ -7,8 +7,6 @@ from inventory_system import routes
 
 def profile_upload_section() -> rx.Component:
     """Render the profile picture upload section."""
-    # Get the list of selected files
-    selected_files = rx.selected_files("profile_upload")
 
     return rx.vstack(
         rx.hstack(
@@ -48,8 +46,7 @@ def profile_upload_section() -> rx.Component:
                         )
                     )
                 ),
-                disabled=ProfileState.is_uploading,
-                color_scheme="blue",  # Match the Update button's color
+                disabled=ProfileState.is_uploading, # Match the Update button's color
             ),
             rx.button(
                 "Clear",
@@ -69,9 +66,9 @@ def profile_upload_section() -> rx.Component:
         ),
         # Show preview of selected file before upload
         rx.cond(
-            rx.selected_files("profile_upload"),  # If a file is selected but not yet uploaded
+            ProfileState.img != "",  # If a file is selected but not yet uploaded
             rx.image(
-                src=rx.selected_files("profile_upload"),  # Preview the selected file
+                src=ProfileState.img,  # Preview the selected file
                 alt="Profile Picture Preview",
                 width="100px",
                 height="100px",
@@ -138,7 +135,7 @@ def profile() -> rx.Component:
                                 "mail",
                                 ProfileState.authenticated_user_info.email,
                             ),
-                            rx.button("Update", type="submit", width="100%", color_scheme="blue"),
+                            rx.button("Update", type="submit", width="100%"),
                             width="100%",
                             spacing="5",
                         ),

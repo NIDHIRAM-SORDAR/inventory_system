@@ -100,6 +100,8 @@ class ProfileState(AuthState):
 
             # Update the img state variable for frontend display
             self.img = upload_url  # Store the full URL as a string
+            if self.authenticated_user_info:
+                self.authenticated_user_info.profile_picture = upload_url  # Update the cached user info
             self.upload_progress = 100
             return rx.toast.success("Profile picture uploaded!", position="top-center")
         except Exception as e:

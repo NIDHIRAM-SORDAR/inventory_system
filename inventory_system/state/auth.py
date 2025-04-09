@@ -20,7 +20,7 @@ class AuthState(reflex_local_auth.LocalAuthState):
             if not result:
                 return None
             return result
-    @rx.var(cache=True)
+    @rx.var
     def profile_picture_safe(self) -> str:
         """Return a non-optional profile picture URL with a fallback."""
         return self.authenticated_user_info.profile_picture if self.authenticated_user_info and self.authenticated_user_info.profile_picture else "/icons/profile.png"
