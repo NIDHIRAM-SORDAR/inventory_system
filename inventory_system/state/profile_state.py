@@ -6,13 +6,14 @@ from sqlmodel import select
 import reflex_local_auth
 from inventory_system import routes
 import os
+from pathlib import Path
 
 class ProfileState(AuthState):
     notifications: bool = True  # State-only field for notifications
     upload_error: str = ""  # To display upload errors
     is_uploading: bool = False  # To track upload status
     upload_progress: int = 0  # Progress percentage (0-100)
-    img: str = ""
+    img: str = ""  # Store the full URL of the newly uploaded image
 
     def handle_submit(self, form_data: dict):
         """Update the LocalUser and UserInfo models with form data."""
@@ -55,27 +56,33 @@ class ProfileState(AuthState):
         """Toggle the notifications setting."""
         self.set_notifications(not self.notifications)
 
+    @rx.event
     async def handle_profile_picture_upload(self, files: list[rx.UploadFile]):
         """Handle the upload of a single profile picture."""
         self.upload_error = ""
         self.is_uploading = True
-        self.upload_progress = 0  # Reset progress
+        self.upload_progress = 0
 
         if not files:
-            self.upload_error = "No file selected."
             self.is_uploading = False
-            return
+            return rx.toast.error("No file selected. Please select an image to upload.", position="bottom-right")
 
-        file = files[0]  # Single file upload
+        file = files[0]
         try:
             file_content = await file.read()
-            filename = f"profile-pic-{self.authenticated_user.id}-{file.filename}"
+            filename = f"profile-pic-{self.authenticated_user.id}-{file.name}"
             upload_dir = rx.get_upload_dir()
-            file_path = os.path.join(upload_dir, filename)
+            file_path = Path(os.path.join(upload_dir, filename))
 
-            with open(file_path, "wb") as f:
+            # Save the file
+            with file_path.open("wb") as f:
                 f.write(file_content)
 
+            # Use the api_url from Reflex config to construct the full URL
+            backend_url = rx.config.get_config().api_url  # e.g., "http://localhost:8000"
+            upload_url = f"{backend_url}/_upload/{filename}"  # e.g., "http://localhost:8000/_upload/profile-pic-2-3686930.png"
+
+            # Update the database
             with rx.session() as session:
                 user_info = session.exec(
                     select(UserInfo).where(UserInfo.user_id == self.authenticated_user.id)
@@ -86,14 +93,18 @@ class ProfileState(AuthState):
                         email=self.authenticated_user.email,
                         role="employee"
                     )
-                user_info.profile_picture = rx.get_upload_url(filename)
+                user_info.profile_picture = upload_url  # Store the full URL
                 session.add(user_info)
                 session.commit()
+                session.refresh(user_info)
 
-            self.upload_progress = 100  # Set to 100% on success
+            # Update the img state variable for frontend display
+            self.img = upload_url  # Store the full URL as a string
+            self.upload_progress = 100
             return rx.toast.success("Profile picture uploaded!", position="top-center")
         except Exception as e:
             self.upload_error = f"Upload failed: {str(e)}"
+            return rx.toast.error(f"Upload failed: {str(e)}", position="bottom-right")
         finally:
             self.is_uploading = False
 
@@ -104,6 +115,8 @@ class ProfileState(AuthState):
             self.is_uploading = False
 
     def clear_upload(self):
-        """Clear selected files."""
-        self.upload_progress = 0  # Reset progress when clearing
+        """Clear selected files and reset image preview."""
+        self.upload_progress = 0
+        self.img = ""
+        self.upload_error = ""
         return rx.clear_selected_files("profile_upload")

@@ -2,11 +2,14 @@
 import reflex as rx
 from ..components.profile_input import profile_input
 from ..templates import template
-from ..state.profile_state import ProfileState  # Updated import
+from ..state.profile_state import ProfileState
 from inventory_system import routes
 
 def profile_upload_section() -> rx.Component:
     """Render the profile picture upload section."""
+    # Get the list of selected files
+    selected_files = rx.selected_files("profile_upload")
+
     return rx.vstack(
         rx.hstack(
             rx.icon("image"),
@@ -28,21 +31,25 @@ def profile_upload_section() -> rx.Component:
             accept={"image/*": [".png", ".jpg", ".jpeg", ".gif"]},
             max_files=1,
             disabled=ProfileState.is_uploading,
-            border="2px dashed #4A5568",
+            border="2px dashed #A0AEC0",  # Lighter border for better contrast
             padding="2em",
             width="100%",
         ),
         rx.hstack(
             rx.button(
                 "Upload",
-                on_click=ProfileState.handle_profile_picture_upload(
-                    rx.upload_files(
-                        upload_id="profile_upload",
-                        on_upload_progress=ProfileState.handle_upload_progress
+                on_click=rx.cond(
+                    ~rx.selected_files("profile_upload"),  # Check if no file is selected
+                    rx.toast.error("Please select the profile picture first", position="bottom-right"),
+                    ProfileState.handle_profile_picture_upload(
+                        rx.upload_files(
+                            upload_id="profile_upload",
+                            on_upload_progress=ProfileState.handle_upload_progress
+                        )
                     )
                 ),
                 disabled=ProfileState.is_uploading,
-                color_scheme="blue",
+                color_scheme="blue",  # Match the Update button's color
             ),
             rx.button(
                 "Clear",
@@ -60,16 +67,38 @@ def profile_upload_section() -> rx.Component:
                 width="100%",
             ),
         ),
+        # Show preview of selected file before upload
         rx.cond(
-            ProfileState.authenticated_user_info.profile_picture,
+            rx.selected_files("profile_upload"),  # If a file is selected but not yet uploaded
             rx.image(
-                src=ProfileState.authenticated_user_info.profile_picture,
-                alt="Profile Picture",
+                src=rx.selected_files("profile_upload"),  # Preview the selected file
+                alt="Profile Picture Preview",
                 width="100px",
                 height="100px",
                 border_radius="50%",
             ),
-            rx.text("No profile picture set."),
+            # Otherwise, show the uploaded image or fallback
+            rx.cond(
+                ProfileState.img != "",  # Recently uploaded image
+                rx.image(
+                    src=ProfileState.img,  # Full URL (e.g., http://localhost:8000/_upload/filename)
+                    alt="Uploaded Profile Picture",
+                    width="100px",
+                    height="100px",
+                    border_radius="50%",
+                ),
+                rx.cond(
+                    ProfileState.authenticated_user_info.profile_picture,  # Stored profile picture
+                    rx.image(
+                        src=ProfileState.authenticated_user_info.profile_picture,
+                        alt="Profile Picture",
+                        width="100px",
+                        height="100px",
+                        border_radius="50%",
+                    ),
+                    rx.text("No profile picture set."),
+                ),
+            ),
         ),
         width="100%",
         spacing="4",
@@ -109,7 +138,7 @@ def profile() -> rx.Component:
                                 "mail",
                                 ProfileState.authenticated_user_info.email,
                             ),
-                            rx.button("Update", type="submit", width="100%"),
+                            rx.button("Update", type="submit", width="100%", color_scheme="blue"),
                             width="100%",
                             spacing="5",
                         ),
