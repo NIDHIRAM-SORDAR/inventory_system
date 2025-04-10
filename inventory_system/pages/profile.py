@@ -24,7 +24,7 @@ def profile_upload_section() -> rx.Component:
         ),
         rx.upload(
             rx.text("Drag and drop an image or click to select"),
-            rx.badge(f"File {rx.selected_files("profile_upload")} has been selected"),
+            rx.badge(f"{rx.selected_files("profile_upload")} has been selected"),
             id="profile_upload",
             accept={"image/*": [".png", ".jpg", ".jpeg", ".gif"]},
             max_files=1,
