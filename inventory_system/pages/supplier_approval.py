@@ -18,23 +18,27 @@ class SupplierApprovalState(AuthState):  # Inherit from CustomRegisterState inst
     def check_auth_and_load(self):
         if not self.is_authenticated or (self.authenticated_user_info and not self.authenticated_user_info.is_admin):
             return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
-
         self.is_loading = True
         with rx.session() as session:
             stmt = (
-                select(Supplier, UserInfo, reflex_local_auth.LocalUser)
+                select(
+                    Supplier.id,
+                    Supplier.company_name.label("username"),
+                    Supplier.contact_email.label("email"),
+                    Supplier.status,
+                    UserInfo.role,
+                    UserInfo.user_id
+                )
                 .outerjoin(UserInfo, Supplier.user_info_id == UserInfo.id)
-                .outerjoin(reflex_local_auth.LocalUser, UserInfo.user_id == reflex_local_auth.LocalUser.id)
             )
             results = session.exec(stmt).all()
-            
             self.users_data = [{
-                "id": supplier.id,
-                "email": supplier.contact_email,
-                "role": user_info.role if user_info else supplier.status,
-                "username": supplier.company_name,
-                "user_id": user_info.user_id if user_info else None
-            } for supplier, user_info, local_user in results]
+                "id": row.id,
+                "email": row.email,
+                "role": row.role if row.role else row.status,  # Prioritize UserInfo.role, fallback to Supplier.status
+                "username": row.username,
+                "user_id": row.user_id
+            } for row in results]
         self.is_loading = False
 
     def send_welcome_email(self, email: str, username: str, password: str):
@@ -51,7 +55,6 @@ class SupplierApprovalState(AuthState):  # Inherit from CustomRegisterState inst
         self.is_loading = True
         self.supplier_error_message = ""
         self.supplier_success_message = ""
-        
         with rx.session() as session:
             supplier = session.exec(select(Supplier).where(Supplier.id == supplier_id)).one_or_none()
             if not supplier:
@@ -60,13 +63,11 @@ class SupplierApprovalState(AuthState):  # Inherit from CustomRegisterState inst
                 return
 
             if make_supplier:
-                user_info = session.exec(select(UserInfo).where(UserInfo.user_id == supplier.user_info_id)).one_or_none()
-                if not user_info:
+                if not supplier.user_info_id:  # Only register if no UserInfo exists
                     default_password = "Supplier123!"
                     try:
                         new_user_id = register_supplier(supplier.company_name, supplier.contact_email, default_password, session)
-                        user_info = session.exec(select(UserInfo).where(UserInfo.user_id == new_user_id)).one()
-                        supplier.user_info_id = user_info.id
+                        supplier.user_info_id = session.exec(select(UserInfo).where(UserInfo.user_id == new_user_id)).one().id
                         supplier.status = "approved"
                         session.add(supplier)
                         session.commit()
@@ -74,14 +75,21 @@ class SupplierApprovalState(AuthState):  # Inherit from CustomRegisterState inst
                     except Exception as e:
                         self.supplier_error_message = f"Failed to register supplier: {str(e)}"
                         session.rollback()
+                else:
+                    supplier.status = "approved"
+                    session.add(supplier)
+                    session.commit()
             else:
                 try:
-                    user_info = session.exec(select(UserInfo).where(UserInfo.user_id == supplier.user_info_id)).one_or_none()
-                    if user_info:
-                        local_user = session.exec(select(reflex_local_auth.LocalUser).where(reflex_local_auth.LocalUser.id == user_info.user_id)).one_or_none()
-                        if local_user:
-                            session.delete(local_user)
-                        session.delete(user_info)
+                    if supplier.user_info_id:
+                        user_info = session.exec(select(UserInfo).where(UserInfo.id == supplier.user_info_id)).one_or_none()
+                        if user_info:
+                            local_user = session.exec(select(reflex_local_auth.LocalUser).where(reflex_local_auth.LocalUser.id == user_info.user_id)).one_or_none()
+                            if local_user:
+                                session.delete(local_user)
+                            session.delete(user_info)  # Cascades to Supplier via ondelete="CASCADE"
+                        else:
+                            session.delete(supplier)
                     else:
                         session.delete(supplier)
                     session.commit()

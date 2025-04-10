@@ -15,25 +15,23 @@ class AdminManagementState(AuthState):
     user_to_delete: Optional[int] = None  # Changed to Optional[int]
 
     def check_auth_and_load(self):
-        """Check authentication and load users on page load."""
         if not self.is_authenticated or (self.authenticated_user_info and not self.authenticated_user_info.is_admin):
             return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
         self.is_loading = True
         with rx.session() as session:
+            current_user_id = self.authenticated_user_info.user_id if self.authenticated_user_info else None
             stmt = (
-                select(UserInfo, reflex_local_auth.LocalUser)
+                select(UserInfo, reflex_local_auth.LocalUser.username)  # Select only needed fields
                 .join(reflex_local_auth.LocalUser, UserInfo.user_id == reflex_local_auth.LocalUser.id)
+                .where(UserInfo.user_id != current_user_id)  # Filter in SQL, not Python
             )
             results = session.exec(stmt).all()
-            
-            # Filter out the current admin user
-            current_user_id = self.authenticated_user_info.user_id if self.authenticated_user_info else None
             self.users_data = [{
-                "username": local_user.username,
+                "username": username,
                 "id": user_info.user_id,
                 "email": user_info.email,
                 "role": user_info.role,
-            } for user_info, local_user in results if user_info.user_id != current_user_id]
+            } for user_info, username in results]
         self.is_loading = False
 
     def change_user_role(self, user_id: int, make_admin: bool):
@@ -68,29 +66,29 @@ class AdminManagementState(AuthState):
         self.user_to_delete = None
 
     def delete_user(self):
-        """Delete the selected user."""
         if self.user_to_delete is None:
             return
-        
         self.is_loading = True
         self.admin_error_message = ""
-        
         with rx.session() as session:
-            user_info = session.exec(select(UserInfo).where(UserInfo.user_id == self.user_to_delete)).one_or_none()
+            user_info = session.exec(
+                select(UserInfo).where(UserInfo.user_id == self.user_to_delete)
+            ).one_or_none()
             if user_info:
-                session.delete(user_info)
-            
-            local_user = session.exec(select(reflex_local_auth.LocalUser).where(reflex_local_auth.LocalUser.id == self.user_to_delete)).one_or_none()
-            if local_user:
-                session.delete(local_user)
-            
-            try:
-                session.commit()
-                self.check_auth_and_load()
-            except Exception as e:
-                self.admin_error_message = f"Error deleting user: {str(e)}"
-                session.rollback()
-            
+                local_user = session.exec(
+                    select(reflex_local_auth.LocalUser).where(reflex_local_auth.LocalUser.id == user_info.user_id)
+                ).one_or_none()
+                if local_user:
+                    session.delete(local_user)  # Deletes LocalUser first due to FK constraint
+                session.delete(user_info)  # Deletes UserInfo (cascades to Supplier if exists)
+                try:
+                    session.commit()
+                    self.check_auth_and_load()
+                except Exception as e:
+                    self.admin_error_message = f"Error deleting user: {str(e)}"
+                    session.rollback()
+            else:
+                self.admin_error_message = "User not found."
         self.show_delete_dialog = False
         self.user_to_delete = None
         self.is_loading = False
