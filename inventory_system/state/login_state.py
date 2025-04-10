@@ -1,6 +1,7 @@
 import reflex as rx
 from inventory_system import routes
 
+
 class LoginState(rx.State):
     show_login: bool = False
 

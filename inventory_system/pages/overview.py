@@ -46,7 +46,9 @@ def tab_content_header() -> rx.Component:
     )
 
 
-@template(route=routes.OVERVIEW_ROUTE, title="Overview", on_load=StatsState.randomize_data)
+@template(
+    route=routes.OVERVIEW_ROUTE, title="Overview", on_load=StatsState.randomize_data
+)
 def overview() -> rx.Component:
     """The overview page.
 
@@ -61,13 +63,12 @@ def overview() -> rx.Component:
                 rx.cond(
                     AuthState.authenticated_user_info,
                     f"Welcome, {AuthState.authenticated_user.username}",
-                    "Welcome, User"
+                    "Welcome, User",
                 ),
-                size="5"
+                size="5",
             ),
-            rx.heading("Please log in", size="5")
+            rx.heading("Please log in", size="5"),
         ),
-        
         rx.flex(
             rx.input(
                 rx.input.slot(rx.icon("search"), padding_left="0"),

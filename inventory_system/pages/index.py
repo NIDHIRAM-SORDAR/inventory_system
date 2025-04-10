@@ -3,6 +3,7 @@ from inventory_system.templates import template
 from inventory_system import routes
 from inventory_system.state.login_state import LoginState
 
+
 @template(route=routes.INDEX_ROUTE, title="Telecom Inventory System", show_nav=False)
 def index() -> rx.Component:
     return rx.box(

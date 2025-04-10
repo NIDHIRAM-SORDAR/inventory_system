@@ -1,161 +1,232 @@
 import reflex as rx
 import reflex_local_auth
-from inventory_system.templates.template import template
-from inventory_system.models import UserInfo
-from sqlmodel import select
-from typing import List, Dict, Any, Optional
-from ..state import AuthState
+from ..templates import template
+from ..state import AdminManagementState
 from inventory_system import routes
 
-class AdminManagementState(AuthState):
-    users_data: List[Dict[str, Any]] = []
-    admin_error_message: str = ""
-    is_loading: bool = False
-    show_delete_dialog: bool = False
-    user_to_delete: Optional[int] = None  # Changed to Optional[int]
 
-    def check_auth_and_load(self):
-        if not self.is_authenticated or (self.authenticated_user_info and not self.authenticated_user_info.is_admin):
-            return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
-        self.is_loading = True
-        with rx.session() as session:
-            current_user_id = self.authenticated_user_info.user_id if self.authenticated_user_info else None
-            stmt = (
-                select(UserInfo, reflex_local_auth.LocalUser.username)  # Select only needed fields
-                .join(reflex_local_auth.LocalUser, UserInfo.user_id == reflex_local_auth.LocalUser.id)
-                .where(UserInfo.user_id != current_user_id)  # Filter in SQL, not Python
+def _header_cell(text: str, icon: str) -> rx.Component:
+    return rx.table.column_header_cell(
+        rx.hstack(
+            rx.icon(icon, size=18),
+            rx.text(text),
+            align="center",
+            spacing="2",
+        ),
+    )
+
+
+def _show_user(user: rx.Var, index: int) -> rx.Component:
+    bg_color = rx.cond(index % 2 == 0, rx.color("gray", 1), rx.color("accent", 2))
+    hover_color = rx.cond(index % 2 == 0, rx.color("gray", 3), rx.color("accent", 3))
+    return rx.table.row(
+        rx.table.row_header_cell(user["username"]),
+        rx.table.cell(user["email"]),
+        rx.table.cell(user["role"]),
+        rx.table.cell(
+            rx.hstack(
+                rx.button(
+                    "Make Admin",
+                    on_click=lambda: AdminManagementState.change_user_role(
+                        user["id"], True
+                    ),
+                    color_scheme="blue",
+                    disabled=(user["role"] == "admin") | (user["role"] == "supplier"),
+                ),
+                rx.button(
+                    "Make Employee",
+                    on_click=lambda: AdminManagementState.change_user_role(
+                        user["id"], False
+                    ),
+                    color_scheme="green",
+                    disabled=(user["role"] == "employee")
+                    | (user["role"] == "supplier"),
+                ),
+                rx.button(
+                    "Delete",
+                    on_click=lambda: AdminManagementState.confirm_delete_user(
+                        user["id"]
+                    ),
+                    color_scheme="red",
+                ),
+                spacing="2",
+                justify="center",
             )
-            results = session.exec(stmt).all()
-            self.users_data = [{
-                "username": username,
-                "id": user_info.user_id,
-                "email": user_info.email,
-                "role": user_info.role,
-            } for user_info, username in results]
-        self.is_loading = False
+        ),
+        rx.alert_dialog.root(
+            rx.alert_dialog.content(
+                rx.alert_dialog.title("Delete User"),
+                rx.alert_dialog.description(
+                    f"Are you sure you want to delete user {user['username']}? This action cannot be undone."
+                ),
+                rx.hstack(
+                    rx.alert_dialog.cancel(
+                        rx.button(
+                            "Cancel",
+                            on_click=AdminManagementState.cancel_delete,
+                            variant="soft",
+                            color_scheme="gray",
+                        )
+                    ),
+                    rx.alert_dialog.action(
+                        rx.button(
+                            "Delete",
+                            on_click=AdminManagementState.delete_user,
+                            color_scheme="red",
+                        )
+                    ),
+                    spacing="3",
+                    justify="end",
+                ),
+            ),
+            open=AdminManagementState.show_delete_dialog
+            & (AdminManagementState.user_to_delete == user["id"]),
+        ),
+        style={"_hover": {"bg": hover_color}, "bg": bg_color},
+        align="center",
+    )
 
-    def change_user_role(self, user_id: int, make_admin: bool):
-        """Change a user's role."""
-        self.is_loading = True
-        self.admin_error_message = ""
-        with rx.session() as session:
-            user_info = session.exec(select(UserInfo).where(UserInfo.user_id == user_id)).one_or_none()
-            if not user_info:
-                self.admin_error_message = "User info not found."
-                self.is_loading = False
-                return
 
-            user_info.is_admin = make_admin
-            if make_admin:
-                user_info.is_supplier = False
-            user_info.set_role()
-            session.add(user_info)
-            session.commit()
-            session.refresh(user_info)
-            self.check_auth_and_load()
-        self.is_loading = False
+def _pagination_view() -> rx.Component:
+    return rx.hstack(
+        rx.text(
+            "Page ",
+            rx.code(AdminManagementState.page_number),
+            f" of {AdminManagementState.total_pages}",
+            justify="end",
+        ),
+        rx.hstack(
+            rx.icon_button(
+                rx.icon("chevrons-left", size=18),
+                on_click=AdminManagementState.first_page,
+                opacity=rx.cond(AdminManagementState.page_number == 1, 0.6, 1),
+                color_scheme=rx.cond(
+                    AdminManagementState.page_number == 1, "gray", "accent"
+                ),
+                variant="soft",
+            ),
+            rx.icon_button(
+                rx.icon("chevron-left", size=18),
+                on_click=AdminManagementState.prev_page,
+                opacity=rx.cond(AdminManagementState.page_number == 1, 0.6, 1),
+                color_scheme=rx.cond(
+                    AdminManagementState.page_number == 1, "gray", "accent"
+                ),
+                variant="soft",
+            ),
+            rx.icon_button(
+                rx.icon("chevron-right", size=18),
+                on_click=AdminManagementState.next_page,
+                opacity=rx.cond(
+                    AdminManagementState.page_number
+                    == AdminManagementState.total_pages,
+                    0.6,
+                    1,
+                ),
+                color_scheme=rx.cond(
+                    AdminManagementState.page_number
+                    == AdminManagementState.total_pages,
+                    "gray",
+                    "accent",
+                ),
+                variant="soft",
+            ),
+            rx.icon_button(
+                rx.icon("chevrons-right", size=18),
+                on_click=AdminManagementState.last_page,
+                opacity=rx.cond(
+                    AdminManagementState.page_number
+                    == AdminManagementState.total_pages,
+                    0.6,
+                    1,
+                ),
+                color_scheme=rx.cond(
+                    AdminManagementState.page_number
+                    == AdminManagementState.total_pages,
+                    "gray",
+                    "accent",
+                ),
+                variant="soft",
+            ),
+            align="center",
+            spacing="2",
+            justify="end",
+        ),
+        spacing="5",
+        margin_top="1em",
+        align="center",
+        width="100%",
+        justify="end",
+    )
 
-    def confirm_delete_user(self, user_id: int):
-        """Show delete confirmation dialog."""
-        self.user_to_delete = user_id
-        self.show_delete_dialog = True
 
-    def cancel_delete(self):
-        """Cancel deletion and close dialog."""
-        self.show_delete_dialog = False
-        self.user_to_delete = None
-
-    def delete_user(self):
-        if self.user_to_delete is None:
-            return
-        self.is_loading = True
-        self.admin_error_message = ""
-        with rx.session() as session:
-            user_info = session.exec(
-                select(UserInfo).where(UserInfo.user_id == self.user_to_delete)
-            ).one_or_none()
-            if user_info:
-                local_user = session.exec(
-                    select(reflex_local_auth.LocalUser).where(reflex_local_auth.LocalUser.id == user_info.user_id)
-                ).one_or_none()
-                if local_user:
-                    session.delete(local_user)  # Deletes LocalUser first due to FK constraint
-                session.delete(user_info)  # Deletes UserInfo (cascades to Supplier if exists)
-                try:
-                    session.commit()
-                    self.check_auth_and_load()
-                except Exception as e:
-                    self.admin_error_message = f"Error deleting user: {str(e)}"
-                    session.rollback()
-            else:
-                self.admin_error_message = "User not found."
-        self.show_delete_dialog = False
-        self.user_to_delete = None
-        self.is_loading = False
-
-@template(route=routes.ADMIN_MGMT, title="Admin Management", on_load=AdminManagementState.check_auth_and_load)
+@template(
+    route=routes.ADMIN_MGMT,
+    title="Admin Management",
+    on_load=AdminManagementState.check_auth_and_load,
+)
 @reflex_local_auth.require_login
 def admin_management() -> rx.Component:
-    """Admin Management Page with regular Reflex table."""
-    def action_buttons(user: rx.Var) -> rx.Component:
-        return rx.hstack(
-            rx.button(
-                "Make Admin",
-                on_click=lambda: AdminManagementState.change_user_role(user["id"], True),
-                color="blue",
-                loading=AdminManagementState.is_loading,
-                disabled=(user["role"] == "admin") | (user["role"] == "supplier"),
+    return rx.box(
+        rx.flex(
+            rx.hstack(
+                rx.heading("Admin Management", size="3"),
+                rx.spacer(),
+                width="100%",
             ),
-            rx.button(
-                "Make Employee",
-                on_click=lambda: AdminManagementState.change_user_role(user["id"], False),
-                color="green",
-                loading=AdminManagementState.is_loading,
-                disabled=(user["role"] == "employee") | (user["role"] == "supplier"),
-            ),
-            rx.button(
-                "Delete",
-                on_click=lambda: AdminManagementState.confirm_delete_user(user["id"]),
-                color="red",
-                loading=AdminManagementState.is_loading,
-            ),
-            rx.alert_dialog.root(
-                rx.alert_dialog.content(
-                    rx.alert_dialog.title("Delete User"),
-                    rx.alert_dialog.description(
-                        f"Are you sure you want to delete user {user['username']}? This action cannot be undone.",
+            rx.flex(
+                rx.cond(
+                    AdminManagementState.sort_reverse,
+                    rx.icon(
+                        "arrow-down-z-a",
+                        size=28,
+                        stroke_width=1.5,
+                        cursor="pointer",
+                        on_click=AdminManagementState.toggle_sort,
                     ),
-                    rx.flex(
-                        rx.alert_dialog.cancel(
-                            rx.button(
-                                "Cancel",
-                                on_click=AdminManagementState.cancel_delete,
-                                variant="soft",
-                                color_scheme="gray",
-                            ),
-                        ),
-                        rx.alert_dialog.action(
-                            rx.button(
-                                "Delete",
-                                on_click=AdminManagementState.delete_user,
-                                color_scheme="red",
-                            ),
-                        ),
-                        spacing="3",
-                        justify="end",
+                    rx.icon(
+                        "arrow-down-a-z",
+                        size=28,
+                        stroke_width=1.5,
+                        cursor="pointer",
+                        on_click=AdminManagementState.toggle_sort,
                     ),
                 ),
-                open=AdminManagementState.show_delete_dialog & (AdminManagementState.user_to_delete == user["id"]),
+                rx.select(
+                    ["username", "email", "role"],
+                    placeholder="Sort By: Username",
+                    size="3",
+                    on_change=AdminManagementState.set_sort_value,
+                ),
+                rx.input(
+                    rx.input.slot(rx.icon("search")),
+                    rx.input.slot(
+                        rx.icon("x"),
+                        justify="end",
+                        cursor="pointer",
+                        on_click=AdminManagementState.setvar("search_value", ""),
+                        display=rx.cond(
+                            AdminManagementState.search_value, "flex", "none"
+                        ),
+                    ),
+                    value=AdminManagementState.search_value,
+                    placeholder="Search here...",
+                    size="3",
+                    max_width=["150px", "150px", "200px", "250px"],
+                    width="100%",
+                    variant="surface",
+                    color_scheme="gray",
+                    on_change=AdminManagementState.set_search_value,
+                ),
+                align="center",
+                justify="end",
+                spacing="3",
             ),
-            spacing="2",
-            justify="center",
-        )
-
-    return rx.vstack(
-        rx.hstack(
-            rx.heading("Admin Management", size="3"),
-            rx.spacer(),
+            spacing="3",
+            justify="between",
+            wrap="wrap",
             width="100%",
+            padding_bottom="1em",
         ),
         rx.cond(
             AdminManagementState.admin_error_message,
@@ -165,25 +236,23 @@ def admin_management() -> rx.Component:
         rx.table.root(
             rx.table.header(
                 rx.table.row(
-                    rx.table.cell("Username"),
-                    rx.table.cell("Email"),
-                    rx.table.cell("Current Role"),
-                    rx.table.cell("Actions", width="200px"),
+                    _header_cell("Username", "user"),
+                    _header_cell("Email", "mail"),
+                    _header_cell("Role", "shield"),
+                    _header_cell("Actions", "settings"),
                 ),
             ),
             rx.table.body(
                 rx.foreach(
-                    AdminManagementState.users_data,
-                    lambda user: rx.table.row(
-                        rx.table.cell(user["username"]),
-                        rx.table.cell(user["email"]),
-                        rx.table.cell(user["role"]),
-                        rx.table.cell(action_buttons(user)),
-                    )
+                    AdminManagementState.current_page,
+                    lambda user, index: _show_user(user, index),
                 )
             ),
+            variant="surface",
+            size="3",
             width="100%",
         ),
+        _pagination_view(),
         width="100%",
         padding="16px",
     )

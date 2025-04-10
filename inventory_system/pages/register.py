@@ -5,13 +5,16 @@ import json
 import os
 from ..templates import template
 from inventory_system import routes
-from inventory_system.state.login_state import LoginState  # Import LoginState for transition
+from inventory_system.state.login_state import (
+    LoginState,
+)  # Import LoginState for transition
 import asyncio
 from ..constants import DEFAULT_PROFILE_PICTURE
 
 # Load user data from JSON file
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 USER_DATA_FILE = os.path.join(PROJECT_ROOT, "user_data.json")
+
 
 def load_user_data():
     """Load user data from JSON file."""
@@ -20,6 +23,7 @@ def load_user_data():
             return json.load(f)
     except FileNotFoundError:
         return []
+
 
 class CustomRegisterState(reflex_local_auth.RegistrationState):
     registration_error: str = ""  # Custom message for validation errors only
@@ -31,7 +35,10 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
         email = form_data.get("email")
 
         for user in user_data:
-            if str(user["ID"]) == str(user_id) and user["Email"].lower() == email.lower():
+            if (
+                str(user["ID"]) == str(user_id)
+                and user["Email"].lower() == email.lower()
+            ):
                 return True
         return False
 
@@ -55,7 +62,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                 session.add(user_info)
                 session.commit()
                 session.refresh(user_info)
-            
+
             # Show success toast directly
             yield rx.toast.success(
                 "Registration successful! Redirecting to login...",
@@ -67,7 +74,11 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
             self.registration_error = ""  # Clear any previous error
             yield rx.redirect(routes.LOGIN_ROUTE)
         else:
-            self.registration_error = reflex_local_auth.RegistrationState.error_message | "Registration failed."
+            self.registration_error = (
+                reflex_local_auth.RegistrationState.error_message
+                | "Registration failed."
+            )
+
 
 def register_error() -> rx.Component:
     """Render the registration error message."""
@@ -81,6 +92,7 @@ def register_error() -> rx.Component:
             width="100%",
         ),
     )
+
 
 def register_form() -> rx.Component:
     """Render the registration form."""
@@ -109,9 +121,10 @@ def register_form() -> rx.Component:
         on_submit=CustomRegisterState.handle_registration_with_email,
     )
 
+
 @template(
-    route=routes.REGISTER_ROUTE, 
-    title="Signup", 
+    route=routes.REGISTER_ROUTE,
+    title="Signup",
     show_nav=False,
     on_load=[LoginState.reset_transition, LoginState.start_transition],
 )

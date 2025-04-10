@@ -5,30 +5,35 @@ from ..templates import template
 from ..models import UserInfo
 from ..state import AuthState  # Import your custom AuthState
 from inventory_system import routes
-from inventory_system.state.login_state import LoginState  # Import LoginState for transition
+from inventory_system.state.login_state import (
+    LoginState,
+)  # Import LoginState for transition
+
 
 class CustomLoginState(AuthState):  # Inherit from your AuthState instead
     """Custom login state to redirect based on user role."""
+
     error_message: str = ""  # Add error_message as a state var
 
     def on_submit(self, form_data: dict):
         """Handle login form submission and redirect based on role."""
         self.error_message = ""
-        
+
         # Implement login logic directly instead of relying on super()
         with rx.session() as session:
             user = session.exec(
-                select(reflex_local_auth.LocalUser)
-                .where(reflex_local_auth.LocalUser.username == form_data["username"])
+                select(reflex_local_auth.LocalUser).where(
+                    reflex_local_auth.LocalUser.username == form_data["username"]
+                )
             ).one_or_none()
-            
+
             if not user or not user.verify(form_data["password"]):
                 self.error_message = "Invalid username or password"
                 return
-            
+
             # Explicitly call our custom _login method
             self._login(user.id)
-            
+
             # Check user role and redirect
             user_info = session.exec(
                 select(UserInfo).where(UserInfo.user_id == self.authenticated_user.id)
@@ -36,6 +41,7 @@ class CustomLoginState(AuthState):  # Inherit from your AuthState instead
             if user_info and user_info.is_admin:
                 return rx.redirect(routes.ADMIN_MGMT)
             return rx.redirect(routes.OVERVIEW_ROUTE)
+
 
 def login_error() -> rx.Component:
     """Render the login error message."""
@@ -49,6 +55,7 @@ def login_error() -> rx.Component:
             width="100%",
         ),
     )
+
 
 def login_form() -> rx.Component:
     """Render the login form."""
@@ -89,11 +96,12 @@ def login_form() -> rx.Component:
         width="100%",
     )
 
+
 @template(
     route=routes.LOGIN_ROUTE,
     title="Login",
     show_nav=False,
-    on_load=[LoginState.reset_transition, LoginState.start_transition]
+    on_load=[LoginState.reset_transition, LoginState.start_transition],
 )
 def login_page() -> rx.Component:
     """Render the login page with a fade-in transition."""

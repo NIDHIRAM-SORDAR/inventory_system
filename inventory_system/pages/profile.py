@@ -5,6 +5,7 @@ from ..templates import template
 from ..state import ProfileState, ProfilePictureState
 from inventory_system import routes
 
+
 def profile_upload_section() -> rx.Component:
     """Render the profile picture upload section."""
     return rx.vstack(
@@ -38,10 +39,13 @@ def profile_upload_section() -> rx.Component:
                 "Upload",
                 on_click=rx.cond(
                     ~rx.selected_files("profile_upload"),
-                    rx.toast.error("Please select the profile picture first", position="bottom-right"),
+                    rx.toast.error(
+                        "Please select the profile picture first",
+                        position="bottom-right",
+                    ),
                     ProfilePictureState.handle_profile_picture_upload(
                         rx.upload_files(upload_id="profile_upload")
-                    )
+                    ),
                 ),
                 disabled=ProfilePictureState.is_uploading,
             ),
@@ -81,6 +85,7 @@ def profile_upload_section() -> rx.Component:
         width="100%",
         spacing="4",
     )
+
 
 @template(route=routes.PROFILE_ROUTE, title="Profile")
 def profile() -> rx.Component:
@@ -163,9 +168,9 @@ def profile() -> rx.Component:
                         rx.cond(
                             ProfileState.authenticated_user_info,
                             f"Role: {ProfileState.authenticated_user_info.role}",
-                            "Role: N/A"
+                            "Role: N/A",
                         ),
-                        size="3"
+                        size="3",
                     ),
                     width="100%",
                 ),
@@ -178,7 +183,7 @@ def profile() -> rx.Component:
                 rx.link("Go to Login", href=routes.LOGIN_ROUTE),
                 spacing="4",
                 align="center",
-            )
+            ),
         ),
         width="100%",
     )

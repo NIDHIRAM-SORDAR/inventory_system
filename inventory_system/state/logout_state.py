@@ -3,6 +3,7 @@ import reflex as rx
 from ..state import AuthState
 from inventory_system import routes
 
+
 class LogoutState(AuthState):
     dialog_open: bool = False  # State to control dialog visibility
 

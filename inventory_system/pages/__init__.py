@@ -10,6 +10,16 @@ from .supplier_approval import supplier_approval
 from .supplier_register import supplier_register
 from .admin_management import admin_management
 
-__all__ = ["about", "overview", "profile", "settings", "index", 
-           "table","register_page","login_page", "supplier_approval", 
-           "supplier_register","admin_management"]
+__all__ = [
+    "about",
+    "overview",
+    "profile",
+    "settings",
+    "index",
+    "table",
+    "register_page",
+    "login_page",
+    "supplier_approval",
+    "supplier_register",
+    "admin_management",
+]
