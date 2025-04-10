@@ -4,7 +4,7 @@ import reflex as rx
 
 from inventory_system import styles
 from inventory_system import routes
-from ..state import AuthState, LogoutState,ProfileState
+from ..state import AuthState, LogoutState,ProfilePictureState
 
 
 def menu_item_icon(icon: str) -> rx.Component:
@@ -104,13 +104,12 @@ def navbar_footer() -> rx.Component:
 
 def user_avatar() -> rx.Component:
     """User avatar component with dropdown menu for authenticated users or login button for guests."""
-    default_profile_pic = "/icons/profile.png"
     return rx.cond(
         AuthState.authenticated_user.id >= 0,
         rx.menu.root(
             rx.menu.trigger(
                 rx.avatar(
-                    src=ProfileState.current_profile_picture,  # Use the safe computed Var
+                    src=ProfilePictureState.profile_picture,  # Use the safe computed Var
                     name=AuthState.authenticated_user.username,
                     size="2",
                 ),

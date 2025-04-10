@@ -2,12 +2,11 @@
 import reflex as rx
 from ..components.profile_input import profile_input
 from ..templates import template
-from ..state.profile_state import ProfileState
+from ..state import ProfileState, ProfilePictureState
 from inventory_system import routes
 
 def profile_upload_section() -> rx.Component:
     """Render the profile picture upload section."""
-
     return rx.vstack(
         rx.hstack(
             rx.icon("image"),
@@ -16,20 +15,21 @@ def profile_upload_section() -> rx.Component:
         ),
         rx.text("Upload a new profile picture.", size="3"),
         rx.cond(
-            ProfileState.upload_error,
+            ProfilePictureState.upload_error,
             rx.callout(
-                ProfileState.upload_error,
+                ProfilePictureState.upload_error,
                 icon="triangle_alert",
                 color_scheme="red",
             ),
         ),
         rx.upload(
             rx.text("Drag and drop an image or click to select"),
+            rx.badge(f"File {rx.selected_files("profile_upload")} has been selected"),
             id="profile_upload",
             accept={"image/*": [".png", ".jpg", ".jpeg", ".gif"]},
             max_files=1,
-            disabled=ProfileState.is_uploading,
-            border="2px dashed #A0AEC0",  # Lighter border for better contrast
+            disabled=ProfilePictureState.is_uploading,
+            border="2px dashed #A0AEC0",
             padding="2em",
             width="100%",
         ),
@@ -37,64 +37,45 @@ def profile_upload_section() -> rx.Component:
             rx.button(
                 "Upload",
                 on_click=rx.cond(
-                    ~rx.selected_files("profile_upload"),  # Check if no file is selected
+                    ~rx.selected_files("profile_upload"),
                     rx.toast.error("Please select the profile picture first", position="bottom-right"),
-                    ProfileState.handle_profile_picture_upload(
-                        rx.upload_files(
-                            upload_id="profile_upload",
-                            on_upload_progress=ProfileState.handle_upload_progress
-                        )
+                    ProfilePictureState.handle_profile_picture_upload(
+                        rx.upload_files(upload_id="profile_upload")
                     )
                 ),
-                disabled=ProfileState.is_uploading, # Match the Update button's color
+                disabled=ProfilePictureState.is_uploading,
             ),
             rx.button(
                 "Clear",
-                on_click=ProfileState.clear_upload,
-                disabled=ProfileState.is_uploading,
+                on_click=ProfilePictureState.clear_upload,
+                disabled=ProfilePictureState.is_uploading,
                 color_scheme="gray",
             ),
             spacing="2",
         ),
         rx.cond(
-            ProfileState.is_uploading,
+            ProfilePictureState.is_uploading,
             rx.vstack(
                 rx.text("Uploading..."),
-                rx.progress(value=ProfileState.upload_progress, max=100),
+                rx.progress(value=ProfilePictureState.upload_progress, max=100),
                 width="100%",
             ),
         ),
-        # Show preview of selected file before upload
         rx.cond(
-            ProfileState.img != "",  # If a file is selected but not yet uploaded
+            ProfilePictureState.preview_img != "",
             rx.image(
-                src=ProfileState.img,  # Preview the selected file
+                src=ProfilePictureState.preview_img,
                 alt="Profile Picture Preview",
                 width="100px",
                 height="100px",
                 border_radius="50%",
             ),
-            # Otherwise, show the uploaded image or fallback
-            rx.cond(
-                ProfileState.img != "",  # Recently uploaded image
-                rx.image(
-                    src=ProfileState.current_profile_picture,  # Full URL (e.g., http://localhost:8000/_upload/filename)
-                    alt="Uploaded Profile Picture",
-                    width="100px",
-                    height="100px",
-                    border_radius="50%",
-                ),
-                rx.cond(
-                    ProfileState.authenticated_user_info.profile_picture,  # Stored profile picture
-                    rx.image(
-                        src=ProfileState.authenticated_user_info.profile_picture,
-                        alt="Profile Picture",
-                        width="100px",
-                        height="100px",
-                        border_radius="50%",
-                    ),
-                    rx.text("No profile picture set."),
-                ),
+            rx.image(
+                src=ProfilePictureState.profile_picture,
+                alt="Profile Picture Preview",
+                width="100px",
+                height="100px",
+                border_radius="50%",
             ),
         ),
         width="100%",

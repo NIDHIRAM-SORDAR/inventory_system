@@ -6,6 +6,8 @@ import os
 from ..templates import template
 from inventory_system import routes
 from inventory_system.state.login_state import LoginState  # Import LoginState for transition
+import asyncio
+from ..constants import DEFAULT_PROFILE_PICTURE
 
 # Load user data from JSON file
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -20,7 +22,7 @@ def load_user_data():
         return []
 
 class CustomRegisterState(reflex_local_auth.RegistrationState):
-    registration_error: str = ""  # Custom error message for validation
+    registration_error: str = ""  # Custom message for validation errors only
 
     def validate_user(self, form_data):
         """Validate user ID and email against user_data.json."""
@@ -33,8 +35,8 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                 return True
         return False
 
-    def handle_registration_with_email(self, form_data):
-        """Handle registration and create UserInfo entry."""
+    async def handle_registration_with_email(self, form_data):
+        """Handle registration and create UserInfo entry with toast and delay."""
         # Validate user ID and email
         if not self.validate_user(form_data):
             self.registration_error = "Invalid ID or email. Please check your details."
@@ -45,17 +47,27 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
         if self.new_user_id >= 0:
             with rx.session() as session:
                 user_info = UserInfo(
-                        email=form_data["email"],
-                        user_id=self.new_user_id,
-                    )
+                    email=form_data["email"],
+                    user_id=self.new_user_id,
+                    profile_picture=DEFAULT_PROFILE_PICTURE,
+                )
                 user_info.set_role()
                 session.add(user_info)
                 session.commit()
                 session.refresh(user_info)
-
+            
+            # Show success toast directly
+            yield rx.toast.success(
+                "Registration successful! Redirecting to login...",
+                position="top-center",
+                duration=1000,
+            )
+            # Wait 2 seconds before redirecting
+            await asyncio.sleep(1)
+            self.registration_error = ""  # Clear any previous error
+            yield rx.redirect(routes.LOGIN_ROUTE)
         else:
             self.registration_error = reflex_local_auth.RegistrationState.error_message | "Registration failed."
-        return registration_result
 
 def register_error() -> rx.Component:
     """Render the registration error message."""
@@ -114,9 +126,8 @@ def register_page() -> rx.Component:
             ),
             rx.card(
                 register_form(),
-                width="100%",  # Set width to 100% to make it responsive
-                max_width="400px",  # Constrain the maximum width of the card
-                # Apply futuristic styling to match the app's theme
+                width="100%",
+                max_width="400px",
                 background="#2D3748",
                 border="1px solid #4A5568",
                 border_radius="12px",
@@ -124,16 +135,14 @@ def register_page() -> rx.Component:
                 box_shadow="0 4px 12px rgba(0, 0, 0, 0.3)",
             ),
         ),
-        padding="10px",  # Add padding to all sides
-        min_height="85vh",  # Use full viewport height
-        width="100%",  # Ensure the center container takes full width
-        max_width="90%",  # Constrain the maximum width of the center container
+        padding="10px",
+        min_height="85vh",
+        width="100%",
+        max_width="90%",
         align="center",
         justify="center",
         overflow="hidden",
-        # Apply the fade-in transition using LoginState
-        opacity=rx.cond(LoginState.show_login, "1.0", "0.0"),  # Map boolean to opacity
+        opacity=rx.cond(LoginState.show_login, "1.0", "0.0"),
         transition="opacity 0.5s ease-in-out",
-        # Ensure the page matches the app's futuristic design
         background="linear-gradient(135deg, #1A202C, #2D3748)",
     )
