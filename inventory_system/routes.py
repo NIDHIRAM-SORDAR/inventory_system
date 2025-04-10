@@ -2,7 +2,6 @@ from __future__ import annotations
 
 # Route constants
 LOGIN_ROUTE = "/login"
-LOGOUT_ROUTE = "/logout"
 REGISTER_ROUTE = "/register"
 INDEX_ROUTE = "/"
 OVERVIEW_ROUTE = "/overview"
@@ -26,7 +25,6 @@ _routes = {
     "supplier_register": SUPPLIER_REGISTER_ROUTE,
     "supplier_approval": SUPPLIER_APPROV_ROUTE,
     "admin-mgmt": ADMIN_MGMT,
-    "logout": LOGOUT_ROUTE,
     "overview": OVERVIEW_ROUTE,
 
 }

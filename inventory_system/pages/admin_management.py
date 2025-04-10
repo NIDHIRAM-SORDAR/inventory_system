@@ -157,7 +157,6 @@ def admin_management() -> rx.Component:
         rx.hstack(
             rx.heading("Admin Management", size="3"),
             rx.spacer(),
-            rx.button("Logout", on_click=rx.redirect(routes.LOGOUT_ROUTE), color="red"),
             width="100%",
         ),
         rx.cond(

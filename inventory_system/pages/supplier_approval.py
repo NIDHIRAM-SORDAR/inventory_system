@@ -119,7 +119,6 @@ def supplier_approval() -> rx.Component:
         rx.hstack(
             rx.heading("Supplier Approval", size="3"),
             rx.spacer(),
-            rx.button("Logout", on_click=rx.redirect(routes.LOGOUT_ROUTE), color="red"),
             width="100%",
         ),
         rx.cond(

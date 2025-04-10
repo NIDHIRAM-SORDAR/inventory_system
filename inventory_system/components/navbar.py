@@ -5,6 +5,7 @@ import reflex as rx
 from inventory_system import styles
 from inventory_system import routes
 from ..state import AuthState, LogoutState,ProfilePictureState
+from ..components.logout import logout_dialog
 
 
 def menu_item_icon(icon: str) -> rx.Component:
@@ -104,24 +105,27 @@ def navbar_footer() -> rx.Component:
 
 def user_avatar() -> rx.Component:
     """User avatar component with dropdown menu for authenticated users or login button for guests."""
-    return rx.cond(
-        AuthState.authenticated_user.id >= 0,
-        rx.menu.root(
-            rx.menu.trigger(
-                rx.avatar(
-                    src=ProfilePictureState.profile_picture,  # Use the safe computed Var
-                    name=AuthState.authenticated_user.username,
-                    size="2",
+    return rx.fragment(
+        rx.cond(
+            AuthState.authenticated_user.id >= 0,
+            rx.menu.root(
+                rx.menu.trigger(
+                    rx.avatar(
+                        src=ProfilePictureState.profile_picture,
+                        name=AuthState.authenticated_user.username,
+                        size="2",
+                    ),
+                ),
+                rx.menu.content(
+                    rx.menu.item("Profile", on_click=lambda: rx.redirect(routes.PROFILE_ROUTE)),
+                    rx.menu.item("Settings", on_click=lambda: rx.redirect(routes.SETTINGS_ROUTE)),
+                    rx.menu.separator(),
+                    rx.menu.item("Logout", on_click=LogoutState.toggle_dialog),  # Trigger dialog
                 ),
             ),
-            rx.menu.content(
-                rx.menu.item("Profile", on_click=lambda: rx.redirect(routes.PROFILE_ROUTE)),
-                rx.menu.item("Settings", on_click=lambda: rx.redirect(routes.SETTINGS_ROUTE)),
-                rx.menu.separator(),
-                rx.menu.item("Logout", on_click=LogoutState.confirm_logout),
-            ),
+            rx.button("Login", on_click=lambda: rx.redirect(routes.LOGIN_ROUTE), size="3"),
         ),
-        rx.button("Login", on_click=lambda: rx.redirect(routes.LOGIN_ROUTE), size="3"),
+        logout_dialog(),  # Include the reusable dialog
     )
 
 
