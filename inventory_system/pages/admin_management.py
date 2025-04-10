@@ -3,6 +3,7 @@ import reflex_local_auth
 from ..templates import template
 from ..state import AdminManagementState
 from inventory_system import routes
+from ..components.comfirmation import confirmation_dialog
 
 
 def _header_cell(text: str, icon: str) -> rx.Component:
@@ -27,60 +28,73 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
             rx.hstack(
                 rx.button(
                     "Make Admin",
-                    on_click=lambda: AdminManagementState.change_user_role(
-                        user["id"], True
-                    ),
+                    on_click=lambda: AdminManagementState.confirm_change_role(user["id"], True),
                     color_scheme="blue",
                     disabled=(user["role"] == "admin") | (user["role"] == "supplier"),
                 ),
                 rx.button(
                     "Make Employee",
-                    on_click=lambda: AdminManagementState.change_user_role(
-                        user["id"], False
-                    ),
+                    on_click=lambda: AdminManagementState.confirm_change_role(user["id"], False),
                     color_scheme="green",
-                    disabled=(user["role"] == "employee")
-                    | (user["role"] == "supplier"),
+                    disabled=(user["role"] == "employee") | (user["role"] == "supplier"),
                 ),
                 rx.button(
                     "Delete",
-                    on_click=lambda: AdminManagementState.confirm_delete_user(
-                        user["id"]
-                    ),
+                    on_click=lambda: AdminManagementState.confirm_delete_user(user["id"]),
                     color_scheme="red",
                 ),
                 spacing="2",
                 justify="center",
-            )
+            ),
+        ),
+        # Updated confirmation dialogs with direct Var access
+        confirmation_dialog(
+            state=AdminManagementState,
+            dialog_open_var=AdminManagementState.show_admin_dialog,
+            action_handler=lambda: AdminManagementState.change_user_role(user["id"], True),
+            cancel_handler=AdminManagementState.cancel_role_change,
+            target_id_var=AdminManagementState.target_user_id,
+            target_id=user["id"],
+            title="Make Admin",
+            description=f"Are you sure you want to make {user['username']} an admin?",
+            confirm_color="blue",
+        ),
+        confirmation_dialog(
+            state=AdminManagementState,
+            dialog_open_var=AdminManagementState.show_employee_dialog,
+            action_handler=lambda: AdminManagementState.change_user_role(user["id"], False),
+            cancel_handler=AdminManagementState.cancel_role_change,
+            target_id_var=AdminManagementState.target_user_id,
+            target_id=user["id"],
+            title="Make Employee",
+            description=f"Are you sure you want to make {user['username']} an employee?",
+            confirm_color="green",
         ),
         rx.alert_dialog.root(
             rx.alert_dialog.content(
                 rx.alert_dialog.title("Delete User"),
-                rx.alert_dialog.description(
-                    f"Are you sure you want to delete user {user['username']}? This action cannot be undone."
-                ),
+                rx.alert_dialog.description(f"Are you sure you want to delete user {user['username']}? This action cannot be undone."),
                 rx.hstack(
                     rx.alert_dialog.cancel(
                         rx.button(
                             "Cancel",
                             on_click=AdminManagementState.cancel_delete,
                             variant="soft",
-                            color_scheme="gray",
+                            color_scheme="gray"
                         )
                     ),
                     rx.alert_dialog.action(
                         rx.button(
                             "Delete",
                             on_click=AdminManagementState.delete_user,
-                            color_scheme="red",
+                            color_scheme="red"
                         )
                     ),
                     spacing="3",
                     justify="end",
                 ),
             ),
-            open=AdminManagementState.show_delete_dialog
-            & (AdminManagementState.user_to_delete == user["id"]),
+            open=AdminManagementState.show_delete_dialog & (AdminManagementState.user_to_delete == user["id"]),
         ),
         style={"_hover": {"bg": hover_color}, "bg": bg_color},
         align="center",

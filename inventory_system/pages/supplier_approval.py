@@ -3,6 +3,7 @@ import reflex_local_auth
 from inventory_system.templates.template import template
 from ..state import SupplierApprovalState
 from inventory_system import routes
+from ..components.comfirmation import confirmation_dialog
 
 
 def _header_cell(text: str, icon: str) -> rx.Component:
@@ -24,11 +25,43 @@ def _show_supplier(user: rx.Var, index: int) -> rx.Component:
         rx.table.cell(user["role"]),
         rx.table.cell(
             rx.hstack(
-                rx.button("Approve Supplier", on_click=lambda: SupplierApprovalState.change_supplier_status(user["id"], True), color_scheme="purple", disabled=(user["role"] == "supplier") | (user["role"] == "admin")),
-                rx.button("Revoke Supplier", on_click=lambda: SupplierApprovalState.change_supplier_status(user["id"], False), color_scheme="orange", disabled=user["role"] != "supplier"),
+                rx.button(
+                    "Approve Supplier",
+                    on_click=lambda: SupplierApprovalState.confirm_change_supplier_status(user["id"], True),
+                    color_scheme="purple",
+                    disabled=(user["role"] == "supplier") | (user["role"] == "admin"),
+                ),
+                rx.button(
+                    "Revoke Supplier",
+                    on_click=lambda: SupplierApprovalState.confirm_change_supplier_status(user["id"], False),
+                    color_scheme="orange",
+                    disabled=user["role"] != "supplier",
+                ),
                 spacing="2",
                 justify="center",
             )
+        ),
+        confirmation_dialog(
+            state=SupplierApprovalState,
+            dialog_open_var=SupplierApprovalState.show_approve_dialog,
+            action_handler=lambda: SupplierApprovalState.change_supplier_status(user["id"], True),
+            cancel_handler=SupplierApprovalState.cancel_supplier_action,  # Add cancel handler
+            target_id_var=SupplierApprovalState.target_supplier_id,
+            target_id=user["id"],
+            title="Approve Supplier",
+            description=f"Are you sure you want to approve {user['username']} as a supplier?",
+            confirm_color="purple",
+        ),
+        confirmation_dialog(
+            state=SupplierApprovalState,
+            dialog_open_var=SupplierApprovalState.show_revoke_dialog,
+            action_handler=lambda: SupplierApprovalState.change_supplier_status(user["id"], False),
+            cancel_handler=SupplierApprovalState.cancel_supplier_action,  # Add cancel handler
+            target_id_var=SupplierApprovalState.target_supplier_id,
+            target_id=user["id"],
+            title="Revoke Supplier",
+            description=f"Are you sure you want to revoke supplier status for {user['username']}?",
+            confirm_color="orange",
         ),
         style={"_hover": {"bg": hover_color}, "bg": bg_color},
         align="center",

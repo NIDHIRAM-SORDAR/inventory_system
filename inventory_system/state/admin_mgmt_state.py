@@ -18,6 +18,9 @@ class AdminManagementState(AuthState):
     sort_value: str = "username"  # Default sort column
     sort_reverse: bool = False
     search_value: str = ""
+    show_admin_dialog: bool = False  # New for Make Admin
+    show_employee_dialog: bool = False  # New for Make Employee
+    target_user_id: Optional[int] = None  # Reuse for all actions
 
     @rx.var
     def total_pages(self) -> int:
@@ -92,6 +95,21 @@ class AdminManagementState(AuthState):
             session.commit()
             self.check_auth_and_load()
         self.is_loading = False
+        self.show_admin_dialog = False  # Close dialogs
+        self.show_employee_dialog = False
+        self.target_user_id = None
+    
+    def confirm_change_role(self, user_id: int, make_admin: bool):
+        self.target_user_id = user_id
+        if make_admin:
+            self.show_admin_dialog = True
+        else:
+            self.show_employee_dialog = True
+
+    def cancel_role_change(self):
+        self.show_admin_dialog = False
+        self.show_employee_dialog = False
+        self.target_user_id = None
 
     def confirm_delete_user(self, user_id: int):
         self.user_to_delete = user_id

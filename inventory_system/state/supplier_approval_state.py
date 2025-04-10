@@ -2,7 +2,7 @@ import reflex as rx
 import reflex_local_auth
 from inventory_system.models import UserInfo, Supplier
 from sqlmodel import select
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from ..state import AuthState
 from ..utils.register_supplier import register_supplier
 
@@ -16,6 +16,9 @@ class SupplierApprovalState(AuthState):
     sort_value: str = "username"  # Default sort column
     sort_reverse: bool = False
     search_value: str = ""
+    show_approve_dialog: bool = False
+    show_revoke_dialog: bool = False
+    target_supplier_id: Optional[int] = None
 
     @rx.var
     def total_pages(self) -> int:
@@ -115,6 +118,10 @@ class SupplierApprovalState(AuthState):
                     session.rollback()
             self.check_auth_and_load()
         self.is_loading = False
+        # Reset dialog state
+        self.show_approve_dialog = False
+        self.show_revoke_dialog = False
+        self.target_supplier_id = None
 
     def set_sort_value(self, value: str):
         self.sort_value = value
@@ -139,4 +146,17 @@ class SupplierApprovalState(AuthState):
 
     def last_page(self):
         self.page_number = self.total_pages
+
+    def confirm_change_supplier_status(self, supplier_id: str, approve: bool):
+        """Show confirmation dialog for changing supplier status."""
+        self.target_supplier_id = supplier_id
+        if approve:
+            self.show_approve_dialog = True
+        else:
+            self.show_revoke_dialog = True
+    
+    def cancel_supplier_action(self):
+        self.show_approve_dialog = False
+        self.show_revoke_dialog = False
+        self.target_supplier_id= None
 
