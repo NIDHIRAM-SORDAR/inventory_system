@@ -4,6 +4,7 @@ import reflex as rx
 
 from .. import styles
 from inventory_system import routes
+from .navbar import user_avatar
 
 
 def sidebar_header() -> rx.Component:
@@ -20,6 +21,7 @@ def sidebar_header() -> rx.Component:
             rx.image(src="/reflex_white.svg", height="1.5em"),
         ),
         rx.spacer(),
+        user_avatar(),  # Add the user avatar here
         align="center",
         width="100%",
         padding="0.35em",
