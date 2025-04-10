@@ -4,7 +4,7 @@ import reflex as rx
 
 from inventory_system import styles
 from inventory_system import routes
-from ..state import AuthState, LogoutState
+from ..state import AuthState, LogoutState,ProfileState
 
 
 def menu_item_icon(icon: str) -> rx.Component:
@@ -110,7 +110,7 @@ def user_avatar() -> rx.Component:
         rx.menu.root(
             rx.menu.trigger(
                 rx.avatar(
-                    src=AuthState.profile_picture_safe,  # Use the safe computed Var
+                    src=ProfileState.current_profile_picture,  # Use the safe computed Var
                     name=AuthState.authenticated_user.username,
                     size="2",
                 ),

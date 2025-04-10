@@ -14,7 +14,12 @@ class ProfileState(AuthState):
     is_uploading: bool = False  # To track upload status
     upload_progress: int = 0  # Progress percentage (0-100)
     img: str = ""  # Store the full URL of the newly uploaded image
-
+    
+    @rx.var
+    def current_profile_picture(self) -> str:
+        """Reactive var for the current profile picture URL."""
+        return self.img if self.img else (self.authenticated_user_info.profile_picture if self.authenticated_user_info else "")
+    
     def handle_submit(self, form_data: dict):
         """Update the LocalUser and UserInfo models with form data."""
         if not self.is_authenticated:

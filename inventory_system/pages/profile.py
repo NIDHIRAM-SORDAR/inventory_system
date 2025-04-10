@@ -78,7 +78,7 @@ def profile_upload_section() -> rx.Component:
             rx.cond(
                 ProfileState.img != "",  # Recently uploaded image
                 rx.image(
-                    src=ProfileState.img,  # Full URL (e.g., http://localhost:8000/_upload/filename)
+                    src=ProfileState.current_profile_picture,  # Full URL (e.g., http://localhost:8000/_upload/filename)
                     alt="Uploaded Profile Picture",
                     width="100px",
                     height="100px",
