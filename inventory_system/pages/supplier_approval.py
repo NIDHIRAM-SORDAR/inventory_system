@@ -1,218 +1,130 @@
 import reflex as rx
 import reflex_local_auth
 from inventory_system.templates.template import template
-from inventory_system.models import UserInfo, Supplier
-from sqlmodel import select
-from typing import List, Dict, Any
-from ..state import AuthState
-from ..utils.register_supplier import register_supplier
+from ..state import SupplierApprovalState
 from inventory_system import routes
 
 
-class SupplierApprovalState(
-    AuthState
-):  # Inherit from CustomRegisterState instead of AuthState
-    users_data: List[Dict[str, Any]] = []
-    supplier_error_message: str = ""
-    supplier_success_message: str = ""
-    is_loading: bool = False
+def _header_cell(text: str, icon: str) -> rx.Component:
+    return rx.table.column_header_cell(
+        rx.hstack(
+            rx.icon(icon, size=18),
+            rx.text(text),
+            align="center",
+            spacing="2",
+        ),
+    )
 
-    def check_auth_and_load(self):
-        if not self.is_authenticated or (
-            self.authenticated_user_info and not self.authenticated_user_info.is_admin
-        ):
-            return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
-        self.is_loading = True
-        with rx.session() as session:
-            stmt = select(
-                Supplier.id,
-                Supplier.company_name.label("username"),
-                Supplier.contact_email.label("email"),
-                Supplier.status,
-                UserInfo.role,
-                UserInfo.user_id,
-            ).outerjoin(UserInfo, Supplier.user_info_id == UserInfo.id)
-            results = session.exec(stmt).all()
-            self.users_data = [
-                {
-                    "id": row.id,
-                    "email": row.email,
-                    "role": (
-                        row.role if row.role else row.status
-                    ),  # Prioritize UserInfo.role, fallback to Supplier.status
-                    "username": row.username,
-                    "user_id": row.user_id,
-                }
-                for row in results
-            ]
-        self.is_loading = False
-
-    def send_welcome_email(self, email: str, username: str, password: str):
-        self.supplier_error_message = ""
-        self.supplier_success_message = ""
-
-        try:
-            print(
-                f"Dummy email sent to {email} with username: {username}, password: {password}"
+def _show_supplier(user: rx.Var, index: int) -> rx.Component:
+    bg_color = rx.cond(index % 2 == 0, rx.color("gray", 1), rx.color("accent", 2))
+    hover_color = rx.cond(index % 2 == 0, rx.color("gray", 3), rx.color("accent", 3))
+    return rx.table.row(
+        rx.table.row_header_cell(user["username"]),
+        rx.table.cell(user["email"]),
+        rx.table.cell(user["role"]),
+        rx.table.cell(
+            rx.hstack(
+                rx.button("Approve Supplier", on_click=lambda: SupplierApprovalState.change_supplier_status(user["id"], True), color_scheme="purple", disabled=(user["role"] == "supplier") | (user["role"] == "admin")),
+                rx.button("Revoke Supplier", on_click=lambda: SupplierApprovalState.change_supplier_status(user["id"], False), color_scheme="orange", disabled=user["role"] != "supplier"),
+                spacing="2",
+                justify="center",
             )
-            self.supplier_success_message = f"Temporary password for {username}: {password} (Email not sent - dummy mode)"
-        except Exception as e:
-            self.supplier_error_message = f"Failed to send email: {str(e)}"
+        ),
+        style={"_hover": {"bg": hover_color}, "bg": bg_color},
+        align="center",
+    )
 
-    def change_supplier_status(self, supplier_id: int, make_supplier: bool):
-        self.is_loading = True
-        self.supplier_error_message = ""
-        self.supplier_success_message = ""
-        with rx.session() as session:
-            supplier = session.exec(
-                select(Supplier).where(Supplier.id == supplier_id)
-            ).one_or_none()
-            if not supplier:
-                self.supplier_error_message = "Supplier not found."
-                self.is_loading = False
-                return
+def _pagination_view() -> rx.Component:
+    return rx.hstack(
+        rx.text("Page ", rx.code(SupplierApprovalState.page_number), f" of {SupplierApprovalState.total_pages}", justify="end"),
+        rx.hstack(
+            rx.icon_button(rx.icon("chevrons-left", size=18), on_click=SupplierApprovalState.first_page, opacity=rx.cond(SupplierApprovalState.page_number == 1, 0.6, 1), color_scheme=rx.cond(SupplierApprovalState.page_number == 1, "gray", "accent"), variant="soft"),
+            rx.icon_button(rx.icon("chevron-left", size=18), on_click=SupplierApprovalState.prev_page, opacity=rx.cond(SupplierApprovalState.page_number == 1, 0.6, 1), color_scheme=rx.cond(SupplierApprovalState.page_number == 1, "gray", "accent"), variant="soft"),
+            rx.icon_button(rx.icon("chevron-right", size=18), on_click=SupplierApprovalState.next_page, opacity=rx.cond(SupplierApprovalState.page_number == SupplierApprovalState.total_pages, 0.6, 1), color_scheme=rx.cond(SupplierApprovalState.page_number == SupplierApprovalState.total_pages, "gray", "accent"), variant="soft"),
+            rx.icon_button(rx.icon("chevrons-right", size=18), on_click=SupplierApprovalState.last_page, opacity=rx.cond(SupplierApprovalState.page_number == SupplierApprovalState.total_pages, 0.6, 1), color_scheme=rx.cond(SupplierApprovalState.page_number == SupplierApprovalState.total_pages, "gray", "accent"), variant="soft"),
+            align="center",
+            spacing="2",
+            justify="end",
+        ),
+        spacing="5",
+        margin_top="1em",
+        align="center",
+        width="100%",
+        justify="end",
+    )
 
-            if make_supplier:
-                if not supplier.user_info_id:  # Only register if no UserInfo exists
-                    default_password = "Supplier123!"
-                    try:
-                        new_user_id = register_supplier(
-                            supplier.company_name,
-                            supplier.contact_email,
-                            default_password,
-                            session,
-                        )
-                        supplier.user_info_id = (
-                            session.exec(
-                                select(UserInfo).where(UserInfo.user_id == new_user_id)
-                            )
-                            .one()
-                            .id
-                        )
-                        supplier.status = "approved"
-                        session.add(supplier)
-                        session.commit()
-                        self.send_welcome_email(
-                            supplier.contact_email,
-                            supplier.company_name,
-                            default_password,
-                        )
-                    except Exception as e:
-                        self.supplier_error_message = (
-                            f"Failed to register supplier: {str(e)}"
-                        )
-                        session.rollback()
-                else:
-                    supplier.status = "approved"
-                    session.add(supplier)
-                    session.commit()
-            else:
-                try:
-                    if supplier.user_info_id:
-                        user_info = session.exec(
-                            select(UserInfo).where(UserInfo.id == supplier.user_info_id)
-                        ).one_or_none()
-                        if user_info:
-                            local_user = session.exec(
-                                select(reflex_local_auth.LocalUser).where(
-                                    reflex_local_auth.LocalUser.id == user_info.user_id
-                                )
-                            ).one_or_none()
-                            if local_user:
-                                session.delete(local_user)
-                            session.delete(
-                                user_info
-                            )  # Cascades to Supplier via ondelete="CASCADE"
-                        else:
-                            session.delete(supplier)
-                    else:
-                        session.delete(supplier)
-                    session.commit()
-                except Exception as e:
-                    self.supplier_error_message = f"Error rejecting supplier: {str(e)}"
-                    session.rollback()
-
-            self.check_auth_and_load()
-        self.is_loading = False
-
-
-@template(
-    route=routes.SUPPLIER_APPROV_ROUTE,
-    title="Supplier Approval",
-    on_load=SupplierApprovalState.check_auth_and_load,
-)
+@template(route=routes.SUPPLIER_APPROV_ROUTE, title="Supplier Approval", on_load=SupplierApprovalState.check_auth_and_load)
 @reflex_local_auth.require_login
 def supplier_approval() -> rx.Component:
-    def action_buttons(user: rx.Var) -> rx.Component:
-        return rx.hstack(
-            rx.button(
-                "Approve Supplier",
-                on_click=lambda: SupplierApprovalState.change_supplier_status(
-                    user["id"], True
-                ),
-                color="purple",
-                loading=SupplierApprovalState.is_loading,
-                disabled=(user["role"] == "supplier") | (user["role"] == "admin"),
+    return rx.box(
+        rx.flex(
+            rx.hstack(
+                rx.heading("Supplier Approval", size="3"),
+                rx.spacer(),
+                width="100%",
             ),
-            rx.button(
-                "Revoke Supplier",
-                on_click=lambda: SupplierApprovalState.change_supplier_status(
-                    user["id"], False
+            rx.flex(
+                rx.cond(
+                    SupplierApprovalState.sort_reverse,
+                    rx.icon("arrow-down-z-a", size=28, stroke_width=1.5, cursor="pointer", on_click=SupplierApprovalState.toggle_sort),
+                    rx.icon("arrow-down-a-z", size=28, stroke_width=1.5, cursor="pointer", on_click=SupplierApprovalState.toggle_sort),
                 ),
-                color="orange",
-                loading=SupplierApprovalState.is_loading,
-                disabled=user["role"] != "supplier",
+                rx.select(
+                    ["username", "email", "role"],
+                    placeholder="Sort By: Username",
+                    size="3",
+                    on_change=SupplierApprovalState.set_sort_value,
+                ),
+                rx.input(
+                    rx.input.slot(rx.icon("search")),
+                    rx.input.slot(rx.icon("x"), justify="end", cursor="pointer", on_click=SupplierApprovalState.setvar("search_value", ""), display=rx.cond(SupplierApprovalState.search_value, "flex", "none")),
+                    value=SupplierApprovalState.search_value,
+                    placeholder="Search here...",
+                    size="3",
+                    max_width=["150px", "150px", "200px", "250px"],
+                    width="100%",
+                    variant="surface",
+                    color_scheme="gray",
+                    on_change=SupplierApprovalState.set_search_value,
+                ),
+                align="center",
+                justify="end",
+                spacing="3",
             ),
-            spacing="2",
-            justify="center",
-        )
-
-    return rx.vstack(
-        rx.hstack(
-            rx.heading("Supplier Approval", size="3"),
-            rx.spacer(),
+            spacing="3",
+            justify="between",
+            wrap="wrap",
             width="100%",
+            padding_bottom="1em",
         ),
         rx.cond(
             SupplierApprovalState.supplier_success_message,
-            rx.callout(
-                SupplierApprovalState.supplier_success_message,
-                icon="check",
-                color_scheme="green",
-                width="100%",
-            ),
+            rx.callout(SupplierApprovalState.supplier_success_message, icon="check", color_scheme="green", width="100%"),
         ),
         rx.cond(
             SupplierApprovalState.supplier_error_message,
-            rx.callout(
-                SupplierApprovalState.supplier_error_message,
-                icon="triangle_alert",
-                color_scheme="red",
-                width="100%",
-            ),
+            rx.callout(SupplierApprovalState.supplier_error_message, icon="triangle_alert", color_scheme="red", width="100%"),
         ),
         rx.table.root(
             rx.table.header(
                 rx.table.row(
-                    rx.table.cell("Username"),
-                    rx.table.cell("Email"),
-                    rx.table.cell("Status"),
-                    rx.table.cell("Actions", width="200px"),
+                    _header_cell("Username", "user"),
+                    _header_cell("Email", "mail"),
+                    _header_cell("Status", "shield"),
+                    _header_cell("Actions", "settings"),
                 ),
             ),
             rx.table.body(
                 rx.foreach(
-                    SupplierApprovalState.users_data,
-                    lambda user: rx.table.row(
-                        rx.table.cell(user["username"]),
-                        rx.table.cell(user["email"]),
-                        rx.table.cell(user["role"]),
-                        rx.table.cell(action_buttons(user)),
-                    ),
+                    SupplierApprovalState.current_page,
+                    lambda user, index: _show_supplier(user, index),
                 )
             ),
+            variant="surface",
+            size="3",
             width="100%",
         ),
+        _pagination_view(),
         width="100%",
         padding="16px",
     )
