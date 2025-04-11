@@ -2,9 +2,9 @@
 
 import reflex as rx
 
-from .. import styles
-from ..templates import template
 from inventory_system import routes
+
+from ..templates import template
 
 
 @template(route=routes.ABOUT_ROUTE, title="About", show_nav=False)
@@ -23,12 +23,27 @@ def about() -> rx.Component:
                     rx.heading(
                         "About Inventory System",
                         size="8",  # String number for Reflex convention
-                        color=rx.color("purple", 10),
-                        style={
-                            "background": f"linear-gradient(45deg, {rx.color('purple', 10)}, {rx.color('purple', 8)})",
-                            "-webkit-background-clip": "text",
-                            "-webkit-text-fill-color": "transparent",
-                        },
+                        style=rx.color_mode_cond(
+                            light={
+                                "background": "linear-gradient(45deg, #FF8C61 0%, #A3CFFA 100%)",
+                                "-webkit-background-clip": "text",
+                                "-webkit-text-fill-color": "transparent",
+                            },
+                            dark={
+                                "background": "linear-gradient(45deg, #4A90E2 0%, #B19CD9 100%)",
+                                "-webkit-background-clip": "text",
+                                "-webkit-text-fill-color": "transparent",
+                            },
+                        ),
+                        font_weight="bold",
+                        text_align="center",
+                        margin_bottom=[
+                            "8px",
+                            "10px",
+                            "12px",
+                        ],  # Responsive margin_bottom
+                        transition="all 0.3s ease-in-out",
+                        _hover={"transform": "scale(1.02)"},
                     ),
                     align="center",
                     spacing="3",
@@ -36,23 +51,63 @@ def about() -> rx.Component:
                 # Description with modern typography
                 rx.text(
                     "Welcome to the Inventory System—a sleek, modern solution for managing your telecom inventory with ease.",
-                    font_size=["1rem", "1.1rem", "1.2rem"],  # Responsive font size
-                    color=rx.color("gray", 11),
-                    _dark={"color": rx.color("gray", 3)},
+                    font_size=["1rem", "1.2em", "1.3em"],  # Match Index page font size
+                    color=rx.color_mode_cond(
+                        light=rx.color("gray", 12),
+                        dark="#E6F0FA",
+                    ),
+                    text_shadow=rx.color_mode_cond(
+                        light="1px 1px 2px rgba(0, 0, 0, 0.3)",
+                        dark="1px 1px 3px rgba(163, 207, 250, 0.5)",
+                    ),
+                    _hover={
+                        "color": rx.color_mode_cond(
+                            light=rx.color("gray", 11),
+                            dark="#FFFFFF",
+                        ),
+                    },
                     text_align="center",
-                    max_width="600px",
+                    max_width=["90%", "80%", "600px"],  # Match Index page max_width
                     line_height="1.6",
+                    margin_bottom=[
+                        "20px",
+                        "25px",
+                        "30px",
+                    ],  # Match Index page margin_bottom
+                    transition="all 0.3s ease-in-out",
                 ),
                 rx.text(
                     "Streamline your operations, track assets, and stay organized—all in one place.",
-                    font_size=["0.9rem", "1rem", "1rem"],  # Responsive font size
-                    color=rx.color("gray", 10),
-                    _dark={"color": rx.color("gray", 4)},
+                    font_size=[
+                        "1rem",
+                        "1.2em",
+                        "1.3em",
+                    ],  # Match Index page font size (adjusted for consistency)
+                    color=rx.color_mode_cond(
+                        light=rx.color("gray", 12),
+                        dark="#E6F0FA",
+                    ),
+                    text_shadow=rx.color_mode_cond(
+                        light="1px 1px 2px rgba(0, 0, 0, 0.3)",
+                        dark="1px 1px 3px rgba(163, 207, 250, 0.5)",
+                    ),
+                    _hover={
+                        "color": rx.color_mode_cond(
+                            light=rx.color("gray", 11),
+                            dark="#FFFFFF",
+                        ),
+                    },
                     text_align="center",
-                    max_width="600px",
+                    max_width=["90%", "80%", "600px"],  # Match Index page max_width
                     line_height="1.6",
+                    margin_bottom=[
+                        "20px",
+                        "25px",
+                        "30px",
+                    ],  # Match Index page margin_bottom
+                    transition="all 0.3s ease-in-out",
                 ),
-                # Call-to-action link
+                # Call-to-action link (typography already aligns with Index page button styles)
                 rx.link(
                     rx.hstack(
                         rx.icon("arrow_right", size=16, color=rx.color("purple", 8)),
@@ -67,6 +122,7 @@ def about() -> rx.Component:
                     _hover={"text_decoration": "underline"},
                     transition="color 0.3s ease",
                 ),
+                # Temporary toggle button for testing modes
                 spacing="5",
                 align_items="center",
                 width="100%",
@@ -90,8 +146,13 @@ def about() -> rx.Component:
         min_height="85vh",
         align="center",
         justify="center",
-        background=rx.color("gray", 2),
-        _dark={"background": rx.color("gray", 11)},
+        # Updated background to match Index page
+        background=rx.color_mode_cond(
+            light="linear-gradient(135deg, #D5E3F0 0%, #F5E8D8 100%)",  # Light mode gradient
+            dark="linear-gradient(135deg, #0A0F2A 0%, #1A2A4A 100%)",  # Dark mode gradient
+        ),
+        background_position="center",
+        background_size="cover",
         overflow="hidden",
         box_sizing="border-box",
     )

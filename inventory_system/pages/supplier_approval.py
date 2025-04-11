@@ -1,9 +1,11 @@
 import reflex as rx
 import reflex_local_auth
-from inventory_system.templates.template import template
-from ..state import SupplierApprovalState
+
 from inventory_system import routes
+from inventory_system.templates.template import template
+
 from ..components.comfirmation import confirmation_dialog
+from ..state import SupplierApprovalState
 
 
 def _header_cell(text: str, icon: str) -> rx.Component:
@@ -16,6 +18,7 @@ def _header_cell(text: str, icon: str) -> rx.Component:
         ),
     )
 
+
 def _show_supplier(user: rx.Var, index: int) -> rx.Component:
     bg_color = rx.cond(index % 2 == 0, rx.color("gray", 1), rx.color("accent", 2))
     hover_color = rx.cond(index % 2 == 0, rx.color("gray", 3), rx.color("accent", 3))
@@ -27,13 +30,17 @@ def _show_supplier(user: rx.Var, index: int) -> rx.Component:
             rx.hstack(
                 rx.button(
                     "Approve Supplier",
-                    on_click=lambda: SupplierApprovalState.confirm_change_supplier_status(user["id"], True),
+                    on_click=lambda: SupplierApprovalState.confirm_change_supplier_status(
+                        user["id"], True
+                    ),
                     color_scheme="purple",
                     disabled=(user["role"] == "supplier") | (user["role"] == "admin"),
                 ),
                 rx.button(
                     "Revoke Supplier",
-                    on_click=lambda: SupplierApprovalState.confirm_change_supplier_status(user["id"], False),
+                    on_click=lambda: SupplierApprovalState.confirm_change_supplier_status(
+                        user["id"], False
+                    ),
                     color_scheme="orange",
                     disabled=user["role"] != "supplier",
                 ),
@@ -44,7 +51,9 @@ def _show_supplier(user: rx.Var, index: int) -> rx.Component:
         confirmation_dialog(
             state=SupplierApprovalState,
             dialog_open_var=SupplierApprovalState.show_approve_dialog,
-            action_handler=lambda: SupplierApprovalState.change_supplier_status(user["id"], True),
+            action_handler=lambda: SupplierApprovalState.change_supplier_status(
+                user["id"], True
+            ),
             cancel_handler=SupplierApprovalState.cancel_supplier_action,  # Add cancel handler
             target_id_var=SupplierApprovalState.target_supplier_id,
             target_id=user["id"],
@@ -55,7 +64,9 @@ def _show_supplier(user: rx.Var, index: int) -> rx.Component:
         confirmation_dialog(
             state=SupplierApprovalState,
             dialog_open_var=SupplierApprovalState.show_revoke_dialog,
-            action_handler=lambda: SupplierApprovalState.change_supplier_status(user["id"], False),
+            action_handler=lambda: SupplierApprovalState.change_supplier_status(
+                user["id"], False
+            ),
             cancel_handler=SupplierApprovalState.cancel_supplier_action,  # Add cancel handler
             target_id_var=SupplierApprovalState.target_supplier_id,
             target_id=user["id"],
@@ -67,14 +78,68 @@ def _show_supplier(user: rx.Var, index: int) -> rx.Component:
         align="center",
     )
 
+
 def _pagination_view() -> rx.Component:
     return rx.hstack(
-        rx.text("Page ", rx.code(SupplierApprovalState.page_number), f" of {SupplierApprovalState.total_pages}", justify="end"),
+        rx.text(
+            "Page ",
+            rx.code(SupplierApprovalState.page_number),
+            f" of {SupplierApprovalState.total_pages}",
+            justify="end",
+        ),
         rx.hstack(
-            rx.icon_button(rx.icon("chevrons-left", size=18), on_click=SupplierApprovalState.first_page, opacity=rx.cond(SupplierApprovalState.page_number == 1, 0.6, 1), color_scheme=rx.cond(SupplierApprovalState.page_number == 1, "gray", "accent"), variant="soft"),
-            rx.icon_button(rx.icon("chevron-left", size=18), on_click=SupplierApprovalState.prev_page, opacity=rx.cond(SupplierApprovalState.page_number == 1, 0.6, 1), color_scheme=rx.cond(SupplierApprovalState.page_number == 1, "gray", "accent"), variant="soft"),
-            rx.icon_button(rx.icon("chevron-right", size=18), on_click=SupplierApprovalState.next_page, opacity=rx.cond(SupplierApprovalState.page_number == SupplierApprovalState.total_pages, 0.6, 1), color_scheme=rx.cond(SupplierApprovalState.page_number == SupplierApprovalState.total_pages, "gray", "accent"), variant="soft"),
-            rx.icon_button(rx.icon("chevrons-right", size=18), on_click=SupplierApprovalState.last_page, opacity=rx.cond(SupplierApprovalState.page_number == SupplierApprovalState.total_pages, 0.6, 1), color_scheme=rx.cond(SupplierApprovalState.page_number == SupplierApprovalState.total_pages, "gray", "accent"), variant="soft"),
+            rx.icon_button(
+                rx.icon("chevrons-left", size=18),
+                on_click=SupplierApprovalState.first_page,
+                opacity=rx.cond(SupplierApprovalState.page_number == 1, 0.6, 1),
+                color_scheme=rx.cond(
+                    SupplierApprovalState.page_number == 1, "gray", "accent"
+                ),
+                variant="soft",
+            ),
+            rx.icon_button(
+                rx.icon("chevron-left", size=18),
+                on_click=SupplierApprovalState.prev_page,
+                opacity=rx.cond(SupplierApprovalState.page_number == 1, 0.6, 1),
+                color_scheme=rx.cond(
+                    SupplierApprovalState.page_number == 1, "gray", "accent"
+                ),
+                variant="soft",
+            ),
+            rx.icon_button(
+                rx.icon("chevron-right", size=18),
+                on_click=SupplierApprovalState.next_page,
+                opacity=rx.cond(
+                    SupplierApprovalState.page_number
+                    == SupplierApprovalState.total_pages,
+                    0.6,
+                    1,
+                ),
+                color_scheme=rx.cond(
+                    SupplierApprovalState.page_number
+                    == SupplierApprovalState.total_pages,
+                    "gray",
+                    "accent",
+                ),
+                variant="soft",
+            ),
+            rx.icon_button(
+                rx.icon("chevrons-right", size=18),
+                on_click=SupplierApprovalState.last_page,
+                opacity=rx.cond(
+                    SupplierApprovalState.page_number
+                    == SupplierApprovalState.total_pages,
+                    0.6,
+                    1,
+                ),
+                color_scheme=rx.cond(
+                    SupplierApprovalState.page_number
+                    == SupplierApprovalState.total_pages,
+                    "gray",
+                    "accent",
+                ),
+                variant="soft",
+            ),
             align="center",
             spacing="2",
             justify="end",
@@ -86,7 +151,12 @@ def _pagination_view() -> rx.Component:
         justify="end",
     )
 
-@template(route=routes.SUPPLIER_APPROV_ROUTE, title="Supplier Approval", on_load=SupplierApprovalState.check_auth_and_load)
+
+@template(
+    route=routes.ADMIN_SUPPLIERS_ROUTE,
+    title="Supplier Approval",
+    on_load=SupplierApprovalState.check_auth_and_load,
+)
 @reflex_local_auth.require_login
 def supplier_approval() -> rx.Component:
     return rx.box(
@@ -99,8 +169,20 @@ def supplier_approval() -> rx.Component:
             rx.flex(
                 rx.cond(
                     SupplierApprovalState.sort_reverse,
-                    rx.icon("arrow-down-z-a", size=28, stroke_width=1.5, cursor="pointer", on_click=SupplierApprovalState.toggle_sort),
-                    rx.icon("arrow-down-a-z", size=28, stroke_width=1.5, cursor="pointer", on_click=SupplierApprovalState.toggle_sort),
+                    rx.icon(
+                        "arrow-down-z-a",
+                        size=28,
+                        stroke_width=1.5,
+                        cursor="pointer",
+                        on_click=SupplierApprovalState.toggle_sort,
+                    ),
+                    rx.icon(
+                        "arrow-down-a-z",
+                        size=28,
+                        stroke_width=1.5,
+                        cursor="pointer",
+                        on_click=SupplierApprovalState.toggle_sort,
+                    ),
                 ),
                 rx.select(
                     ["username", "email", "role"],
@@ -110,7 +192,15 @@ def supplier_approval() -> rx.Component:
                 ),
                 rx.input(
                     rx.input.slot(rx.icon("search")),
-                    rx.input.slot(rx.icon("x"), justify="end", cursor="pointer", on_click=SupplierApprovalState.setvar("search_value", ""), display=rx.cond(SupplierApprovalState.search_value, "flex", "none")),
+                    rx.input.slot(
+                        rx.icon("x"),
+                        justify="end",
+                        cursor="pointer",
+                        on_click=SupplierApprovalState.setvar("search_value", ""),
+                        display=rx.cond(
+                            SupplierApprovalState.search_value, "flex", "none"
+                        ),
+                    ),
                     value=SupplierApprovalState.search_value,
                     placeholder="Search here...",
                     size="3",
@@ -132,11 +222,21 @@ def supplier_approval() -> rx.Component:
         ),
         rx.cond(
             SupplierApprovalState.supplier_success_message,
-            rx.callout(SupplierApprovalState.supplier_success_message, icon="check", color_scheme="green", width="100%"),
+            rx.callout(
+                SupplierApprovalState.supplier_success_message,
+                icon="check",
+                color_scheme="green",
+                width="100%",
+            ),
         ),
         rx.cond(
             SupplierApprovalState.supplier_error_message,
-            rx.callout(SupplierApprovalState.supplier_error_message, icon="triangle_alert", color_scheme="red", width="100%"),
+            rx.callout(
+                SupplierApprovalState.supplier_error_message,
+                icon="triangle_alert",
+                color_scheme="red",
+                width="100%",
+            ),
         ),
         rx.table.root(
             rx.table.header(

@@ -1,17 +1,24 @@
 from __future__ import annotations
 
 # Route constants
+
+# inventory_system/routes.py
+
+# Base Routes
+INDEX_ROUTE = "/"
 LOGIN_ROUTE = "/login"
 REGISTER_ROUTE = "/register"
-INDEX_ROUTE = "/"
 OVERVIEW_ROUTE = "/overview"
+ABOUT_ROUTE = "/about"
 PROFILE_ROUTE = "/profile"
 SETTINGS_ROUTE = "/settings"
-ABOUT_ROUTE = "/about"
 TABLE_ROUTE = "/table"
 SUPPLIER_REGISTER_ROUTE = "/supplier-register"
-SUPPLIER_APPROV_ROUTE = "/supplier-management"
-ADMIN_MGMT = "/admin-management"
+
+# New Admin Routes
+ADMIN_ROUTE = "/admin"
+ADMIN_USERS_ROUTE = "/admin/users"
+ADMIN_SUPPLIERS_ROUTE = "/admin/suppliers"
 
 # Dictionary to store routes (for easy access and modification)
 _routes = {
@@ -23,11 +30,12 @@ _routes = {
     "about": ABOUT_ROUTE,
     "table": TABLE_ROUTE,
     "supplier_register": SUPPLIER_REGISTER_ROUTE,
-    "supplier_approval": SUPPLIER_APPROV_ROUTE,
-    "admin-mgmt": ADMIN_MGMT,
     "overview": OVERVIEW_ROUTE,
-
+    "admin": ADMIN_ROUTE,
+    "admin_users": ADMIN_USERS_ROUTE,
+    "admin_suppliers": ADMIN_SUPPLIERS_ROUTE,
 }
+
 
 def get_route(name: str) -> str:
     """Get a route by its name.
@@ -42,6 +50,7 @@ def get_route(name: str) -> str:
         KeyError: If the route name is not found.
     """
     return _routes[name]
+
 
 def set_route(name: str, route: str) -> None:
     """Set a route by its name.
