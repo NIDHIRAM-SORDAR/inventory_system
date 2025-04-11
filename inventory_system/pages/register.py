@@ -30,6 +30,11 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
     registration_error: str = ""
     is_submitting: bool = False  # Added for loading state
 
+    def reset_form_state(self):
+        """Reset form state on page load."""
+        self.registration_error = ""
+        self.is_submitting = False
+
     def validate_user(self, form_data):
         """Validate user ID and email against user_data.json."""
         user_data = load_user_data()
@@ -59,7 +64,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                 return
 
             # Proceed with registration
-            registration_result = self.handle_registration(form_data)
+            self.handle_registration(form_data)
             if self.new_user_id >= 0:
                 with rx.session() as session:
                     user_info = UserInfo(
@@ -315,7 +320,11 @@ def register_form() -> rx.Component:
     route=routes.REGISTER_ROUTE,
     title="Signup",
     show_nav=False,
-    on_load=[LoginState.reset_transition, LoginState.start_transition],
+    on_load=[
+        LoginState.reset_transition,
+        LoginState.start_transition,
+        CustomRegisterState.reset_form_state,
+    ],
 )
 def register_page() -> rx.Component:
     """Render the registration page with a fade-in transition."""

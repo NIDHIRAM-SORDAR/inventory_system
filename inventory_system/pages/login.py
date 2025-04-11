@@ -1,27 +1,27 @@
 import reflex as rx
 import reflex_local_auth
 from sqlmodel import select
-from ..templates import template
-from ..models import UserInfo
-from ..state import AuthState  # Import your custom AuthState
+
 from inventory_system import routes
 from inventory_system.state.login_state import (
     LoginState,
 )  # Import LoginState for transition
 
-
-import reflex as rx
-import reflex_local_auth
-from inventory_system.templates.template import template
-from inventory_system import routes
-from sqlmodel import select
-from inventory_system.models import UserInfo  # Assuming UserInfo is your model for user roles
+from ..models import UserInfo
+from ..state import AuthState  # Import your custom AuthState
+from ..templates import template
 
 
 class CustomLoginState(AuthState):
     """Custom login state to redirect based on user role."""
+
     error_message: str = ""
     is_submitting: bool = False
+
+    def reset_form_state(self):
+        """Reset form state on page load."""
+        self.error_message = ""
+        self.is_submitting = False
 
     async def on_submit(self, form_data: dict):
         """Handle login form submission and redirect based on role."""
@@ -46,14 +46,18 @@ class CustomLoginState(AuthState):
 
                 # Check user role and redirect
                 user_info = session.exec(
-                    select(UserInfo).where(UserInfo.user_id == self.authenticated_user.id)
+                    select(UserInfo).where(
+                        UserInfo.user_id == self.authenticated_user.id
+                    )
                 ).one_or_none()
                 if user_info and user_info.is_admin:
                     return rx.redirect(routes.ADMIN_MGMT)
                 return rx.redirect(routes.OVERVIEW_ROUTE)
 
         finally:
-            self.is_submitting = False  # Ensure is_submitting is reset even if an error occurs
+            self.is_submitting = (
+                False  # Ensure is_submitting is reset even if an error occurs
+            )
 
 
 def login_error() -> rx.Component:
@@ -164,7 +168,10 @@ def login_form() -> rx.Component:
                 rx.link(
                     rx.hstack(
                         rx.icon("user_plus", size=16, color=rx.color("purple", 8)),
-                        rx.text("Don't have an account? Register here.", color=rx.color("purple", 8)),
+                        rx.text(
+                            "Don't have an account? Register here.",
+                            color=rx.color("purple", 8),
+                        ),
                         spacing="2",
                     ),
                     href=reflex_local_auth.routes.REGISTER_ROUTE,
@@ -185,7 +192,11 @@ def login_form() -> rx.Component:
     route=routes.LOGIN_ROUTE,
     title="Login",
     show_nav=False,
-    on_load=[LoginState.reset_transition, LoginState.start_transition],
+    on_load=[
+        LoginState.reset_transition,
+        LoginState.start_transition,
+        CustomLoginState.reset_form_state,
+    ],
 )
 def login_page() -> rx.Component:
     """Render the login page with a fade-in transition."""
