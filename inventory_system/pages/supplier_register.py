@@ -291,6 +291,7 @@ def supplier_registration_form() -> rx.Component:
     route=routes.SUPPLIER_REGISTER_ROUTE,
     title="Supplier Registration",
     show_nav=False,
+    on_load=SupplierRegisterState.clear_messages,
 )
 def supplier_register() -> rx.Component:
     return rx.center(

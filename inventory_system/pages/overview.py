@@ -21,6 +21,7 @@ from ..views.charts import (
 from ..views.stats_cards import stats_cards
 from ..state import AuthState
 from inventory_system import routes
+import reflex_local_auth
 
 
 def _time_data() -> rx.Component:
@@ -49,6 +50,7 @@ def tab_content_header() -> rx.Component:
 @template(
     route=routes.OVERVIEW_ROUTE, title="Overview", on_load=StatsState.randomize_data
 )
+@reflex_local_auth.require_login
 def overview() -> rx.Component:
     """The overview page.
 
