@@ -1,11 +1,13 @@
 # inventory_system/pages/supplier_register.py
 import reflex as rx
-from inventory_system.templates.template import template
-from inventory_system.models import Supplier
-from sqlmodel import select
 import reflex_local_auth
-from email_validator import validate_email, EmailNotValidError
+from email_validator import EmailNotValidError, validate_email
+from sqlmodel import select
+
 from inventory_system import routes
+from inventory_system.models import Supplier
+from inventory_system.templates.template import template
+
 
 class SupplierRegisterState(rx.State):
     company_name: str = ""
@@ -88,15 +90,20 @@ class SupplierRegisterState(rx.State):
             self.description = ""
             self.contact_email = ""
             self.contact_phone = ""
-            self.success_message = "Registration successful! Please wait for admin approval."
+            self.success_message = (
+                "Registration successful! Please wait for admin approval."
+            )
             self.is_submitting = False
+
 
 def supplier_registration_form() -> rx.Component:
     return rx.form(
         rx.vstack(
             # Enhanced heading with icon and gradient text
             rx.hstack(
-                rx.icon("building", size=32, color=rx.color("purple", 10)),  # Changed "accent" to "purple"
+                rx.icon(
+                    "building", size=32, color=rx.color("purple", 10)
+                ),  # Changed "accent" to "purple"
                 rx.heading(
                     "Supplier Registration",
                     size="8",
@@ -137,7 +144,9 @@ def supplier_registration_form() -> rx.Component:
             rx.vstack(
                 rx.text("Company Name", weight="bold", color=rx.color("gray", 12)),
                 rx.input(
-                    rx.input.slot(rx.icon("building_2", color=rx.color("purple", 8))),  # Changed "accent" to "purple"
+                    rx.input.slot(
+                        rx.icon("building_2", color=rx.color("purple", 8))
+                    ),  # Changed "accent" to "purple"
                     value=SupplierRegisterState.company_name,
                     on_change=SupplierRegisterState.set_company_name,
                     placeholder="Enter company name",
@@ -160,7 +169,9 @@ def supplier_registration_form() -> rx.Component:
             rx.vstack(
                 rx.text("Description", weight="bold", color=rx.color("gray", 12)),
                 rx.text_area(
-                    rx.input.slot(rx.icon("file_text", color=rx.color("purple", 8))),  # Changed "accent" to "purple"
+                    rx.input.slot(
+                        rx.icon("file_text", color=rx.color("purple", 8))
+                    ),  # Changed "accent" to "purple"
                     value=SupplierRegisterState.description,
                     on_change=SupplierRegisterState.set_description,
                     placeholder="Describe your company",
@@ -184,7 +195,9 @@ def supplier_registration_form() -> rx.Component:
             rx.vstack(
                 rx.text("Contact Email", weight="bold", color=rx.color("gray", 12)),
                 rx.input(
-                    rx.input.slot(rx.icon("mail", color=rx.color("purple", 8))),  # Changed "accent" to "purple"
+                    rx.input.slot(
+                        rx.icon("mail", color=rx.color("purple", 8))
+                    ),  # Changed "accent" to "purple"
                     value=SupplierRegisterState.contact_email,
                     on_change=SupplierRegisterState.set_contact_email,
                     type="email",
@@ -208,7 +221,9 @@ def supplier_registration_form() -> rx.Component:
             rx.vstack(
                 rx.text("Contact Phone", weight="bold", color=rx.color("gray", 12)),
                 rx.input(
-                    rx.input.slot(rx.icon("phone", color=rx.color("purple", 8))),  # Changed "accent" to "purple"
+                    rx.input.slot(
+                        rx.icon("phone", color=rx.color("purple", 8))
+                    ),  # Changed "accent" to "purple"
                     value=SupplierRegisterState.contact_phone,
                     on_change=SupplierRegisterState.set_contact_phone,
                     placeholder="Enter contact phone",
@@ -251,8 +266,13 @@ def supplier_registration_form() -> rx.Component:
             rx.center(
                 rx.link(
                     rx.hstack(
-                        rx.icon("log_in", size=16, color=rx.color("purple", 8)),  # Changed "accent" to "purple"
-                        rx.text("Already registered? Log in here.", color=rx.color("purple", 8)),  # Changed "accent" to "purple"
+                        rx.icon(
+                            "log_in", size=16, color=rx.color("purple", 8)
+                        ),  # Changed "accent" to "purple"
+                        rx.text(
+                            "Already registered? Log in here.",
+                            color=rx.color("purple", 8),
+                        ),  # Changed "accent" to "purple"
                         spacing="2",
                     ),
                     href=reflex_local_auth.routes.LOGIN_ROUTE,
@@ -266,13 +286,23 @@ def supplier_registration_form() -> rx.Component:
         on_submit=SupplierRegisterState.register_supplier,
     )
 
+
 @template(route=routes.SUPPLIER_REGISTER_ROUTE, title="Supplier Registration")
 def supplier_register() -> rx.Component:
     return rx.center(
         rx.card(
             supplier_registration_form(),
-            width=["90%", "80%", "500px"],  # Responsive width
-            padding="2em",
+            width="100%",  # Ensure the card takes full width of its container
+            max_width=[
+                "90%",
+                "80%",
+                "500px",
+            ],  # Responsive max_width: 90% on small, 80% on medium, 500px on large
+            padding=[
+                "1em",
+                "1.5em",
+                "2em",
+            ],  # Responsive padding: smaller on small screens
             box_shadow="0 8px 32px rgba(0, 0, 0, 0.1)",
             border_radius="lg",
             background=rx.color("gray", 1),
@@ -283,11 +313,14 @@ def supplier_register() -> rx.Component:
                 "transform": "translateY(-4px)",
             },
         ),
-        padding_top="2em",
-        width="100%",
-        height="85vh",
+        padding=["1em", "1.5em", "2em"],  # Responsive padding for the container
+        width="100%",  # Ensure the container takes full viewport width
+        max_width="100%",  # Prevent overflow by capping at 100%
+        min_height="85vh",  # Use min_height to ensure the background fills the viewport
         align="center",
         justify="center",
         background=rx.color("gray", 2),
         _dark={"background": rx.color("gray", 11)},
+        overflow="hidden",  # Prevent content from stretching outside
+        box_sizing="border-box",  # Ensure padding is included in width calculations
     )

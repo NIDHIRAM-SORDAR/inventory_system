@@ -1,13 +1,16 @@
-import reflex as rx
-import reflex_local_auth
-from inventory_system.models import UserInfo
+import asyncio
 import json
 import os
-from ..templates import template
+
+import reflex as rx
+import reflex_local_auth
+
 from inventory_system import routes
+from inventory_system.models import UserInfo
 from inventory_system.state.login_state import LoginState
-import asyncio
+
 from ..constants import DEFAULT_PROFILE_PICTURE
+from ..templates import template
 
 # Load user data from JSON file
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -49,7 +52,9 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
         try:
             # Validate user ID and email
             if not self.validate_user(form_data):
-                self.registration_error = "Invalid ID or email. Please check your details."
+                self.registration_error = (
+                    "Invalid ID or email. Please check your details."
+                )
                 self.is_submitting = False
                 return
 
@@ -271,7 +276,10 @@ def register_form() -> rx.Component:
                     rx.link(
                         rx.hstack(
                             rx.icon("log_in", size=16, color=rx.color("purple", 8)),
-                            rx.text("Already have an account? Login here.", color=rx.color("purple", 8)),
+                            rx.text(
+                                "Already have an account? Login here.",
+                                color=rx.color("purple", 8),
+                            ),
                             spacing="2",
                         ),
                         href=reflex_local_auth.routes.LOGIN_ROUTE,
@@ -280,7 +288,10 @@ def register_form() -> rx.Component:
                     rx.link(
                         rx.hstack(
                             rx.icon("building", size=16, color=rx.color("purple", 8)),
-                            rx.text("Register as a supplier instead.", color=rx.color("purple", 8)),
+                            rx.text(
+                                "Register as a supplier instead.",
+                                color=rx.color("purple", 8),
+                            ),
                             spacing="2",
                         ),
                         href=routes.SUPPLIER_REGISTER_ROUTE,
@@ -327,8 +338,17 @@ def register_page() -> rx.Component:
             ),
             rx.card(
                 register_form(),
-                width=["90%", "80%", "500px"],
-                padding="2em",
+                width="100%",  # Ensure the card takes full width of its container
+                max_width=[
+                    "90%",
+                    "80%",
+                    "500px",
+                ],  # Responsive max_width: 90% on small, 80% on medium, 500px on large
+                padding=[
+                    "1em",
+                    "1.5em",
+                    "2em",
+                ],  # Responsive padding: smaller on small screens
                 box_shadow="0 8px 32px rgba(0, 0, 0, 0.1)",
                 border_radius="lg",
                 background=rx.color("gray", 1),
@@ -340,13 +360,16 @@ def register_page() -> rx.Component:
                 },
             ),
         ),
-        padding_top="2em",
-        width="100%",
-        height="85vh",
+        padding=["1em", "1.5em", "2em"],  # Responsive padding for the container
+        width="100%",  # Ensure the container takes full viewport width
+        max_width="100%",  # Prevent overflow by capping at 100%
+        min_height="85vh",  # Use min_height to ensure the background fills the viewport
         align="center",
         justify="center",
         background=rx.color("gray", 2),
         _dark={"background": rx.color("gray", 11)},
         opacity=rx.cond(LoginState.show_login, "1.0", "0.0"),
         transition="opacity 0.5s ease-in-out",
+        overflow="hidden",  # Prevent content from stretching outside
+        box_sizing="border-box",  # Ensure padding is included in width calculations
     )
