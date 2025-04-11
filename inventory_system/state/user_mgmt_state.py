@@ -1,13 +1,14 @@
+from typing import Any, Dict, List, Optional
+
 import reflex as rx
 import reflex_local_auth
-from inventory_system.models import UserInfo
 from sqlmodel import select
-from typing import List, Dict, Any, Optional
-from ..state import AuthState
+
+from inventory_system.models import UserInfo
+from inventory_system.state.auth import AuthState
 
 
-
-class AdminManagementState(AuthState):
+class UserManagementState(AuthState):
     users_data: List[Dict[str, Any]] = []
     admin_error_message: str = ""
     is_loading: bool = False
@@ -99,7 +100,7 @@ class AdminManagementState(AuthState):
         self.show_admin_dialog = False  # Close dialogs
         self.show_employee_dialog = False
         self.target_user_id = None
-    
+
     def confirm_change_role(self, user_id: int, make_admin: bool):
         self.target_user_id = user_id
         if make_admin:

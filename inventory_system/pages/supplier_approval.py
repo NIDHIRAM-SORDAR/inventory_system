@@ -2,10 +2,10 @@ import reflex as rx
 import reflex_local_auth
 
 from inventory_system import routes
+from inventory_system.state.supplier_approval_state import SupplierApprovalState
 from inventory_system.templates.template import template
 
 from ..components.comfirmation import confirmation_dialog
-from ..state import SupplierApprovalState
 
 
 def _header_cell(text: str, icon: str) -> rx.Component:
@@ -153,7 +153,7 @@ def _pagination_view() -> rx.Component:
 
 
 @template(
-    route=routes.ADMIN_SUPPLIERS_ROUTE,
+    route=routes.SUPPLIER_APPROVAL_ROUTE,
     title="Supplier Approval",
     on_load=SupplierApprovalState.check_auth_and_load,
 )

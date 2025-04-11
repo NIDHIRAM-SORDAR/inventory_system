@@ -1,7 +1,8 @@
 # inventory_system/state/logout_state.py
 import reflex as rx
-from ..state import AuthState
+
 from inventory_system import routes
+from inventory_system.state.auth import AuthState
 
 
 class LogoutState(AuthState):

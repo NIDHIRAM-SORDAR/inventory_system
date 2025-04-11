@@ -2,9 +2,11 @@
 
 import reflex as rx
 
-from inventory_system import styles
-from inventory_system import routes
-from ..state import AuthState, LogoutState,ProfilePictureState
+from inventory_system import routes, styles
+from inventory_system.state.auth import AuthState
+from inventory_system.state.logout_state import LogoutState
+from inventory_system.state.profile_picture_state import ProfilePictureState
+
 from ..components.logout import logout_dialog
 
 
@@ -117,13 +119,21 @@ def user_avatar() -> rx.Component:
                     ),
                 ),
                 rx.menu.content(
-                    rx.menu.item("Profile", on_click=lambda: rx.redirect(routes.PROFILE_ROUTE)),
-                    rx.menu.item("Settings", on_click=lambda: rx.redirect(routes.SETTINGS_ROUTE)),
+                    rx.menu.item(
+                        "Profile", on_click=lambda: rx.redirect(routes.PROFILE_ROUTE)
+                    ),
+                    rx.menu.item(
+                        "Settings", on_click=lambda: rx.redirect(routes.SETTINGS_ROUTE)
+                    ),
                     rx.menu.separator(),
-                    rx.menu.item("Logout", on_click=LogoutState.toggle_dialog),  # Trigger dialog
+                    rx.menu.item(
+                        "Logout", on_click=LogoutState.toggle_dialog
+                    ),  # Trigger dialog
                 ),
             ),
-            rx.button("Login", on_click=lambda: rx.redirect(routes.LOGIN_ROUTE), size="3"),
+            rx.button(
+                "Login", on_click=lambda: rx.redirect(routes.LOGIN_ROUTE), size="3"
+            ),
         ),
         logout_dialog(),  # Include the reusable dialog
     )
@@ -168,7 +178,9 @@ def menu_button() -> rx.Component:
                     rx.divider(),
                     *[
                         menu_item(
-                            text=page.get("title", page["route"].strip("/").capitalize()),
+                            text=page.get(
+                                "title", page["route"].strip("/").capitalize()
+                            ),
                             url=page["route"],
                         )
                         for page in ordered_pages

@@ -2,9 +2,9 @@ import reflex as rx
 import reflex_local_auth
 
 from inventory_system import routes
+from inventory_system.state.user_mgmt_state import UserManagementState
 
 from ..components.comfirmation import confirmation_dialog
-from ..state import AdminManagementState
 from ..templates import template
 
 
@@ -30,7 +30,7 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
             rx.hstack(
                 rx.button(
                     "Make Admin",
-                    on_click=lambda: AdminManagementState.confirm_change_role(
+                    on_click=lambda: UserManagementState.confirm_change_role(
                         user["id"], True
                     ),
                     color_scheme="blue",
@@ -38,7 +38,7 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
                 ),
                 rx.button(
                     "Make Employee",
-                    on_click=lambda: AdminManagementState.confirm_change_role(
+                    on_click=lambda: UserManagementState.confirm_change_role(
                         user["id"], False
                     ),
                     color_scheme="green",
@@ -47,7 +47,7 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
                 ),
                 rx.button(
                     "Delete",
-                    on_click=lambda: AdminManagementState.confirm_delete_user(
+                    on_click=lambda: UserManagementState.confirm_delete_user(
                         user["id"]
                     ),
                     color_scheme="red",
@@ -58,26 +58,26 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
         ),
         # Updated confirmation dialogs with direct Var access
         confirmation_dialog(
-            state=AdminManagementState,
-            dialog_open_var=AdminManagementState.show_admin_dialog,
-            action_handler=lambda: AdminManagementState.change_user_role(
+            state=UserManagementState,
+            dialog_open_var=UserManagementState.show_admin_dialog,
+            action_handler=lambda: UserManagementState.change_user_role(
                 user["id"], True
             ),
-            cancel_handler=AdminManagementState.cancel_role_change,
-            target_id_var=AdminManagementState.target_user_id,
+            cancel_handler=UserManagementState.cancel_role_change,
+            target_id_var=UserManagementState.target_user_id,
             target_id=user["id"],
             title="Make Admin",
             description=f"Are you sure you want to make {user['username']} an admin?",
             confirm_color="blue",
         ),
         confirmation_dialog(
-            state=AdminManagementState,
-            dialog_open_var=AdminManagementState.show_employee_dialog,
-            action_handler=lambda: AdminManagementState.change_user_role(
+            state=UserManagementState,
+            dialog_open_var=UserManagementState.show_employee_dialog,
+            action_handler=lambda: UserManagementState.change_user_role(
                 user["id"], False
             ),
-            cancel_handler=AdminManagementState.cancel_role_change,
-            target_id_var=AdminManagementState.target_user_id,
+            cancel_handler=UserManagementState.cancel_role_change,
+            target_id_var=UserManagementState.target_user_id,
             target_id=user["id"],
             title="Make Employee",
             description=f"Are you sure you want to make {user['username']} an employee?",
@@ -93,7 +93,7 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
                     rx.alert_dialog.cancel(
                         rx.button(
                             "Cancel",
-                            on_click=AdminManagementState.cancel_delete,
+                            on_click=UserManagementState.cancel_delete,
                             variant="soft",
                             color_scheme="gray",
                         )
@@ -101,7 +101,7 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
                     rx.alert_dialog.action(
                         rx.button(
                             "Delete",
-                            on_click=AdminManagementState.delete_user,
+                            on_click=UserManagementState.delete_user,
                             color_scheme="red",
                         )
                     ),
@@ -109,8 +109,8 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
                     justify="end",
                 ),
             ),
-            open=AdminManagementState.show_delete_dialog
-            & (AdminManagementState.user_to_delete == user["id"]),
+            open=UserManagementState.show_delete_dialog
+            & (UserManagementState.user_to_delete == user["id"]),
         ),
         style={"_hover": {"bg": hover_color}, "bg": bg_color},
         align="center",
@@ -121,41 +121,39 @@ def _pagination_view() -> rx.Component:
     return rx.hstack(
         rx.text(
             "Page ",
-            rx.code(AdminManagementState.page_number),
-            f" of {AdminManagementState.total_pages}",
+            rx.code(UserManagementState.page_number),
+            f" of {UserManagementState.total_pages}",
             justify="end",
         ),
         rx.hstack(
             rx.icon_button(
                 rx.icon("chevrons-left", size=18),
-                on_click=AdminManagementState.first_page,
-                opacity=rx.cond(AdminManagementState.page_number == 1, 0.6, 1),
+                on_click=UserManagementState.first_page,
+                opacity=rx.cond(UserManagementState.page_number == 1, 0.6, 1),
                 color_scheme=rx.cond(
-                    AdminManagementState.page_number == 1, "gray", "accent"
+                    UserManagementState.page_number == 1, "gray", "accent"
                 ),
                 variant="soft",
             ),
             rx.icon_button(
                 rx.icon("chevron-left", size=18),
-                on_click=AdminManagementState.prev_page,
-                opacity=rx.cond(AdminManagementState.page_number == 1, 0.6, 1),
+                on_click=UserManagementState.prev_page,
+                opacity=rx.cond(UserManagementState.page_number == 1, 0.6, 1),
                 color_scheme=rx.cond(
-                    AdminManagementState.page_number == 1, "gray", "accent"
+                    UserManagementState.page_number == 1, "gray", "accent"
                 ),
                 variant="soft",
             ),
             rx.icon_button(
                 rx.icon("chevron-right", size=18),
-                on_click=AdminManagementState.next_page,
+                on_click=UserManagementState.next_page,
                 opacity=rx.cond(
-                    AdminManagementState.page_number
-                    == AdminManagementState.total_pages,
+                    UserManagementState.page_number == UserManagementState.total_pages,
                     0.6,
                     1,
                 ),
                 color_scheme=rx.cond(
-                    AdminManagementState.page_number
-                    == AdminManagementState.total_pages,
+                    UserManagementState.page_number == UserManagementState.total_pages,
                     "gray",
                     "accent",
                 ),
@@ -163,16 +161,14 @@ def _pagination_view() -> rx.Component:
             ),
             rx.icon_button(
                 rx.icon("chevrons-right", size=18),
-                on_click=AdminManagementState.last_page,
+                on_click=UserManagementState.last_page,
                 opacity=rx.cond(
-                    AdminManagementState.page_number
-                    == AdminManagementState.total_pages,
+                    UserManagementState.page_number == UserManagementState.total_pages,
                     0.6,
                     1,
                 ),
                 color_scheme=rx.cond(
-                    AdminManagementState.page_number
-                    == AdminManagementState.total_pages,
+                    UserManagementState.page_number == UserManagementState.total_pages,
                     "gray",
                     "accent",
                 ),
@@ -191,12 +187,12 @@ def _pagination_view() -> rx.Component:
 
 
 @template(
-    route=routes.ADMIN_USERS_ROUTE,
+    route=routes.USER_MANAGEMENT_ROUTE,
     title="User Management",
-    on_load=AdminManagementState.check_auth_and_load,
+    on_load=UserManagementState.check_auth_and_load,
 )
 @reflex_local_auth.require_login
-def admin_management() -> rx.Component:
+def user_management() -> rx.Component:
     return rx.box(
         rx.flex(
             rx.hstack(
@@ -206,27 +202,27 @@ def admin_management() -> rx.Component:
             ),
             rx.flex(
                 rx.cond(
-                    AdminManagementState.sort_reverse,
+                    UserManagementState.sort_reverse,
                     rx.icon(
                         "arrow-down-z-a",
                         size=28,
                         stroke_width=1.5,
                         cursor="pointer",
-                        on_click=AdminManagementState.toggle_sort,
+                        on_click=UserManagementState.toggle_sort,
                     ),
                     rx.icon(
                         "arrow-down-a-z",
                         size=28,
                         stroke_width=1.5,
                         cursor="pointer",
-                        on_click=AdminManagementState.toggle_sort,
+                        on_click=UserManagementState.toggle_sort,
                     ),
                 ),
                 rx.select(
                     ["username", "email", "role"],
                     placeholder="Sort By: Username",
                     size="3",
-                    on_change=AdminManagementState.set_sort_value,
+                    on_change=UserManagementState.set_sort_value,
                 ),
                 rx.input(
                     rx.input.slot(rx.icon("search")),
@@ -234,19 +230,19 @@ def admin_management() -> rx.Component:
                         rx.icon("x"),
                         justify="end",
                         cursor="pointer",
-                        on_click=AdminManagementState.setvar("search_value", ""),
+                        on_click=UserManagementState.setvar("search_value", ""),
                         display=rx.cond(
-                            AdminManagementState.search_value, "flex", "none"
+                            UserManagementState.search_value, "flex", "none"
                         ),
                     ),
-                    value=AdminManagementState.search_value,
+                    value=UserManagementState.search_value,
                     placeholder="Search here...",
                     size="3",
                     max_width=["150px", "150px", "200px", "250px"],
                     width="100%",
                     variant="surface",
                     color_scheme="gray",
-                    on_change=AdminManagementState.set_search_value,
+                    on_change=UserManagementState.set_search_value,
                 ),
                 align="center",
                 justify="end",
@@ -259,8 +255,8 @@ def admin_management() -> rx.Component:
             padding_bottom="1em",
         ),
         rx.cond(
-            AdminManagementState.admin_error_message,
-            rx.text(AdminManagementState.admin_error_message, color="red"),
+            UserManagementState.admin_error_message,
+            rx.text(UserManagementState.admin_error_message, color="red"),
             rx.fragment(),
         ),
         rx.table.root(
@@ -274,7 +270,7 @@ def admin_management() -> rx.Component:
             ),
             rx.table.body(
                 rx.foreach(
-                    AdminManagementState.current_page,
+                    UserManagementState.current_page,
                     lambda user, index: _show_user(user, index),
                 )
             ),

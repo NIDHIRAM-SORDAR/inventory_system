@@ -1,9 +1,12 @@
+from typing import Any, Dict, List, Optional
+
 import reflex as rx
 import reflex_local_auth
-from inventory_system.models import UserInfo, Supplier
 from sqlmodel import select
-from typing import List, Dict, Any, Optional
-from ..state import AuthState
+
+from inventory_system.models import Supplier, UserInfo
+from inventory_system.state.auth import AuthState
+
 from ..utils.register_supplier import register_supplier
 
 

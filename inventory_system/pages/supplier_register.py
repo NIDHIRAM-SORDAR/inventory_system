@@ -165,28 +165,30 @@ def supplier_registration_form() -> rx.Component:
                 spacing="1",
                 width="100%",
             ),
-            # Description Input with Icon
+            # Replace the Description Input section
             rx.vstack(
                 rx.text("Description", weight="bold", color=rx.color("gray", 12)),
-                rx.text_area(
-                    rx.input.slot(
-                        rx.icon("file_text", color=rx.color("purple", 8))
-                    ),  # Changed "accent" to "purple"
-                    value=SupplierRegisterState.description,
-                    on_change=SupplierRegisterState.set_description,
-                    placeholder="Describe your company",
-                    width="100%",
-                    required=True,
-                    variant="soft",
-                    color_scheme="purple",  # Changed "accent" to "purple"
-                    rows="4",
-                    style={
-                        "border": f"1px solid {rx.color('purple', 4)}",  # Changed "accent" to "purple"
-                        "_focus": {
-                            "border": f"2px solid {rx.color('purple', 6)}",  # Changed "accent" to "purple"
-                            "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",  # Changed "accent" to "purple"
+                rx.hstack(
+                    rx.icon("file_text", color=rx.color("purple", 8), size=24),
+                    rx.text_area(
+                        value=SupplierRegisterState.description,
+                        on_change=SupplierRegisterState.set_description,
+                        placeholder="Describe your company",
+                        width="100%",
+                        required=True,
+                        variant="soft",
+                        color_scheme="purple",
+                        rows="4",
+                        style={
+                            "border": f"1px solid {rx.color('purple', 4)}",
+                            "_focus": {
+                                "border": f"2px solid {rx.color('purple', 6)}",
+                                "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",
+                            },
                         },
-                    },
+                    ),
+                    spacing="2",
+                    width="100%",
                 ),
                 spacing="1",
                 width="100%",
@@ -326,6 +328,6 @@ def supplier_register() -> rx.Component:
         justify="center",
         background=rx.color("gray", 2),
         _dark={"background": rx.color("gray", 11)},
-        overflow="hidden",  # Prevent content from stretching outside
+        overflow="auto",  # Prevent content from stretching outside
         box_sizing="border-box",  # Ensure padding is included in width calculations
     )

@@ -379,6 +379,6 @@ def register_page() -> rx.Component:
         _dark={"background": rx.color("gray", 11)},
         opacity=rx.cond(LoginState.show_login, "1.0", "0.0"),
         transition="opacity 0.5s ease-in-out",
-        overflow="hidden",  # Prevent content from stretching outside
+        overflow="auto",  # Prevent content from stretching outside
         box_sizing="border-box",  # Ensure padding is included in width calculations
     )

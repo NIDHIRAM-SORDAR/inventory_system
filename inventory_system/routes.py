@@ -1,8 +1,7 @@
-from __future__ import annotations
-
-# Route constants
-
 # inventory_system/routes.py
+"""Route constants for the inventory system application."""
+
+from __future__ import annotations
 
 # Base Routes
 INDEX_ROUTE = "/"
@@ -15,25 +14,25 @@ SETTINGS_ROUTE = "/settings"
 TABLE_ROUTE = "/table"
 SUPPLIER_REGISTER_ROUTE = "/supplier-register"
 
-# New Admin Routes
+# Admin Routes
 ADMIN_ROUTE = "/admin"
-ADMIN_USERS_ROUTE = "/admin/users"
-ADMIN_SUPPLIERS_ROUTE = "/admin/suppliers"
+USER_MANAGEMENT_ROUTE = "/admin/users"  # Renamed from ADMIN_USERS_ROUTE
+SUPPLIER_APPROVAL_ROUTE = "/admin/suppliers"  # Renamed from ADMIN_SUPPLIERS_ROUTE
 
 # Dictionary to store routes (for easy access and modification)
 _routes = {
+    "index": INDEX_ROUTE,
     "login": LOGIN_ROUTE,
     "register": REGISTER_ROUTE,
-    "index": INDEX_ROUTE,
+    "overview": OVERVIEW_ROUTE,
+    "about": ABOUT_ROUTE,
     "profile": PROFILE_ROUTE,
     "settings": SETTINGS_ROUTE,
-    "about": ABOUT_ROUTE,
     "table": TABLE_ROUTE,
     "supplier_register": SUPPLIER_REGISTER_ROUTE,
-    "overview": OVERVIEW_ROUTE,
     "admin": ADMIN_ROUTE,
-    "admin_users": ADMIN_USERS_ROUTE,
-    "admin_suppliers": ADMIN_SUPPLIERS_ROUTE,
+    "user_management": USER_MANAGEMENT_ROUTE,  # Renamed from admin_users
+    "supplier_approval": SUPPLIER_APPROVAL_ROUTE,  # Renamed from admin_suppliers
 }
 
 

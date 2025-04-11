@@ -1,6 +1,8 @@
 # inventory_system/components/logout_dialog.py
 import reflex as rx
-from ..state.logout_state import LogoutState
+
+from inventory_system.state.logout_state import LogoutState
+
 
 def logout_dialog(
     title: str = "Log Out",

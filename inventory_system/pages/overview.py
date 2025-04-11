@@ -3,6 +3,10 @@
 import datetime
 
 import reflex as rx
+import reflex_local_auth
+
+from inventory_system import routes
+from inventory_system.state.auth import AuthState
 
 from .. import styles
 from ..components.card import card
@@ -19,9 +23,6 @@ from ..views.charts import (
     users_chart,
 )
 from ..views.stats_cards import stats_cards
-from ..state import AuthState
-from inventory_system import routes
-import reflex_local_auth
 
 
 def _time_data() -> rx.Component:

@@ -1,10 +1,11 @@
 # inventory_system/state/profile_state.py
 import reflex as rx
-from ..models import UserInfo
-from ..state import AuthState
-from sqlmodel import select
 import reflex_local_auth
+from sqlmodel import select
+
 from inventory_system import routes
+from inventory_system.models import UserInfo
+from inventory_system.state.auth import AuthState
 
 
 class ProfileState(AuthState):

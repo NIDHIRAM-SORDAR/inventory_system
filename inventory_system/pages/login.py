@@ -3,12 +3,12 @@ import reflex_local_auth
 from sqlmodel import select
 
 from inventory_system import routes
+from inventory_system.state.auth import AuthState
 from inventory_system.state.login_state import (
     LoginState,
 )  # Import LoginState for transition
 
 from ..models import UserInfo
-from ..state import AuthState  # Import your custom AuthState
 from ..templates import template
 
 
@@ -51,7 +51,7 @@ class CustomLoginState(AuthState):
                     )
                 ).one_or_none()
                 if user_info and user_info.is_admin:
-                    return rx.redirect(routes.ADMIN_MGMT)
+                    return rx.redirect(routes.ADMIN_ROUTE)
                 return rx.redirect(routes.OVERVIEW_ROUTE)
 
         finally:

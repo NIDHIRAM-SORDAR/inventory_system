@@ -1,9 +1,12 @@
 # inventory_system/pages/profile.py
 import reflex as rx
+
+from inventory_system import routes
+from inventory_system.state.profile_picture_state import ProfilePictureState
+from inventory_system.state.profile_state import ProfileState
+
 from ..components.profile_input import profile_input
 from ..templates import template
-from ..state import ProfileState, ProfilePictureState
-from inventory_system import routes
 
 
 def profile_upload_section() -> rx.Component:
@@ -25,7 +28,7 @@ def profile_upload_section() -> rx.Component:
         ),
         rx.upload(
             rx.text("Drag and drop an image or click to select"),
-            rx.badge(f"{rx.selected_files("profile_upload")} has been selected"),
+            rx.badge(f"{rx.selected_files('profile_upload')} has been selected"),
             id="profile_upload",
             accept={"image/*": [".png", ".jpg", ".jpeg", ".gif"]},
             max_files=1,
