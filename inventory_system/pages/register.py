@@ -5,9 +5,7 @@ import json
 import os
 from ..templates import template
 from inventory_system import routes
-from inventory_system.state.login_state import (
-    LoginState,
-)  # Import LoginState for transition
+from inventory_system.state.login_state import LoginState
 import asyncio
 from ..constants import DEFAULT_PROFILE_PICTURE
 
@@ -26,7 +24,8 @@ def load_user_data():
 
 
 class CustomRegisterState(reflex_local_auth.RegistrationState):
-    registration_error: str = ""  # Custom message for validation errors only
+    registration_error: str = ""
+    is_submitting: bool = False  # Added for loading state
 
     def validate_user(self, form_data):
         """Validate user ID and email against user_data.json."""
@@ -44,40 +43,54 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
 
     async def handle_registration_with_email(self, form_data):
         """Handle registration and create UserInfo entry with toast and delay."""
-        # Validate user ID and email
-        if not self.validate_user(form_data):
-            self.registration_error = "Invalid ID or email. Please check your details."
-            return
+        self.registration_error = ""
+        self.is_submitting = True
 
-        # Proceed with registration
-        registration_result = self.handle_registration(form_data)
-        if self.new_user_id >= 0:
-            with rx.session() as session:
-                user_info = UserInfo(
-                    email=form_data["email"],
-                    user_id=self.new_user_id,
-                    profile_picture=DEFAULT_PROFILE_PICTURE,
+        try:
+            # Validate user ID and email
+            if not self.validate_user(form_data):
+                self.registration_error = "Invalid ID or email. Please check your details."
+                self.is_submitting = False
+                return
+
+            # Proceed with registration
+            registration_result = self.handle_registration(form_data)
+            if self.new_user_id >= 0:
+                with rx.session() as session:
+                    user_info = UserInfo(
+                        email=form_data["email"],
+                        user_id=self.new_user_id,
+                        profile_picture=DEFAULT_PROFILE_PICTURE,
+                    )
+                    user_info.set_role()
+                    session.add(user_info)
+                    session.commit()
+                    session.refresh(user_info)
+
+                # Show success toast directly
+                yield rx.toast.success(
+                    "Registration successful! Redirecting to login...",
+                    position="top-center",
+                    duration=1000,
                 )
-                user_info.set_role()
-                session.add(user_info)
-                session.commit()
-                session.refresh(user_info)
+                # Wait 1 second before redirecting
+                await asyncio.sleep(1)
+                self.registration_error = ""
+                yield rx.redirect(routes.LOGIN_ROUTE)
+            else:
+                self.registration_error = (
+                    reflex_local_auth.RegistrationState.error_message
+                    | "Registration failed."
+                )
+                self.is_submitting = False
 
-            # Show success toast directly
-            yield rx.toast.success(
-                "Registration successful! Redirecting to login...",
-                position="top-center",
-                duration=1000,
-            )
-            # Wait 2 seconds before redirecting
-            await asyncio.sleep(1)
-            self.registration_error = ""  # Clear any previous error
-            yield rx.redirect(routes.LOGIN_ROUTE)
-        else:
-            self.registration_error = (
-                reflex_local_auth.RegistrationState.error_message
-                | "Registration failed."
-            )
+        except Exception as e:
+            self.registration_error = "An unexpected error occurred. Please try again."
+            print(f"Registration error: {str(e)}")  # Log for debugging
+            self.is_submitting = False
+
+        finally:
+            self.is_submitting = False
 
 
 def register_error() -> rx.Component:
@@ -90,35 +103,200 @@ def register_error() -> rx.Component:
             color_scheme="red",
             role="alert",
             width="100%",
+            transition="all 0.3s ease-in-out",
         ),
     )
 
 
 def register_form() -> rx.Component:
-    """Render the registration form."""
+    """Render the registration form with styling similar to supplier registration."""
     return rx.form(
         rx.vstack(
-            rx.heading("Create an Account", size="6"),
+            # Enhanced heading with icon and gradient text
+            rx.hstack(
+                rx.icon("user_plus", size=32, color=rx.color("purple", 10)),
+                rx.heading(
+                    "Create an Account",
+                    size="8",  # Using string number as per Reflex convention
+                    color=rx.color("purple", 10),
+                    style={
+                        "background": f"linear-gradient(45deg, {rx.color('purple', 10)}, {rx.color('purple', 8)})",
+                        "-webkit-background-clip": "text",
+                        "-webkit-text-fill-color": "transparent",
+                    },
+                ),
+                align="center",
+                spacing="3",
+            ),
+            # Error message with animation
             register_error(),
-            rx.text("ID"),
-            rx.input(name="id", width="100%"),
-            rx.text("Username"),
-            rx.input(name="username", width="100%"),
-            rx.text("Email"),
-            rx.input(name="email", width="100%"),
-            rx.text("Password"),
-            rx.input(name="password", type="password", width="100%"),
-            rx.text("Confirm Password"),
-            rx.input(name="confirm_password", type="password", width="100%"),
-            rx.button("Sign Up", width="100%"),
-            rx.center(
-                rx.link("Login", href=reflex_local_auth.routes.LOGIN_ROUTE),
+            # ID Input with Icon
+            rx.vstack(
+                rx.text("ID", weight="bold", color=rx.color("gray", 12)),
+                rx.input(
+                    rx.input.slot(rx.icon("hash", color=rx.color("purple", 8))),
+                    name="id",
+                    type="text",
+                    placeholder="Enter your ID",
+                    width="100%",
+                    required=True,
+                    variant="soft",
+                    color_scheme="purple",
+                    style={
+                        "border": f"1px solid {rx.color('purple', 4)}",
+                        "_focus": {
+                            "border": f"2px solid {rx.color('purple', 6)}",
+                            "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",
+                        },
+                    },
+                ),
+                spacing="1",
                 width="100%",
             ),
-            min_width="300px",
-            spacing="1",
+            # Username Input with Icon
+            rx.vstack(
+                rx.text("Username", weight="bold", color=rx.color("gray", 12)),
+                rx.input(
+                    rx.input.slot(rx.icon("user", color=rx.color("purple", 8))),
+                    name="username",
+                    type="text",
+                    placeholder="Enter your username",
+                    width="100%",
+                    required=True,
+                    variant="soft",
+                    color_scheme="purple",
+                    style={
+                        "border": f"1px solid {rx.color('purple', 4)}",
+                        "_focus": {
+                            "border": f"2px solid {rx.color('purple', 6)}",
+                            "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",
+                        },
+                    },
+                ),
+                spacing="1",
+                width="100%",
+            ),
+            # Email Input with Icon
+            rx.vstack(
+                rx.text("Email", weight="bold", color=rx.color("gray", 12)),
+                rx.input(
+                    rx.input.slot(rx.icon("mail", color=rx.color("purple", 8))),
+                    name="email",
+                    type="email",
+                    placeholder="Enter your email",
+                    width="100%",
+                    required=True,
+                    variant="soft",
+                    color_scheme="purple",
+                    style={
+                        "border": f"1px solid {rx.color('purple', 4)}",
+                        "_focus": {
+                            "border": f"2px solid {rx.color('purple', 6)}",
+                            "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",
+                        },
+                    },
+                ),
+                spacing="1",
+                width="100%",
+            ),
+            # Password Input with Icon
+            rx.vstack(
+                rx.text("Password", weight="bold", color=rx.color("gray", 12)),
+                rx.input(
+                    rx.input.slot(rx.icon("lock", color=rx.color("purple", 8))),
+                    name="password",
+                    type="password",
+                    placeholder="Enter your password",
+                    width="100%",
+                    required=True,
+                    variant="soft",
+                    color_scheme="purple",
+                    style={
+                        "border": f"1px solid {rx.color('purple', 4)}",
+                        "_focus": {
+                            "border": f"2px solid {rx.color('purple', 6)}",
+                            "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",
+                        },
+                    },
+                ),
+                spacing="1",
+                width="100%",
+            ),
+            # Confirm Password Input with Icon
+            rx.vstack(
+                rx.text("Confirm Password", weight="bold", color=rx.color("gray", 12)),
+                rx.input(
+                    rx.input.slot(rx.icon("lock", color=rx.color("purple", 8))),
+                    name="confirm_password",
+                    type="password",
+                    placeholder="Confirm your password",
+                    width="100%",
+                    required=True,
+                    variant="soft",
+                    color_scheme="purple",
+                    style={
+                        "border": f"1px solid {rx.color('purple', 4)}",
+                        "_focus": {
+                            "border": f"2px solid {rx.color('purple', 6)}",
+                            "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",
+                        },
+                    },
+                ),
+                spacing="1",
+                width="100%",
+            ),
+            # Sign Up Button with Loading State
+            rx.button(
+                rx.cond(
+                    CustomRegisterState.is_submitting,
+                    rx.spinner(size="2"),
+                    rx.text("Sign Up"),
+                ),
+                type="submit",
+                width="100%",
+                size="3",
+                color_scheme="purple",
+                variant="solid",
+                style={
+                    "background": f"linear-gradient(45deg, {rx.color('purple', 8)}, {rx.color('purple', 10)})",
+                    "_hover": {
+                        "background": f"linear-gradient(45deg, {rx.color('purple', 9)}, {rx.color('purple', 11)})",
+                    },
+                    "transition": "all 0.3s ease",
+                },
+            ),
+            # Links for Login and Supplier Registration
+            rx.center(
+                rx.vstack(
+                    rx.link(
+                        rx.hstack(
+                            rx.icon("log_in", size=16, color=rx.color("purple", 8)),
+                            rx.text("Already have an account? Login here.", color=rx.color("purple", 8)),
+                            spacing="2",
+                        ),
+                        href=reflex_local_auth.routes.LOGIN_ROUTE,
+                        _hover={"text_decoration": "underline"},
+                    ),
+                    rx.link(
+                        rx.hstack(
+                            rx.icon("building", size=16, color=rx.color("purple", 8)),
+                            rx.text("Register as a supplier instead.", color=rx.color("purple", 8)),
+                            spacing="2",
+                        ),
+                        href=routes.SUPPLIER_REGISTER_ROUTE,
+                        _hover={"text_decoration": "underline"},
+                    ),
+                    spacing="2",
+                    align="center",
+                ),
+                width="100%",
+            ),
+            spacing="5",
+            width="100%",
+            min_width=["90%", "80%", "400px"],
         ),
         on_submit=CustomRegisterState.handle_registration_with_email,
+        width="100%",
     )
 
 
@@ -135,27 +313,40 @@ def register_page() -> rx.Component:
             reflex_local_auth.RegistrationState.success,
             rx.vstack(
                 rx.text("Registration successful!"),
-                rx.link("Go to Login", href=reflex_local_auth.routes.LOGIN_ROUTE),
+                rx.link(
+                    rx.hstack(
+                        rx.icon("log_in", size=16, color=rx.color("purple", 8)),
+                        rx.text("Go to Login", color=rx.color("purple", 8)),
+                        spacing="2",
+                    ),
+                    href=reflex_local_auth.routes.LOGIN_ROUTE,
+                    _hover={"text_decoration": "underline"},
+                ),
+                spacing="4",
+                align="center",
             ),
             rx.card(
                 register_form(),
-                width="100%",
-                max_width="400px",
-                background="#2D3748",
-                border="1px solid #4A5568",
-                border_radius="12px",
-                padding="10px",
-                box_shadow="0 4px 12px rgba(0, 0, 0, 0.3)",
+                width=["90%", "80%", "500px"],
+                padding="2em",
+                box_shadow="0 8px 32px rgba(0, 0, 0, 0.1)",
+                border_radius="lg",
+                background=rx.color("gray", 1),
+                _dark={"background": rx.color("gray", 12)},
+                transition="all 0.3s ease",
+                _hover={
+                    "box_shadow": "0 12px 48px rgba(0, 0, 0, 0.15)",
+                    "transform": "translateY(-4px)",
+                },
             ),
         ),
-        padding="10px",
-        min_height="85vh",
+        padding_top="2em",
         width="100%",
-        max_width="90%",
+        height="85vh",
         align="center",
         justify="center",
-        overflow="hidden",
+        background=rx.color("gray", 2),
+        _dark={"background": rx.color("gray", 11)},
         opacity=rx.cond(LoginState.show_login, "1.0", "0.0"),
         transition="opacity 0.5s ease-in-out",
-        background="linear-gradient(135deg, #1A202C, #2D3748)",
     )

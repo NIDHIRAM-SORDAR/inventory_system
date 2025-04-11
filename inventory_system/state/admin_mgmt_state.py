@@ -35,6 +35,7 @@ class AdminManagementState(AuthState):
                 for u in data
                 if self.search_value.lower() in u["username"].lower()
                 or self.search_value.lower() in u["email"].lower()
+                or self.search_value.lower() in u["role"].lower()
             ]
         return sorted(data, key=lambda x: x[self.sort_value], reverse=self.sort_reverse)
 
