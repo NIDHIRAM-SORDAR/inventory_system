@@ -1,15 +1,18 @@
 """The settings page."""
 
 import reflex as rx
+import reflex_local_auth
+
+from inventory_system import routes
 
 from ..templates import template
 from ..views.color_picker import primary_color_picker, secondary_color_picker
 from ..views.radius_picker import radius_picker
 from ..views.scaling_picker import scaling_picker
-from inventory_system import routes
 
 
 @template(route=routes.SETTINGS_ROUTE, title="Settings")
+@reflex_local_auth.require_login
 def settings() -> rx.Component:
     """The settings page.
 

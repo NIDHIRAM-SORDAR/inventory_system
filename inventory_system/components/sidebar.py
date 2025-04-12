@@ -2,8 +2,10 @@
 
 import reflex as rx
 
-from .. import styles
 from inventory_system import routes
+from inventory_system.state.auth import AuthState
+
+from .. import styles
 from .navbar import user_avatar
 
 
@@ -63,17 +65,7 @@ def sidebar_item_icon(icon: str) -> rx.Component:
 
 
 def sidebar_item(text: str, url: str) -> rx.Component:
-    """Sidebar item.
-
-    Args:
-        text: The text of the item.
-        url: The URL of the item.
-
-    Returns:
-        rx.Component: The sidebar item component.
-
-    """
-    # Whether the item is active.
+    """Sidebar item."""
     active = (rx.State.router.page.path == url.lower()) | (
         (rx.State.router.page.path == routes.OVERVIEW_ROUTE) & text == "Overview"
     )
@@ -85,8 +77,7 @@ def sidebar_item(text: str, url: str) -> rx.Component:
                 ("Overview", sidebar_item_icon("home")),
                 ("Table", sidebar_item_icon("table-2")),
                 ("About", sidebar_item_icon("book-open")),
-                ("Profile", sidebar_item_icon("user")),
-                ("Settings", sidebar_item_icon("settings")),
+                ("Admin Dashboard", sidebar_item_icon("shield")),
                 sidebar_item_icon("layout-dashboard"),
             ),
             rx.text(text, size="3", weight="regular"),
@@ -120,6 +111,7 @@ def sidebar_item(text: str, url: str) -> rx.Component:
             width="100%",
             spacing="2",
             padding="0.35em",
+            transition="background-color 0.2s ease, color 0.2s ease",  # Smooth hover
         ),
         underline="none",
         href=url,
@@ -128,30 +120,22 @@ def sidebar_item(text: str, url: str) -> rx.Component:
 
 
 def sidebar() -> rx.Component:
-    """The sidebar.
-
-    Returns:
-        The sidebar component.
-
-    """
-    # Get all the decorated pages and add them to the sidebar.
+    """The sidebar."""
     from reflex.page import get_decorated_pages
 
-    # The ordered page routes.
+    # Define ordered page routes
     ordered_page_routes = [
         routes.OVERVIEW_ROUTE,
         routes.TABLE_ROUTE,
         routes.ABOUT_ROUTE,
-        routes.PROFILE_ROUTE,
-        routes.SETTINGS_ROUTE,
+        routes.ADMIN_ROUTE,
     ]
 
-    # Get the decorated pages.
     pages = get_decorated_pages()
-
-    # Include all pages even if they are not in the ordered_page_routes.
+    # Filter pages to include only those in ordered_page_routes
+    filtered_pages = [page for page in pages if page["route"] in ordered_page_routes]
     ordered_pages = sorted(
-        pages,
+        filtered_pages,
         key=lambda page: (
             ordered_page_routes.index(page["route"])
             if page["route"] in ordered_page_routes
@@ -164,9 +148,22 @@ def sidebar() -> rx.Component:
             sidebar_header(),
             rx.vstack(
                 *[
-                    sidebar_item(
-                        text=page.get("title", page["route"].strip("/").capitalize()),
-                        url=page["route"],
+                    rx.cond(
+                        AuthState.is_admin & (page["route"] == routes.ADMIN_ROUTE),
+                        sidebar_item(
+                            text=page.get("title", "Admin Dashboard"),
+                            url=page["route"],
+                        ),
+                        rx.cond(
+                            page["route"] != routes.ADMIN_ROUTE,
+                            sidebar_item(
+                                text=page.get(
+                                    "title", page["route"].strip("/").capitalize()
+                                ),
+                                url=page["route"],
+                            ),
+                            rx.fragment(),
+                        ),
                     )
                     for page in ordered_pages
                 ],
@@ -191,4 +188,5 @@ def sidebar() -> rx.Component:
         left="0px",
         flex="1",
         bg=rx.color("gray", 2),
+        transition="width 0.3s ease",  # Smooth transition
     )

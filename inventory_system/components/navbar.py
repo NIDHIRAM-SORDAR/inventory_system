@@ -15,15 +15,7 @@ def menu_item_icon(icon: str) -> rx.Component:
 
 
 def menu_item(text: str, url: str) -> rx.Component:
-    """Menu item.
-
-    Args:
-        text: The text of the item.
-        url: The URL of the item.
-
-    Returns:
-        rx.Component: The menu item component.
-    """
+    """Menu item."""
     active = (rx.State.router.page.path == url.lower()) | (
         (rx.State.router.page.path == routes.OVERVIEW_ROUTE) & text == "Overview"
     )
@@ -35,8 +27,7 @@ def menu_item(text: str, url: str) -> rx.Component:
                 ("Overview", menu_item_icon("home")),
                 ("Table", menu_item_icon("table-2")),
                 ("About", menu_item_icon("book-open")),
-                ("Profile", menu_item_icon("user")),
-                ("Settings", menu_item_icon("settings")),
+                ("Admin Dashboard", menu_item_icon("shield")),
                 menu_item_icon("layout-dashboard"),
             ),
             rx.text(text, size="4", weight="regular"),
@@ -70,6 +61,7 @@ def menu_item(text: str, url: str) -> rx.Component:
             width="100%",
             spacing="2",
             padding="0.35em",
+            transition="background-color 0.2s ease, color 0.2s ease",  # Smooth hover
         ),
         underline="none",
         href=url,
@@ -109,33 +101,37 @@ def user_avatar() -> rx.Component:
     """User avatar component with dropdown menu for authenticated users or login button for guests."""
     return rx.fragment(
         rx.cond(
-            AuthState.authenticated_user.id >= 0,
-            rx.menu.root(
-                rx.menu.trigger(
-                    rx.avatar(
-                        src=ProfilePictureState.profile_picture,
-                        name=AuthState.authenticated_user.username,
-                        size="2",
+            AuthState.is_computing,  # Check if user info is loading
+            rx.box(),  # Render nothing during loading
+            rx.cond(
+                AuthState.authenticated_user.id >= 0,
+                rx.menu.root(
+                    rx.menu.trigger(
+                        rx.avatar(
+                            src=ProfilePictureState.profile_picture,
+                            name=AuthState.authenticated_user.username,
+                            size="2",
+                        ),
+                    ),
+                    rx.menu.content(
+                        rx.menu.item(
+                            "Profile",
+                            on_click=lambda: rx.redirect(routes.PROFILE_ROUTE),
+                        ),
+                        rx.menu.item(
+                            "Settings",
+                            on_click=lambda: rx.redirect(routes.SETTINGS_ROUTE),
+                        ),
+                        rx.menu.separator(),
+                        rx.menu.item("Logout", on_click=LogoutState.toggle_dialog),
                     ),
                 ),
-                rx.menu.content(
-                    rx.menu.item(
-                        "Profile", on_click=lambda: rx.redirect(routes.PROFILE_ROUTE)
-                    ),
-                    rx.menu.item(
-                        "Settings", on_click=lambda: rx.redirect(routes.SETTINGS_ROUTE)
-                    ),
-                    rx.menu.separator(),
-                    rx.menu.item(
-                        "Logout", on_click=LogoutState.toggle_dialog
-                    ),  # Trigger dialog
+                rx.button(
+                    "Login", on_click=lambda: rx.redirect(routes.LOGIN_ROUTE), size="2"
                 ),
-            ),
-            rx.button(
-                "Login", on_click=lambda: rx.redirect(routes.LOGIN_ROUTE), size="3"
             ),
         ),
-        logout_dialog(),  # Include the reusable dialog
+        logout_dialog(),
     )
 
 
@@ -147,13 +143,13 @@ def menu_button() -> rx.Component:
         routes.OVERVIEW_ROUTE,
         routes.TABLE_ROUTE,
         routes.ABOUT_ROUTE,
-        routes.PROFILE_ROUTE,
-        routes.SETTINGS_ROUTE,
+        routes.ADMIN_ROUTE,
     ]
 
     pages = get_decorated_pages()
+    filtered_pages = [page for page in pages if page["route"] in ordered_page_routes]
     ordered_pages = sorted(
-        pages,
+        filtered_pages,
         key=lambda page: (
             ordered_page_routes.index(page["route"])
             if page["route"] in ordered_page_routes
@@ -177,11 +173,22 @@ def menu_button() -> rx.Component:
                     ),
                     rx.divider(),
                     *[
-                        menu_item(
-                            text=page.get(
-                                "title", page["route"].strip("/").capitalize()
+                        rx.cond(
+                            AuthState.is_admin & (page["route"] == routes.ADMIN_ROUTE),
+                            menu_item(
+                                text=page.get("title", "Admin Dashboard"),
+                                url=page["route"],
                             ),
-                            url=page["route"],
+                            rx.cond(
+                                page["route"] != routes.ADMIN_ROUTE,
+                                menu_item(
+                                    text=page.get(
+                                        "title", page["route"].strip("/").capitalize()
+                                    ),
+                                    url=page["route"],
+                                ),
+                                rx.fragment(),
+                            ),
                         )
                         for page in ordered_pages
                     ],
@@ -196,6 +203,7 @@ def menu_button() -> rx.Component:
                 width="20em",
                 padding="1em",
                 bg=rx.color("gray", 1),
+                transition="transform 0.3s ease",  # Smooth drawer transition
             ),
             width="100%",
         ),
@@ -224,7 +232,7 @@ def navbar() -> rx.Component:
             align="center",
             width="100%",
             padding_y="1.25em",
-            padding_x=["1em", "1em", "2em"],
+            padding_x=["0.5em", "0.5em", "1em", "1em", "1em", "2em"],  # Responsive
         ),
         display=["block", "block", "block", "block", "block", "none"],
         position="sticky",
@@ -232,4 +240,5 @@ def navbar() -> rx.Component:
         top="0px",
         z_index="5",
         border_bottom=styles.border,
+        transition="padding 0.3s ease",
     )

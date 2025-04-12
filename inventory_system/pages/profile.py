@@ -1,5 +1,6 @@
 # inventory_system/pages/profile.py
 import reflex as rx
+import reflex_local_auth
 
 from inventory_system import routes
 from inventory_system.state.profile_picture_state import ProfilePictureState
@@ -91,6 +92,7 @@ def profile_upload_section() -> rx.Component:
 
 
 @template(route=routes.PROFILE_ROUTE, title="Profile")
+@reflex_local_auth.require_login
 def profile() -> rx.Component:
     return rx.vstack(
         rx.cond(

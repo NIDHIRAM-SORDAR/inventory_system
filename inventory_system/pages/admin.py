@@ -1,5 +1,6 @@
 # inventory_system/views/admin.py
 import reflex as rx
+import reflex_local_auth
 
 from inventory_system import routes, styles
 from inventory_system.components.card import card
@@ -14,6 +15,7 @@ from inventory_system.templates import template
     title="Admin Dashboard",
     on_load=AdminState.check_auth_and_load,
 )
+@reflex_local_auth.require_login
 def admin() -> rx.Component:
     """The admin page for managing users and suppliers.
 
