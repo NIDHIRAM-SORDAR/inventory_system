@@ -3,8 +3,7 @@ import reflex_local_auth
 
 from inventory_system import routes
 from inventory_system.state.login_state import CustomLoginState
-
-from ..templates import template
+from inventory_system.templates import template
 
 
 def login_error() -> rx.Component:
@@ -26,7 +25,6 @@ def login_form() -> rx.Component:
     """Render the login form with styling similar to supplier registration."""
     return rx.form(
         rx.vstack(
-            # Enhanced heading with icon and gradient text
             rx.hstack(
                 rx.icon("log_in", size=32, color=rx.color("purple", 10)),
                 rx.heading(
@@ -42,9 +40,7 @@ def login_form() -> rx.Component:
                 align="center",
                 spacing="3",
             ),
-            # Error message with animation
             login_error(),
-            # Username Input with Icon
             rx.vstack(
                 rx.text("Username", weight="bold", color=rx.color("gray", 12)),
                 rx.input(
@@ -67,7 +63,6 @@ def login_form() -> rx.Component:
                 spacing="1",
                 width="100%",
             ),
-            # Password Input with Icon
             rx.vstack(
                 rx.text("Password", weight="bold", color=rx.color("gray", 12)),
                 rx.input(
@@ -90,7 +85,6 @@ def login_form() -> rx.Component:
                 spacing="1",
                 width="100%",
             ),
-            # Login Button with Loading State
             rx.button(
                 rx.cond(
                     CustomLoginState.is_submitting,
@@ -110,7 +104,6 @@ def login_form() -> rx.Component:
                     "transition": "all 0.3s ease",
                 },
             ),
-            # Register Link with Icon
             rx.center(
                 rx.link(
                     rx.hstack(
@@ -141,31 +134,34 @@ def login_form() -> rx.Component:
     show_nav=False,
     on_load=[
         CustomLoginState.reset_form_state,
+        CustomLoginState.route_calc,
     ],
 )
 def login_page() -> rx.Component:
     """Render the login page with a fade-in transition."""
-    return rx.center(
-        rx.card(
-            login_form(),
-            width=["90%", "80%", "500px"],
-            padding="2em",
-            box_shadow="0 8px 32px rgba(0, 0, 0, 0.1)",
-            border_radius="lg",
-            background=rx.color("gray", 1),
-            _dark={"background": rx.color("gray", 12)},
-            transition="all 0.3s ease",
-            _hover={
-                "box_shadow": "0 12px 48px rgba(0, 0, 0, 0.15)",
-                "transform": "translateY(-4px)",
-            },
+    return (
+        rx.center(
+            rx.card(
+                login_form(),
+                width=["90%", "80%", "500px"],
+                padding="2em",
+                box_shadow="0 8px 32px rgba(0, 0, 0, 0.1)",
+                border_radius="lg",
+                background=rx.color("gray", 1),
+                _dark={"background": rx.color("gray", 12)},
+                transition="all 0.3s ease",
+                _hover={
+                    "box_shadow": "0 12px 48px rgba(0, 0, 0, 0.15)",
+                    "transform": "translateY(-4px)",
+                },
+            ),
+            padding_top="2em",
+            width="100%",
+            height="85vh",
+            align="center",
+            justify="center",
+            background=rx.color("gray", 2),
+            _dark={"background": rx.color("gray", 11)},
+            transition="opacity 0.5s ease-in-out",
         ),
-        padding_top="2em",
-        width="100%",
-        height="85vh",
-        align="center",
-        justify="center",
-        background=rx.color("gray", 2),
-        _dark={"background": rx.color("gray", 11)},
-        transition="opacity 0.5s ease-in-out",
     )

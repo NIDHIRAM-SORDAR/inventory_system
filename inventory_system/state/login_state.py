@@ -1,3 +1,5 @@
+import asyncio
+
 import reflex as rx
 import reflex_local_auth
 from sqlmodel import select
@@ -18,6 +20,13 @@ class CustomLoginState(AuthState):
     def is_login(self) -> bool:
         """Computed var to check if the user is logged in."""
         return self.authenticated_user.id >= 0
+
+    def route_calc(self):
+        """Handle redirects for authenticated users on page load."""
+        if self.is_login:
+            if self.is_admin:
+                return rx.redirect(routes.ADMIN_ROUTE)
+            return rx.redirect(routes.OVERVIEW_ROUTE)
 
     def reset_form_state(self):
         """Reset form state on page load."""
@@ -51,11 +60,10 @@ class CustomLoginState(AuthState):
                         UserInfo.user_id == self.authenticated_user.id
                     )
                 ).one_or_none()
+                asyncio.sleep(3)
                 if user_info and user_info.is_admin:
-                    return rx.redirect(routes.ADMIN_ROUTE)
-                return rx.redirect(routes.OVERVIEW_ROUTE)
+                    yield rx.redirect(routes.ADMIN_ROUTE)
+                yield rx.redirect(routes.OVERVIEW_ROUTE)
 
         finally:
-            self.is_submitting = (
-                False  # Ensure is_submitting is reset even if an error occurs
-            )
+            self.is_submitting = False
