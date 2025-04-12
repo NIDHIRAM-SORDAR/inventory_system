@@ -7,7 +7,6 @@ import reflex_local_auth
 
 from inventory_system import routes
 from inventory_system.models import UserInfo
-from inventory_system.state.login_state import LoginState
 
 from ..constants import DEFAULT_PROFILE_PICTURE
 from ..templates import template
@@ -321,8 +320,6 @@ def register_form() -> rx.Component:
     title="Signup",
     show_nav=False,
     on_load=[
-        LoginState.reset_transition,
-        LoginState.start_transition,
         CustomRegisterState.reset_form_state,
     ],
 )
@@ -377,7 +374,6 @@ def register_page() -> rx.Component:
         justify="center",
         background=rx.color("gray", 2),
         _dark={"background": rx.color("gray", 11)},
-        opacity=rx.cond(LoginState.show_login, "1.0", "0.0"),
         transition="opacity 0.5s ease-in-out",
         overflow="auto",  # Prevent content from stretching outside
         box_sizing="border-box",  # Ensure padding is included in width calculations

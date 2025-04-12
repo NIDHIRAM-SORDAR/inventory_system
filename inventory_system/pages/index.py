@@ -1,7 +1,6 @@
 import reflex as rx
 
 from inventory_system import routes
-from inventory_system.state.login_state import LoginState
 from inventory_system.templates import template
 
 
@@ -118,7 +117,7 @@ def index() -> rx.Component:
                         "transform": "scale(1.05)",
                     },
                     transition="all 0.3s ease-in-out",
-                    on_click=LoginState.trigger_login_transition,
+                    on_click=rx.redirect(routes.LOGIN_ROUTE),
                 ),
                 rx.button(
                     rx.hstack(
