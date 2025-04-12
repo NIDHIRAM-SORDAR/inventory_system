@@ -4,6 +4,7 @@ import reflex as rx
 
 from inventory_system import routes, styles
 from inventory_system.state.auth import AuthState
+from inventory_system.state.login_state import CustomLoginState
 from inventory_system.state.logout_state import LogoutState
 from inventory_system.state.profile_picture_state import ProfilePictureState
 
@@ -98,37 +99,43 @@ def navbar_footer() -> rx.Component:
 
 
 def user_avatar() -> rx.Component:
-    """User avatar component with dropdown menu for authenticated users or login button for guests."""
+    """User avatar component with dropdown menu for authenticated users or login icon for guests."""
     return rx.fragment(
         rx.cond(
-            AuthState.is_computing,  # Check if user info is loading
-            rx.box(),  # Render nothing during loading
-            rx.cond(
-                AuthState.authenticated_user.id >= 0,
-                rx.menu.root(
-                    rx.menu.trigger(
-                        rx.avatar(
-                            src=ProfilePictureState.profile_picture,
-                            name=AuthState.authenticated_user.username,
-                            size="2",
-                        ),
-                    ),
-                    rx.menu.content(
-                        rx.menu.item(
-                            "Profile",
-                            on_click=lambda: rx.redirect(routes.PROFILE_ROUTE),
-                        ),
-                        rx.menu.item(
-                            "Settings",
-                            on_click=lambda: rx.redirect(routes.SETTINGS_ROUTE),
-                        ),
-                        rx.menu.separator(),
-                        rx.menu.item("Logout", on_click=LogoutState.toggle_dialog),
+            CustomLoginState.is_login,
+            rx.menu.root(
+                rx.menu.trigger(
+                    rx.avatar(
+                        src=ProfilePictureState.profile_picture,
+                        name=AuthState.authenticated_user.username,
+                        size="2",
                     ),
                 ),
-                rx.button(
-                    "Login", on_click=lambda: rx.redirect(routes.LOGIN_ROUTE), size="2"
+                rx.menu.content(
+                    rx.menu.item(
+                        "Profile", on_click=lambda: rx.redirect(routes.PROFILE_ROUTE)
+                    ),
+                    rx.menu.item(
+                        "Settings", on_click=lambda: rx.redirect(routes.SETTINGS_ROUTE)
+                    ),
+                    rx.menu.separator(),
+                    rx.menu.item("Logout", on_click=LogoutState.toggle_dialog),
                 ),
+            ),
+            rx.button(
+                rx.icon(
+                    "log-in", size=20
+                ),  # Use log-in icon, size matches navbar style
+                on_click=lambda: rx.redirect(routes.LOGIN_ROUTE),
+                variant="ghost",  # Blends with navbar
+                size="2",  # Matches avatar size
+                color_scheme="gray",  # Subtle, consistent with navbar
+                padding="0.5em",  # Tight padding for alignment
+                _hover={
+                    "color": styles.accent_text_color,
+                    "background_color": styles.gray_bg_color,
+                    "transition": "color 0.2s ease, background-color 0.2s ease",  # Smooth hover
+                },
             ),
         ),
         logout_dialog(),

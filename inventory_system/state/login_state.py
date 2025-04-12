@@ -14,6 +14,11 @@ class CustomLoginState(AuthState):
     error_message: str = ""
     is_submitting: bool = False
 
+    @rx.var
+    def is_login(self) -> bool:
+        """Computed var to check if the user is logged in."""
+        return self.authenticated_user.id >= 0
+
     def reset_form_state(self):
         """Reset form state on page load."""
         self.error_message = ""
