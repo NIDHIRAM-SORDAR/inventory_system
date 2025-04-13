@@ -3,16 +3,12 @@ from datetime import timedelta
 
 import reflex as rx
 import reflex_local_auth
-import structlog
 from sqlmodel import select
 
 from inventory_system import routes
 from inventory_system.state.auth import AuthState
-
-from ..constants import LOG_DIR
-from ..models import UserInfo
-
-audit_logger = structlog.get_logger(LOG_DIR)
+from inventory_system.models import UserInfo
+from inventory_system.logging import audit_logger
 
 
 class CustomLoginState(AuthState):
@@ -48,7 +44,7 @@ class CustomLoginState(AuthState):
             "http_request",
             method="POST",
             url=self.router.page.raw_path,
-            user_id=None,  # Before authentication
+            user_id=None,
             ip_address=self.router.session.client_ip,
         )
 
@@ -95,7 +91,7 @@ class CustomLoginState(AuthState):
 
         finally:
             self.is_submitting = False
-            # Log HTTP response (simulated)
+            # Log HTTP response
             audit_logger.info(
                 "http_response",
                 method="POST",

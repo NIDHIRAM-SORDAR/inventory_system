@@ -7,10 +7,11 @@ import reflex as rx
 
 from . import styles
 from .pages import *
+from inventory_system.logging import setup_loguru
 
 # Set the environment variable
 os.environ["REFLEX_UPLOADED_FILES_DIR"] = "assets/uploads"
-
+setup_loguru()
 # Create the app.
 app = rx.App(
     style=styles.base_style,

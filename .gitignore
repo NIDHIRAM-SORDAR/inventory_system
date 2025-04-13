@@ -11,3 +11,4 @@ venv/
 .env
 
 inventory_system/create_admin.py
+assets/logs/*

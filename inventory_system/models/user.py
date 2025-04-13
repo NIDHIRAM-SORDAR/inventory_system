@@ -7,9 +7,7 @@ from sqlalchemy import event, inspect
 from sqlalchemy.orm import Mapper
 from sqlmodel import Field, Relationship
 
-from ..constants import LOG_DIR
-
-audit_logger = structlog.get_logger(LOG_DIR)
+from inventory_system.logging import audit_logger
 
 
 def get_utc_now() -> datetime:
@@ -45,13 +43,13 @@ def log_db_changes(mapper: Mapper, connection, target: rx.Model):
             details["changes"] = changes
         else:
             return  # Skip logging empty updates
-    elif state.was_deleted:  # DELETE
+    elif state.deleted:  # DELETE
         action = f"delete_{target.__tablename__}"
-        # Use state.attrs to get attribute values before deletion
+        # Use the target instance directly to capture attributes before deletion
         details["deleted"] = {
-            attr.key: attr.value
-            for attr in state.attrs
-            if not attr.key.startswith("_") and attr.value is not None
+            attr: getattr(target, attr)
+            for attr in target.__table__.columns.keys()
+            if not attr.startswith("_")
         }
 
     if action:
@@ -105,9 +103,13 @@ class Supplier(rx.Model, table=True):
         self.updated_at = get_utc_now()
 
 
-event.listen(UserInfo, "after_insert", log_db_changes)
-event.listen(UserInfo, "after_update", log_db_changes)
-event.listen(UserInfo, "before_delete", log_db_changes)
-event.listen(Supplier, "after_insert", log_db_changes)
-event.listen(Supplier, "after_update", log_db_changes)
-event.listen(Supplier, "before_delete", log_db_changes)
+def attach_event_listeners(model):
+    """Attach event listeners to a model."""
+    event.listen(model, "after_insert", log_db_changes)
+    event.listen(model, "after_update", log_db_changes)
+    event.listen(model, "before_delete", log_db_changes)
+
+
+# Attach event listeners to models
+attach_event_listeners(UserInfo)
+attach_event_listeners(Supplier)
