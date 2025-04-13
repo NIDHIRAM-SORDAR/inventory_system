@@ -7,7 +7,7 @@ from sqlmodel import select
 
 from inventory_system import routes
 from inventory_system.logging.logging import audit_logger
-from inventory_system.models import UserInfo
+from inventory_system.models.user import UserInfo
 from inventory_system.state.auth import AuthState
 
 
@@ -21,6 +21,10 @@ class CustomLoginState(AuthState):
     def is_login(self) -> bool:
         """Computed var to check if the user is logged in."""
         return self.authenticated_user.id >= 0
+
+    @rx.var(cache=True)
+    def get_username(self) -> str | None:
+        return self.authenticated_user.username if self.authenticated_user else None
 
     def route_calc(self):
         """Handle redirects for authenticated users on page load."""
@@ -45,6 +49,7 @@ class CustomLoginState(AuthState):
             method="POST",
             url=self.router.page.raw_path,
             user_id=None,
+            username=form_data.get("username"),  # Include username from form
             ip_address=self.router.session.client_ip,
         )
 
@@ -73,7 +78,7 @@ class CustomLoginState(AuthState):
                 audit_logger.info(
                     "login_success",
                     user_id=user.id,
-                    username=form_data["username"],
+                    username=self.get_username,
                     ip_address=self.router.session.client_ip,
                     method="POST",
                     url=self.router.page.raw_path,
@@ -97,6 +102,9 @@ class CustomLoginState(AuthState):
                 method="POST",
                 url=self.router.page.raw_path,
                 user_id=user.id if user else None,
+                username=self.get_username
+                if self.get_username
+                else form_data.get("username"),
                 ip_address=self.router.session.client_ip,
                 status_code=200 if user else 401,
             )

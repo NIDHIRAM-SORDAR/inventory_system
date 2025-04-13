@@ -3,15 +3,35 @@ Audit logging module for SQLModel/SQLAlchemy models.
 Provides functions to automatically log database operations.
 """
 
+import reflex as rx
+import reflex_local_auth  # Import LocalUser for username lookup
 from sqlalchemy import event, inspect
 from sqlalchemy.orm import Mapper
+from sqlmodel import select
 
 from inventory_system.logging.logging import audit_logger
+
+
+def get_username_by_user_id(user_id):
+    """Helper function to fetch username from LocalUser by user_id."""
+    if user_id is None:
+        return None
+    try:
+        with rx.session() as session:
+            user = session.exec(
+                select(reflex_local_auth.LocalUser).where(
+                    reflex_local_auth.LocalUser.id == user_id
+                )
+            ).one_or_none()
+            return user.username if user else None
+    except Exception:
+        return None
 
 
 def log_insert(mapper: Mapper, connection, target):
     """Log insertion of a new record."""
     user_id = getattr(target, "user_id", None)
+    username = get_username_by_user_id(user_id) if user_id else None
 
     details = {"new": {k: v for k, v in target.dict().items() if not k.startswith("_")}}
 
@@ -20,6 +40,7 @@ def log_insert(mapper: Mapper, connection, target):
         user_id=user_id,
         entity_type=target.__tablename__,
         entity_id=target.id,
+        username=username,
         details=details,
     )
 
@@ -28,6 +49,7 @@ def log_update(mapper: Mapper, connection, target):
     """Log updates to an existing record."""
     state = inspect(target)
     user_id = getattr(target, "user_id", None)
+    username = get_username_by_user_id(user_id) if user_id else None
 
     changes = {}
     for attr in state.attrs:
@@ -48,6 +70,7 @@ def log_update(mapper: Mapper, connection, target):
         user_id=user_id,
         entity_type=target.__tablename__,
         entity_id=target.id,
+        username=username,
         details=details,
     )
 
@@ -55,6 +78,7 @@ def log_update(mapper: Mapper, connection, target):
 def log_delete(mapper: Mapper, connection, target):
     """Log deletion of a record."""
     user_id = getattr(target, "user_id", None)
+    username = get_username_by_user_id(user_id) if user_id else None
 
     details = {
         "deleted": {
@@ -69,6 +93,7 @@ def log_delete(mapper: Mapper, connection, target):
         user_id=user_id,
         entity_type=target.__tablename__,
         entity_id=target.id,
+        username=username,
         details=details,
     )
 

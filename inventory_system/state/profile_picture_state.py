@@ -6,7 +6,7 @@ from pathlib import Path
 import reflex as rx
 from sqlmodel import select
 
-from inventory_system.models import UserInfo
+from inventory_system.models.user import UserInfo
 from inventory_system.state.auth import AuthState
 
 from ..constants import DEFAULT_PROFILE_PICTURE

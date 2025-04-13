@@ -6,7 +6,7 @@ import reflex as rx
 import reflex_local_auth
 
 from inventory_system import routes
-from inventory_system.state.auth import AuthState
+from inventory_system.state.login_state import CustomLoginState
 
 from .. import styles
 from ..components.card import card
@@ -60,18 +60,7 @@ def overview() -> rx.Component:
 
     """
     return rx.vstack(
-        rx.cond(
-            AuthState.is_authenticated,  # Use is_authenticated first
-            rx.heading(
-                rx.cond(
-                    AuthState.authenticated_user_info,
-                    f"Welcome, {AuthState.authenticated_user.username}",
-                    "Welcome, User",
-                ),
-                size="5",
-            ),
-            rx.heading("Please log in", size="5"),
-        ),
+        rx.heading(f"Welcome {CustomLoginState.get_username}", size="5"),
         rx.flex(
             rx.input(
                 rx.input.slot(rx.icon("search"), padding_left="0"),

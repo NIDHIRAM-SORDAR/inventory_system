@@ -5,7 +5,7 @@ from email_validator import EmailNotValidError, validate_email
 from sqlmodel import select
 
 from inventory_system import routes
-from inventory_system.models import Supplier
+from inventory_system.models.user import Supplier
 from inventory_system.templates.template import template
 
 

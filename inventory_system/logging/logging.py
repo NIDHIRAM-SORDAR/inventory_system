@@ -51,7 +51,14 @@ def format_record(record):
     if "method" in extras and "url" in extras:
         # HTTP request/response logs
         http_context = []
-        for field in ["method", "url", "status_code", "user_id", "ip_address"]:
+        for field in [
+            "method",
+            "url",
+            "status_code",
+            "user_id",
+            "ip_address",
+            "username",
+        ]:
             if field in extras and extras[field] is not None:
                 http_context.append(f"{field}={extras[field]}")
 
@@ -63,6 +70,7 @@ def format_record(record):
         db_context = [
             f"entity={extras['entity_type']}",
             f"id={extras['entity_id']}",
+            f"username={extras['username']}",
         ]
 
         if "user_id" in extras and extras["user_id"] is not None:

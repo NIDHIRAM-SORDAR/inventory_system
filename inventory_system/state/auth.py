@@ -5,7 +5,7 @@ import reflex as rx
 import reflex_local_auth
 import sqlmodel
 
-from ..models import UserInfo
+from inventory_system.models.user import UserInfo
 
 
 class AuthState(reflex_local_auth.LocalAuthState):

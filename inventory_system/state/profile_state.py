@@ -4,7 +4,7 @@ import reflex_local_auth
 from sqlmodel import select
 
 from inventory_system import routes
-from inventory_system.models import UserInfo
+from inventory_system.models.user import UserInfo
 from inventory_system.state.auth import AuthState
 
 

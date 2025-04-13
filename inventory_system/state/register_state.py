@@ -6,7 +6,7 @@ import reflex as rx
 import reflex_local_auth
 
 from inventory_system import routes
-from inventory_system.models import UserInfo
+from inventory_system.models.user import UserInfo
 
 from ..constants import DEFAULT_PROFILE_PICTURE
 
