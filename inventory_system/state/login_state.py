@@ -1,13 +1,18 @@
 import asyncio
+from datetime import timedelta
 
 import reflex as rx
 import reflex_local_auth
+import structlog
 from sqlmodel import select
 
 from inventory_system import routes
-from inventory_system.state.auth import AuthState  # Import LoginState for transition
+from inventory_system.state.auth import AuthState
 
+from ..constants import LOG_DIR
 from ..models import UserInfo
+
+audit_logger = structlog.get_logger(LOG_DIR)
 
 
 class CustomLoginState(AuthState):
@@ -38,6 +43,15 @@ class CustomLoginState(AuthState):
         self.error_message = ""
         self.is_submitting = True
 
+        # Log HTTP request
+        audit_logger.info(
+            "http_request",
+            method="POST",
+            url=self.router.page.raw_path,
+            user_id=None,  # Before authentication
+            ip_address=self.router.session.client_ip,
+        )
+
         try:
             with rx.session() as session:
                 user = session.exec(
@@ -49,21 +63,44 @@ class CustomLoginState(AuthState):
                 if not user or not user.verify(form_data["password"]):
                     self.error_message = "Invalid username or password"
                     self.is_submitting = False
+                    audit_logger.info(
+                        "login_failed",
+                        username=form_data["username"],
+                        error=self.error_message,
+                        ip_address=self.router.session.client_ip,
+                        method="POST",
+                        url=self.router.page.raw_path,
+                    )
                     return
 
-                # Explicitly call our custom _login method
-                self._login(user.id)
+                self._login(user.id, expiration_delta=timedelta(days=7))
+                audit_logger.info(
+                    "login_success",
+                    user_id=user.id,
+                    username=form_data["username"],
+                    ip_address=self.router.session.client_ip,
+                    method="POST",
+                    url=self.router.page.raw_path,
+                )
 
-                # Check user role and redirect
                 user_info = session.exec(
                     select(UserInfo).where(
                         UserInfo.user_id == self.authenticated_user.id
                     )
                 ).one_or_none()
-                asyncio.sleep(3)
+                await asyncio.sleep(1)  # Adjusted for async
                 if user_info and user_info.is_admin:
-                    yield rx.redirect(routes.ADMIN_ROUTE)
-                yield rx.redirect(routes.OVERVIEW_ROUTE)
+                    return rx.redirect(routes.ADMIN_ROUTE)
+                return rx.redirect(routes.OVERVIEW_ROUTE)
 
         finally:
             self.is_submitting = False
+            # Log HTTP response (simulated)
+            audit_logger.info(
+                "http_response",
+                method="POST",
+                url=self.router.page.raw_path,
+                user_id=user.id if user else None,
+                ip_address=self.router.session.client_ip,
+                status_code=200 if user else 401,
+            )
