@@ -6,9 +6,9 @@ import reflex_local_auth
 from sqlmodel import select
 
 from inventory_system import routes
-from inventory_system.state.auth import AuthState
+from inventory_system.logging.logging import audit_logger
 from inventory_system.models import UserInfo
-from inventory_system.logging import audit_logger
+from inventory_system.state.auth import AuthState
 
 
 class CustomLoginState(AuthState):

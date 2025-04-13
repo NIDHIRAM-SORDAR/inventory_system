@@ -86,10 +86,8 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                 self.registration_error = ""
                 yield rx.redirect(routes.LOGIN_ROUTE)
             else:
-                self.registration_error = (
-                    reflex_local_auth.RegistrationState.error_message
-                    | "Registration failed."
-                )
+                # Use a plain string for the error message
+                self.registration_error = "Registration failed. Please try again."
                 self.is_submitting = False
 
         except Exception as e:

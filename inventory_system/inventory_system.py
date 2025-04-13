@@ -5,9 +5,10 @@ import os
 
 import reflex as rx
 
+from inventory_system.logging.logging import setup_loguru
+
 from . import styles
 from .pages import *
-from inventory_system.logging import setup_loguru
 
 # Set the environment variable
 os.environ["REFLEX_UPLOADED_FILES_DIR"] = "assets/uploads"
