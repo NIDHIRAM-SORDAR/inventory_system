@@ -4,8 +4,10 @@ import os
 
 import reflex as rx
 import reflex_local_auth
+from sqlmodel import select
 
 from inventory_system import routes
+from inventory_system.logging.logging import audit_logger
 from inventory_system.models.user import UserInfo
 
 from ..constants import DEFAULT_PROFILE_PICTURE
@@ -50,50 +52,153 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
     async def handle_registration_with_email(self, form_data):
         """Handle registration and create UserInfo entry with toast and delay."""
         self.registration_error = ""
+        self.error_message = ""  # Clear parent error message too initially
         self.is_submitting = True
+        self.new_user_id = -1  # Ensure reset
+
+        username = form_data.get("username", "N/A")
+        email = form_data.get("email", "N/A")
+        submitted_id = form_data.get("id", "N/A")
+        ip_address = self.router.session.client_ip
+
+        audit_logger.info(  # Log attempt
+            "attempt_registration",
+            username=username,
+            email=email,
+            submitted_id=submitted_id,
+            ip_address=ip_address,
+        )
 
         try:
-            # Validate user ID and email
+            # 1. Custom Validation
             if not self.validate_user(form_data):
                 self.registration_error = (
                     "Invalid ID or email. Please check your details."
                 )
+                # Log is handled inside validate_user
                 self.is_submitting = False
                 return
 
-            # Proceed with registration
+            # 2. Proceed with base registration (calls _validate_fields -> sets self.error_message on fail)
+            # Store the result which might contain event specs (though we had issues with them)
             self.handle_registration(form_data)
-            if self.new_user_id >= 0:
-                with rx.session() as session:
-                    user_info = UserInfo(
-                        email=form_data["email"],
-                        user_id=self.new_user_id,
-                        profile_picture=DEFAULT_PROFILE_PICTURE,
-                    )
-                    user_info.set_role()
-                    session.add(user_info)
-                    session.commit()
-                    session.refresh(user_info)
 
-                # Show success toast directly
-                yield rx.toast.success(
-                    "Registration successful! Redirecting to login...",
-                    position="top-center",
-                    duration=1000,
-                )
-                # Wait 1 second before redirecting
-                await asyncio.sleep(1)
-                self.registration_error = ""
-                yield rx.redirect(routes.LOGIN_ROUTE)
-            else:
-                # Use a plain string for the error message
-                self.registration_error = "Registration failed. Please try again."
+            # **** CHECK FOR PARENT ERROR MESSAGE ****
+            # If the base handler failed validation, it would have set self.error_message
+            if self.error_message:
+                # Copy the parent's error message to the child's variable
+                self.registration_error = self.error_message
                 self.is_submitting = False
+                audit_logger.warning(  # Log base validation failure
+                    "registration_validation_failed",
+                    reason=self.registration_error,
+                    username=username,
+                    ip_address=ip_address,
+                )
+                # If validation_result contained focus/value events, yielding them caused errors.
+                # So, we just return here, relying on the registration_error display.
+                return
+
+            # 3. Check if LocalUser was created successfully
+            if self.new_user_id >= 0:
+                # **** Log LocalUser creation success (part 1 of registration) ****
+                audit_logger.info(
+                    "registration_localuser_created",
+                    username=username,
+                    user_id=self.new_user_id,
+                    ip_address=ip_address,
+                )
+                # 4. Create UserInfo
+                with rx.session() as session:
+                    try:
+                        # ... (Check for existing UserInfo - good practice)
+                        existing_info = session.exec(
+                            select(UserInfo).where(UserInfo.user_id == self.new_user_id)
+                        ).first()
+                        if existing_info:
+                            audit_logger.warning(
+                                "registration_warning",
+                                reason="UserInfo already exists",
+                                username=username,
+                                user_id=self.new_user_id,
+                                ip_address=ip_address,
+                            )
+
+                        user_info = UserInfo(
+                            email=form_data["email"],
+                            user_id=self.new_user_id,
+                            profile_picture=DEFAULT_PROFILE_PICTURE,
+                        )
+                        user_info.set_role()
+                        session.add(user_info)
+                        session.commit()
+                        session.refresh(user_info)
+
+                        # **** Log full registration success ****
+                        audit_logger.info(
+                            "success_registration",
+                            username=username,
+                            email=email,
+                            user_id=self.new_user_id,
+                            user_info_id=user_info.id,
+                            role=user_info.role,
+                            ip_address=ip_address,
+                        )
+
+                        # 5. Show success feedback and redirect (async part)
+                        yield rx.toast.success(
+                            "Registration successful! Redirecting to login...",
+                            position="top-center",
+                            duration=1000,  # Using 2 seconds delay
+                        )
+                        await asyncio.sleep(2)  # Using 2 seconds delay
+                        self.registration_error = ""  # Clear error on success path
+                        yield rx.redirect(routes.LOGIN_ROUTE)
+                        # No need to explicitly set success=False here if UI doesn't depend on it
+
+                    except Exception as db_error:
+                        # Error during UserInfo creation
+                        self.registration_error = "Registration partially failed: Could not save user details."
+                        audit_logger.error(
+                            "registration_failed",
+                            reason="Error creating UserInfo",
+                            username=username,
+                            user_id=self.new_user_id,
+                            error=str(db_error),
+                            ip_address=ip_address,
+                        )
+                        session.rollback()
+                        # Fall through to finally block
+
+            else:
+                # Base registration validation passed, but LocalUser wasn't created (self.new_user_id < 0)
+                # self.error_message might have been set by _register_user if it failed,
+                # otherwise provide a generic message.
+                self.registration_error = (
+                    self.error_message
+                    or "Registration failed: Could not create user account."
+                )
+                audit_logger.error(
+                    "registration_failed",
+                    reason=self.registration_error,
+                    username=username,
+                    ip_address=ip_address,
+                )
+                # Fall through to finally block
 
         except Exception as e:
             self.registration_error = "An unexpected error occurred. Please try again."
-            print(f"Registration error: {str(e)}")  # Log for debugging
-            self.is_submitting = False
+            print(f"Registration error: {str(e)}")  # Keep for debugging
+            audit_logger.critical(  # Log unexpected errors
+                "registration_failed_unexpected",
+                reason=str(e),
+                username=username,
+                email=email,
+                submitted_id=submitted_id,
+                ip_address=ip_address,
+                exception_type=type(e).__name__,
+            )
+            # Fall through to finally block
 
         finally:
-            self.is_submitting = False
+            self.is_submitting = False  # Ensure this always runs

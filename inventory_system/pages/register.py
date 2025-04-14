@@ -73,6 +73,7 @@ def register_form() -> rx.Component:
                 rx.input(
                     rx.input.slot(rx.icon("user", color=rx.color("purple", 8))),
                     name="username",
+                    id="username",
                     type="text",
                     placeholder="Enter your username",
                     width="100%",
@@ -231,45 +232,28 @@ def register_form() -> rx.Component:
 def register_page() -> rx.Component:
     """Render the registration page with a fade-in transition."""
     return rx.center(
-        rx.cond(
-            reflex_local_auth.RegistrationState.success,
-            rx.vstack(
-                rx.text("Registration successful!"),
-                rx.link(
-                    rx.hstack(
-                        rx.icon("log_in", size=16, color=rx.color("purple", 8)),
-                        rx.text("Go to Login", color=rx.color("purple", 8)),
-                        spacing="2",
-                    ),
-                    href=reflex_local_auth.routes.LOGIN_ROUTE,
-                    _hover={"text_decoration": "underline"},
-                ),
-                spacing="4",
-                align="center",
-            ),
-            rx.card(
-                register_form(),
-                width="100%",  # Ensure the card takes full width of its container
-                max_width=[
-                    "90%",
-                    "80%",
-                    "500px",
-                ],  # Responsive max_width: 90% on small, 80% on medium, 500px on large
-                padding=[
-                    "1em",
-                    "1.5em",
-                    "2em",
-                ],  # Responsive padding: smaller on small screens
-                box_shadow="0 8px 32px rgba(0, 0, 0, 0.1)",
-                border_radius="lg",
-                background=rx.color("gray", 1),
-                _dark={"background": rx.color("gray", 12)},
-                transition="all 0.3s ease",
-                _hover={
-                    "box_shadow": "0 12px 48px rgba(0, 0, 0, 0.15)",
-                    "transform": "translateY(-4px)",
-                },
-            ),
+        rx.card(
+            register_form(),
+            width="100%",  # Ensure the card takes full width of its container
+            max_width=[
+                "90%",
+                "80%",
+                "500px",
+            ],  # Responsive max_width: 90% on small, 80% on medium, 500px on large
+            padding=[
+                "1em",
+                "1.5em",
+                "2em",
+            ],  # Responsive padding: smaller on small screens
+            box_shadow="0 8px 32px rgba(0, 0, 0, 0.1)",
+            border_radius="lg",
+            background=rx.color("gray", 1),
+            _dark={"background": rx.color("gray", 12)},
+            transition="all 0.3s ease",
+            _hover={
+                "box_shadow": "0 12px 48px rgba(0, 0, 0, 0.15)",
+                "transform": "translateY(-4px)",
+            },
         ),
         padding=["1em", "1.5em", "2em"],  # Responsive padding for the container
         width="100%",  # Ensure the container takes full viewport width
