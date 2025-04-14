@@ -4,6 +4,7 @@ import reflex as rx
 import reflex_local_auth
 from sqlmodel import select
 
+from inventory_system.logging.logging import audit_logger
 from inventory_system.models.user import UserInfo
 from inventory_system.state.auth import AuthState
 
@@ -81,6 +82,22 @@ class UserManagementState(AuthState):
     def change_user_role(self, user_id: int, make_admin: bool):
         self.is_loading = True
         self.admin_error_message = ""
+        # **** Get current user information ****
+        acting_user_id = self.authenticated_user.id if self.authenticated_user else None
+        acting_username = (
+            self.authenticated_user.username if self.authenticated_user else "Unknown"
+        )
+        target_role = "admin" if make_admin else "employee"
+
+        # **** Log the intent BEFORE the operation ****
+        audit_logger.info(
+            f"attempt_change_role_{target_role}",
+            acting_user_id=acting_user_id,
+            acting_username=acting_username,
+            target_user_id=user_id,
+            target_role=target_role,
+            ip_address=self.router.session.client_ip,  # Add IP if available
+        )
         with rx.session() as session:
             user_info = session.exec(
                 select(UserInfo).where(UserInfo.user_id == user_id)
@@ -88,14 +105,51 @@ class UserManagementState(AuthState):
             if not user_info:
                 self.admin_error_message = "User info not found."
                 self.is_loading = False
+                # **** Log failure ****
+                audit_logger.error(
+                    f"fail_change_role_{target_role}",
+                    acting_user_id=acting_user_id,
+                    acting_username=acting_username,
+                    target_user_id=user_id,
+                    reason="User info not found",
+                    ip_address=self.router.session.client_ip,
+                )
                 return
+            original_role = (
+                user_info.role
+            )  # Capture original role for logging if needed
             user_info.is_admin = make_admin
             if make_admin:
                 user_info.is_supplier = False
             user_info.set_role()
             session.add(user_info)
-            session.commit()
-            self.check_auth_and_load()
+            try:
+                session.commit()
+                # The SQLAlchemy listener (log_update) will log the actual change details.
+                # You could add a success log here too if desired, complementing the SQLAlchemy log.
+                audit_logger.info(
+                    f"success_change_role_{target_role}",
+                    acting_user_id=acting_user_id,
+                    acting_username=acting_username,
+                    target_user_id=user_id,
+                    original_role=original_role,
+                    new_role=user_info.role,
+                    ip_address=self.router.session.client_ip,
+                )
+                self.check_auth_and_load()  # Refresh data
+            except Exception as e:
+                session.rollback()
+                self.admin_error_message = f"Failed to change role: {e}"
+                # **** Log failure ****
+                audit_logger.error(
+                    f"fail_change_role_{target_role}",
+                    acting_user_id=acting_user_id,
+                    acting_username=acting_username,
+                    target_user_id=user_id,
+                    reason=f"Database error: {e}",
+                    ip_address=self.router.session.client_ip,
+                )
+
         self.is_loading = False
         self.show_admin_dialog = False  # Close dialogs
         self.show_employee_dialog = False
@@ -124,6 +178,21 @@ class UserManagementState(AuthState):
     def delete_user(self):
         if self.user_to_delete is None:
             return
+        # **** Get current user information ****
+        acting_user_id = self.authenticated_user.id if self.authenticated_user else None
+        acting_username = (
+            self.authenticated_user.username if self.authenticated_user else "Unknown"
+        )
+        target_user_id = self.user_to_delete
+
+        # **** Log the intent BEFORE the operation ****
+        audit_logger.info(
+            "attempt_delete_user",
+            acting_user_id=acting_user_id,
+            acting_username=acting_username,
+            target_user_id=target_user_id,
+            ip_address=self.router.session.client_ip,
+        )
         self.is_loading = True
         self.admin_error_message = ""
         with rx.session() as session:
@@ -141,9 +210,25 @@ class UserManagementState(AuthState):
                 session.delete(user_info)
                 try:
                     session.commit()
+                    # The SQLAlchemy listener (log_delete) will log details of the deleted record.
+                    audit_logger.info(
+                        "success_delete_user",
+                        acting_user_id=acting_user_id,
+                        acting_username=acting_username,
+                        target_user_id=target_user_id,
+                        ip_address=self.router.session.client_ip,
+                    )
                     self.check_auth_and_load()
                 except Exception as e:
-                    self.admin_error_message = f"Error deleting user: {str(e)}"
+                    # ... (error logging) ...
+                    audit_logger.error(
+                        "fail_delete_user",
+                        acting_user_id=acting_user_id,
+                        acting_username=acting_username,
+                        target_user_id=target_user_id,
+                        reason=f"Database error: {e}",
+                        ip_address=self.router.session.client_ip,
+                    )
                     session.rollback()
         self.show_delete_dialog = False
         self.user_to_delete = None
