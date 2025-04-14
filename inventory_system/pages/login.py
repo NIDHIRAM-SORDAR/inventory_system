@@ -42,7 +42,11 @@ def login_form() -> rx.Component:
             ),
             login_error(),
             rx.vstack(
-                rx.text("Username", weight="bold", color=rx.color("gray", 12)),
+                rx.hstack(
+                    rx.text("Username", weight="bold", color=rx.color("gray", 12)),
+                    rx.text("*", color="red"),  # Add asterisk
+                    spacing="1",
+                ),
                 rx.input(
                     rx.input.slot(rx.icon("user", color=rx.color("purple", 8))),
                     name="username",
@@ -64,7 +68,11 @@ def login_form() -> rx.Component:
                 width="100%",
             ),
             rx.vstack(
-                rx.text("Password", weight="bold", color=rx.color("gray", 12)),
+                rx.hstack(
+                    rx.text("Password", weight="bold", color=rx.color("gray", 12)),
+                    rx.text("*", color="red"),  # Add asterisk
+                    spacing="1",
+                ),
                 rx.input(
                     rx.input.slot(rx.icon("lock", color=rx.color("purple", 8))),
                     name="password",

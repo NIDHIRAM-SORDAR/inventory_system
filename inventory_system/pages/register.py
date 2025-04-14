@@ -46,7 +46,11 @@ def register_form() -> rx.Component:
             register_error(),
             # ID Input with Icon
             rx.vstack(
-                rx.text("ID", weight="bold", color=rx.color("gray", 12)),
+                rx.hstack(
+                    rx.text("ID", weight="bold", color=rx.color("gray", 12)),
+                    rx.text("*", color="red"),  # Add asterisk
+                    spacing="1",
+                ),
                 rx.input(
                     rx.input.slot(rx.icon("hash", color=rx.color("purple", 8))),
                     name="id",
@@ -69,7 +73,11 @@ def register_form() -> rx.Component:
             ),
             # Username Input with Icon
             rx.vstack(
-                rx.text("Username", weight="bold", color=rx.color("gray", 12)),
+                rx.hstack(  # Use hstack for label and asterisk
+                    rx.text("Username", weight="bold", color=rx.color("gray", 12)),
+                    rx.text("*", color="red"),  # Add asterisk
+                    spacing="1",
+                ),
                 rx.input(
                     rx.input.slot(rx.icon("user", color=rx.color("purple", 8))),
                     name="username",
@@ -93,7 +101,11 @@ def register_form() -> rx.Component:
             ),
             # Email Input with Icon
             rx.vstack(
-                rx.text("Email", weight="bold", color=rx.color("gray", 12)),
+                rx.hstack(
+                    rx.text("Email", weight="bold", color=rx.color("gray", 12)),
+                    rx.text("*", color="red"),  # Add asterisk
+                    spacing="1",
+                ),
                 rx.input(
                     rx.input.slot(rx.icon("mail", color=rx.color("purple", 8))),
                     name="email",
@@ -116,7 +128,11 @@ def register_form() -> rx.Component:
             ),
             # Password Input with Icon
             rx.vstack(
-                rx.text("Password", weight="bold", color=rx.color("gray", 12)),
+                rx.hstack(
+                    rx.text("Password", weight="bold", color=rx.color("gray", 12)),
+                    rx.text("*", color="red"),  # Add asterisk
+                    spacing="1",
+                ),
                 rx.input(
                     rx.input.slot(rx.icon("lock", color=rx.color("purple", 8))),
                     name="password",
@@ -139,7 +155,13 @@ def register_form() -> rx.Component:
             ),
             # Confirm Password Input with Icon
             rx.vstack(
-                rx.text("Confirm Password", weight="bold", color=rx.color("gray", 12)),
+                rx.hstack(
+                    rx.text(
+                        "Confirm Password", weight="bold", color=rx.color("gray", 12)
+                    ),
+                    rx.text("*", color="red"),  # Add asterisk
+                    spacing="1",
+                ),
                 rx.input(
                     rx.input.slot(rx.icon("lock", color=rx.color("purple", 8))),
                     name="confirm_password",
