@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 
 import reflex as rx
 import reflex_local_auth
@@ -48,6 +49,72 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
             ):
                 return True
         return False
+
+    def _validate_fields(
+        self, username, password, confirm_password
+    ) -> bool:  # Returns True if valid, False otherwise
+        """Override base validation to add specific constraints
+        and only set error messages, not return DOM events."""
+
+        self.registration_error = ""  # Use our custom error state var
+
+        # --- Username Constraints ---
+        if not username:
+            self.registration_error = "Username cannot be empty"
+            return False
+        if len(username) < 4:
+            self.registration_error = "Username must be at least 4 characters long"
+            return False
+        if len(username) > 20:
+            self.registration_error = "Username cannot exceed 20 characters"
+            return False
+        # Example: Alphanumeric + underscore only
+        if not re.match(r"^[a-zA-Z0-9_]+$", username):
+            self.registration_error = (
+                "Username can only contain letters, numbers, and underscores (_)"
+            )
+            return False
+        # Uniqueness Check
+        with rx.session() as session:
+            existing_user = session.exec(
+                select(reflex_local_auth.user.LocalUser).where(
+                    reflex_local_auth.user.LocalUser.username == username
+                )
+            ).one_or_none()
+        if existing_user is not None:
+            self.registration_error = (
+                f"Username {username} is already registered. Try a different name"
+            )
+            return False
+
+        # --- Password Constraints ---
+        if not password:
+            self.registration_error = "Password cannot be empty"
+            return False
+        if len(password) < 8:
+            self.registration_error = "Password must be at least 8 characters long"
+            return False
+        if not re.search(r"[A-Z]", password):
+            self.registration_error = "Password must contain an uppercase letter"
+            return False
+        if not re.search(r"[a-z]", password):
+            self.registration_error = "Password must contain a lowercase letter"
+            return False
+        if not re.search(r"[0-9]", password):
+            self.registration_error = "Password must contain a number"
+            return False
+        # Example: Check for at least one special character
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+            self.registration_error = "Password must contain a special character"
+            return False
+
+        # --- Confirm Password Check ---
+        if password != confirm_password:
+            self.registration_error = "Passwords do not match"
+            return False
+
+        # If all custom checks pass
+        return True  # Indicate validation success
 
     async def handle_registration_with_email(self, form_data):
         """Handle registration and create UserInfo entry with toast and delay."""
@@ -146,13 +213,13 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         )
 
                         # 5. Show success feedback and redirect (async part)
+                        self.registration_error = ""
                         yield rx.toast.success(
                             "Registration successful! Redirecting to login...",
                             position="top-center",
                             duration=1000,  # Using 2 seconds delay
                         )
                         await asyncio.sleep(2)  # Using 2 seconds delay
-                        self.registration_error = ""  # Clear error on success path
                         yield rx.redirect(routes.LOGIN_ROUTE)
                         # No need to explicitly set success=False here if UI doesn't depend on it
 

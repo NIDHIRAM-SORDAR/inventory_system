@@ -1,4 +1,6 @@
 # inventory_system/pages/supplier_register.py
+import re
+
 import reflex as rx
 import reflex_local_auth
 from email_validator import EmailNotValidError, validate_email
@@ -7,6 +9,9 @@ from sqlmodel import select
 from inventory_system import routes
 from inventory_system.models.user import Supplier
 from inventory_system.templates.template import template
+
+MAX_COMPANY_NAME_LENGTH = 100  # Example limit
+MAX_DESCRIPTION_LENGTH = 500  # Example limit
 
 
 class SupplierRegisterState(rx.State):
@@ -42,14 +47,28 @@ class SupplierRegisterState(rx.State):
         if not self.company_name:
             self.error_message = "Company name is required."
             return False
+        if len(self.company_name) > MAX_COMPANY_NAME_LENGTH:
+            self.error_message = (
+                f"Company name cannot exceed {MAX_COMPANY_NAME_LENGTH} characters."
+            )
+            return False
         if not self.description:
             self.error_message = "Description is required."
+            return False
+        if len(self.description) > MAX_DESCRIPTION_LENGTH:
+            self.error_message = (
+                f"Description cannot exceed {MAX_DESCRIPTION_LENGTH} characters."
+            )
             return False
         if not self.contact_email:
             self.error_message = "Contact email is required."
             return False
         if not self.contact_phone:
             self.error_message = "Contact phone is required."
+            return False
+        phone_regex = r"^(?:\+88)?\d{7,}$"
+        if not re.match(phone_regex, self.contact_phone):
+            self.error_message = "Please enter a valid phone number format."
             return False
         try:
             validate_email(self.contact_email)
@@ -142,7 +161,11 @@ def supplier_registration_form() -> rx.Component:
             ),
             # Company Name Input with Icon
             rx.vstack(
-                rx.text("Company Name", weight="bold", color=rx.color("gray", 12)),
+                rx.hstack(
+                    rx.text("Company Name", weight="bold", color=rx.color("gray", 12)),
+                    rx.text("*", color="red"),  # Add asterisk
+                    spacing="1",
+                ),
                 rx.input(
                     rx.input.slot(
                         rx.icon("building_2", color=rx.color("purple", 8))
@@ -167,7 +190,11 @@ def supplier_registration_form() -> rx.Component:
             ),
             # Replace the Description Input section
             rx.vstack(
-                rx.text("Description", weight="bold", color=rx.color("gray", 12)),
+                rx.hstack(
+                    rx.text("Description", weight="bold", color=rx.color("gray", 12)),
+                    rx.text("*", color="red"),  # Add asterisk
+                    spacing="1",
+                ),
                 rx.hstack(
                     rx.icon("file_text", color=rx.color("purple", 8), size=24),
                     rx.text_area(
@@ -195,7 +222,11 @@ def supplier_registration_form() -> rx.Component:
             ),
             # Contact Email Input with Icon
             rx.vstack(
-                rx.text("Contact Email", weight="bold", color=rx.color("gray", 12)),
+                rx.hstack(
+                    rx.text("Contact Email", weight="bold", color=rx.color("gray", 12)),
+                    rx.text("*", color="red"),  # Add asterisk
+                    spacing="1",
+                ),
                 rx.input(
                     rx.input.slot(
                         rx.icon("mail", color=rx.color("purple", 8))
@@ -221,7 +252,11 @@ def supplier_registration_form() -> rx.Component:
             ),
             # Contact Phone Input with Icon
             rx.vstack(
-                rx.text("Contact Phone", weight="bold", color=rx.color("gray", 12)),
+                rx.hstack(
+                    rx.text("Contact Phone", weight="bold", color=rx.color("gray", 12)),
+                    rx.text("*", color="red"),  # Add asterisk
+                    spacing="1",
+                ),
                 rx.input(
                     rx.input.slot(
                         rx.icon("phone", color=rx.color("purple", 8))
@@ -230,6 +265,7 @@ def supplier_registration_form() -> rx.Component:
                     on_change=SupplierRegisterState.set_contact_phone,
                     placeholder="Enter contact phone",
                     width="100%",
+                    type="tel",
                     required=True,
                     variant="soft",
                     color_scheme="purple",  # Changed "accent" to "purple"
