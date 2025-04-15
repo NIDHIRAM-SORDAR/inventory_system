@@ -1,4 +1,0 @@
-alembic
-assets
-inventory_system
-venv-inventory
