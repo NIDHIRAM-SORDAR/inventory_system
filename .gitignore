@@ -7,7 +7,7 @@ assets/external/
 .vscode/
 .web
 __pycache__/
-venv/
+venv-inventory/
 .env
 
 inventory_system/create_admin.py
