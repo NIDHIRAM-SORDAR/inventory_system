@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 import re
@@ -13,7 +12,7 @@ from inventory_system.models.user import UserInfo
 
 from ..constants import DEFAULT_PROFILE_PICTURE
 
-# Load user data from JSON file
+# Load user data from JSON files
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 USER_DATA_FILE = os.path.join(PROJECT_ROOT, "user_data.json")
 
@@ -29,7 +28,7 @@ def load_user_data():
 
 class CustomRegisterState(reflex_local_auth.RegistrationState):
     registration_error: str = ""
-    is_submitting: bool = False  # Added for loading state
+    is_submitting: bool = False  # Added for loading
 
     def reset_form_state(self):
         """Reset form state on page load."""
@@ -118,12 +117,16 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
 
     async def handle_registration_with_email(self, form_data):
         """Handle registration and create UserInfo entry with toast and delay."""
-        self.registration_error = ""
-        self.error_message = ""  # Clear parent error message too initially
+        self.registration_error = ""  # Clear custom error message
+        self.error_message = ""  # Clear parent error message
         self.is_submitting = True
         self.new_user_id = -1  # Ensure reset
 
         username = form_data.get("username", "N/A")
+        password = form_data.get("password", "N/A")  # Get password
+        confirm_password = form_data.get(
+            "confirm_password", "N/A"
+        )  # Get confirm_password
         email = form_data.get("email", "N/A")
         submitted_id = form_data.get("id", "N/A")
         ip_address = self.router.session.client_ip
@@ -137,48 +140,53 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
         )
 
         try:
-            # 1. Custom Validation
+            # 1. Custom ID/Email Pre-Validation (from external source)
             if not self.validate_user(form_data):
                 self.registration_error = (
                     "Invalid ID or email. Please check your details."
                 )
-                # Log is handled inside validate_user
+                audit_logger.warning(  # Log pre-validation failure
+                    "registration_prevalidation_failed",
+                    reason=self.registration_error,
+                    username=username,
+                    email=email,
+                    submitted_id=submitted_id,
+                    ip_address=ip_address,
+                )
                 self.is_submitting = False
-                return
+                return  # Stop if ID/email validation fails
 
-            # 2. Proceed with base registration (calls _validate_fields -> sets self.error_message on fail)
-            # Store the result which might contain event specs (though we had issues with them)
-            self.handle_registration(form_data)
-
-            # **** CHECK FOR PARENT ERROR MESSAGE ****
-            # If the base handler failed validation, it would have set self.error_message
-            if self.error_message:
-                # Copy the parent's error message to the child's variable
-                self.registration_error = self.error_message
-                self.is_submitting = False
-                audit_logger.warning(  # Log base validation failure
+            # 2. Custom Field Validation (Username, Password)
+            # Directly call your overridden _validate_fields
+            if not self._validate_fields(username, password, confirm_password):
+                # self.registration_error is already set by _validate_fields
+                audit_logger.warning(  # Log custom validation failure
                     "registration_validation_failed",
                     reason=self.registration_error,
                     username=username,
                     ip_address=ip_address,
                 )
-                # If validation_result contained focus/value events, yielding them caused errors.
-                # So, we just return here, relying on the registration_error display.
-                return
+                self.is_submitting = False
+                return  # Stop if custom validation fails
 
-            # 3. Check if LocalUser was created successfully
+            # 3. If all validations passed, register
+            # the user using the base _register_user
+            # This method handles hashing and saving the LocalUser
+            self._register_user(username, password)
+
+            # 4. Check if LocalUser was created successfully
+            # (new_user_id gets set in _register_user)
             if self.new_user_id >= 0:
-                # **** Log LocalUser creation success (part 1 of registration) ****
                 audit_logger.info(
                     "registration_localuser_created",
                     username=username,
                     user_id=self.new_user_id,
                     ip_address=ip_address,
                 )
-                # 4. Create UserInfo
+                # 5. Create UserInfo
                 with rx.session() as session:
                     try:
-                        # ... (Check for existing UserInfo - good practice)
+                        # Check for existing UserInfo (good practice)
                         existing_info = session.exec(
                             select(UserInfo).where(UserInfo.user_id == self.new_user_id)
                         ).first()
@@ -190,19 +198,20 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                                 user_id=self.new_user_id,
                                 ip_address=ip_address,
                             )
+                            # Decide how to handle this - update? error?
+                            #  For now, let's proceed.
 
                         user_info = UserInfo(
                             email=form_data["email"],
                             user_id=self.new_user_id,
-                            profile_picture=DEFAULT_PROFILE_PICTURE,
+                            profile_picture=DEFAULT_PROFILE_PICTURE,  # Make sure DEFAULT_PROFILE_PICTURE is defined  # noqa: E501
                         )
-                        user_info.set_role()
+                        user_info.set_role()  # Sets the role based on flags
                         session.add(user_info)
                         session.commit()
                         session.refresh(user_info)
 
-                        # **** Log full registration success ****
-                        audit_logger.info(
+                        audit_logger.info(  # Log full success
                             "success_registration",
                             username=username,
                             email=email,
@@ -212,22 +221,22 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                             ip_address=ip_address,
                         )
 
-                        # 5. Show success feedback and redirect (async part)
+                        # 6. Show success feedback and redirect
                         self.registration_error = ""
                         yield rx.toast.success(
                             "Registration successful! Redirecting to login...",
                             position="top-center",
-                            duration=1000,  # Using 2 seconds delay
+                            duration=2000,  # Use duration instead of sleep if possible
                         )
-                        await asyncio.sleep(2)  # Using 2 seconds delay
-                        yield rx.redirect(routes.LOGIN_ROUTE)
-                        # No need to explicitly set success=False here if UI doesn't depend on it
+                        yield rx.redirect(routes.LOGIN_ROUTE)  # Redirect after toast
 
                     except Exception as db_error:
-                        # Error during UserInfo creation
-                        self.registration_error = "Registration partially failed: Could not save user details."
+                        self.registration_error = (
+                            "Registration partially failed: "
+                            "Could not save user details."
+                        )
                         audit_logger.error(
-                            "registration_failed",
+                            "registration_failed_userinfo",
                             reason="Error creating UserInfo",
                             username=username,
                             user_id=self.new_user_id,
@@ -235,27 +244,23 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                             ip_address=ip_address,
                         )
                         session.rollback()
-                        # Fall through to finally block
+                        # Potentially delete the LocalUser if UserInfo fails? ...
+                        # Depends on requirements.
 
             else:
-                # Base registration validation passed, but LocalUser wasn't created (self.new_user_id < 0)
-                # self.error_message might have been set by _register_user if it failed,
-                # otherwise provide a generic message.
+                # _register_user failed (e.g., database issue)
                 self.registration_error = (
-                    self.error_message
-                    or "Registration failed: Could not create user account."
+                    "Registration failed: Could not create user account."
                 )
                 audit_logger.error(
-                    "registration_failed",
+                    "registration_failed_localuser",
                     reason=self.registration_error,
                     username=username,
                     ip_address=ip_address,
                 )
-                # Fall through to finally block
 
         except Exception as e:
             self.registration_error = "An unexpected error occurred. Please try again."
-            print(f"Registration error: {str(e)}")  # Keep for debugging
             audit_logger.critical(  # Log unexpected errors
                 "registration_failed_unexpected",
                 reason=str(e),
@@ -265,7 +270,6 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                 ip_address=ip_address,
                 exception_type=type(e).__name__,
             )
-            # Fall through to finally block
 
         finally:
             self.is_submitting = False  # Ensure this always runs

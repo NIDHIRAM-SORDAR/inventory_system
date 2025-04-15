@@ -1,0 +1,72 @@
+[project]
+name = "inventory_system"
+version = "0.1.0"
+description = "A Reflex-based inventory system."
+authors = [
+    { name = "Your Name", email = "your@email.com" },
+]
+readme = "README.md"
+license = "MIT"
+dependencies = [
+    "reflex", # Core framework
+    "reflex-local-auth", # Authentication
+    "sqlmodel", # Database models & ORM
+    "email-validator", # Validation
+    "loguru", # Logging
+    "pandas", # Data handling (for utils)
+    "openpyxl", # Excel support for pandas
+    "python-dotenv", # Environment variables
+    "alembic", # Database migrations
+    "psutil", # System utilities (often needed by dev server)
+    "redis", # If used for caching/tasks
+    "ruff>=0.11.5",
+]
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "uv",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-playwright",
+    "playwright",
+    "mypy",
+    "build", # For building packages
+    "twine", # For uploading packages
+]
+
+# ... other parts of your pyproject.toml ...
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+# No need for select/ignore/fixable here unless you have other general settings
+
+[tool.ruff.lint]
+# Select the rule categories you want. 'E' includes E501. 'I' is for imports.
+select = ["E", "F", "I"]
+ignore = []
+# REMOVE fixable = ["E501"] - It's not needed for line length formatting
+unfixable = []
+# You can keep per-file-ignores here if needed
+
+[tool.ruff.format]
+# These settings are correct and used by the formatter
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# ... rest of your pyproject.toml ...
+
+[tool.setuptools]
+packages = ["inventory_system"]
+
+[tool.uv.sources]
+# Optional: Define custom package sources if needed
+# my-index = { url = "https://my-private-index.com/simple" }
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

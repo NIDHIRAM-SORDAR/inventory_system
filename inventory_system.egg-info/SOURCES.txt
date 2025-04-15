@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+inventory_system/__init__.py
+inventory_system/constants.py
+inventory_system/create_admin.py
+inventory_system/inventory_system.py
+inventory_system/routes.py
+inventory_system/styles.py
+inventory_system.egg-info/PKG-INFO
+inventory_system.egg-info/SOURCES.txt
+inventory_system.egg-info/dependency_links.txt
+inventory_system.egg-info/requires.txt
+inventory_system.egg-info/top_level.txt

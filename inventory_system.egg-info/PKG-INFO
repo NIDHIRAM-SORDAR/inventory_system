@@ -1,0 +1,30 @@
+Metadata-Version: 2.4
+Name: inventory_system
+Version: 0.1.0
+Summary: A Reflex-based inventory system.
+Author-email: Your Name <your@email.com>
+License-Expression: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: reflex
+Requires-Dist: reflex-local-auth
+Requires-Dist: sqlmodel
+Requires-Dist: email-validator
+Requires-Dist: loguru
+Requires-Dist: pandas
+Requires-Dist: openpyxl
+Requires-Dist: python-dotenv
+Requires-Dist: alembic
+Requires-Dist: psutil
+Requires-Dist: redis
+Requires-Dist: ruff>=0.11.5
+Provides-Extra: dev
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: uv; extra == "dev"
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-asyncio; extra == "dev"
+Requires-Dist: pytest-playwright; extra == "dev"
+Requires-Dist: playwright; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Requires-Dist: build; extra == "dev"
+Requires-Dist: twine; extra == "dev"

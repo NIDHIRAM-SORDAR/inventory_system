@@ -1,14 +1,47 @@
-.states
-assets/external/
-*.db
-*.py[cod]
-.cursorignore
+# --- Environments ---
+# Ignore virtual environments created by venv, virtualenv, uv venv, etc.
 .venv/
-.vscode/
-.web
-__pycache__/
-venv-inventory/
+# venv-inventory/  # Remove or keep uncommented if you still use this specific older env name
+
+# Ignore environment variables file
 .env
 
-inventory_system/create_admin.py
+# --- Python ---
+# Ignore Python cache and compiled/optimized/shared library files
+__pycache__/
+*.py[cod]
+
+# --- Databases ---
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Logs ---
+# Ignore log files or directories
 assets/logs/*
+# Or ignore the entire directory:
+# assets/logs/
+
+# --- Editor/Tool Specific ---
+.vscode/
+.cursorignore
+.states
+
+# --- Project Specific ---
+# Ignored directories/files specific to this project
+assets/external/
+.web
+
+# --- Specific Files (Review if still needed) ---
+# Is this script intentionally not committed? Contains secrets or local only?
+inventory_system/create_admin.py
+
+# --- Operating System Files ---
+# Ignore OS-generated files (Examples - uncomment/add as needed)
+# .DS_Store  # macOS
+# Thumbs.db  # Windows
+# desktop.ini # Windows
+
+# --- uv Cache ---
+# uv's global cache is typically outside the project directory,
+# so no specific project ignore rule is usually needed.
