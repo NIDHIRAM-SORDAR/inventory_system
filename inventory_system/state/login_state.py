@@ -3,6 +3,7 @@ from datetime import timedelta
 
 import reflex as rx
 import reflex_local_auth
+import sqlalchemy
 from sqlmodel import select
 
 from inventory_system import routes
@@ -38,6 +39,8 @@ class CustomLoginState(AuthState):
         self.error_message = ""
         self.is_submitting = False
 
+    # inventory_system/state/login_state.py
+
     async def on_submit(self, form_data: dict):
         """Handle login form submission and redirect based on role."""
         self.error_message = ""
@@ -49,17 +52,34 @@ class CustomLoginState(AuthState):
             method="POST",
             url=self.router.page.raw_path,
             user_id=None,
-            username=form_data.get("username"),  # Include username from form
+            username=form_data.get("username"),
             ip_address=self.router.session.client_ip,
         )
 
         try:
             with rx.session() as session:
-                user = session.exec(
-                    select(reflex_local_auth.LocalUser).where(
-                        reflex_local_auth.LocalUser.username == form_data["username"]
+                try:
+                    user = session.exec(
+                        select(reflex_local_auth.LocalUser).where(
+                            reflex_local_auth.LocalUser.username
+                            == form_data["username"]
+                        )
+                    ).one_or_none()
+                except sqlalchemy.exc.MultipleResultsFound:
+                    self.error_message = (
+                        "Multiple accounts found for this username."
+                        "Please contact support."
                     )
-                ).one_or_none()
+                    self.is_submitting = False
+                    audit_logger.error(
+                        "login_failed_multiple_users",
+                        username=form_data["username"],
+                        error="Multiple LocalUser records found",
+                        ip_address=self.router.session.client_ip,
+                        method="POST",
+                        url=self.router.page.raw_path,
+                    )
+                    return
 
                 if not user or not user.verify(form_data["password"]):
                     self.error_message = "Invalid username or password"
@@ -84,11 +104,27 @@ class CustomLoginState(AuthState):
                     url=self.router.page.raw_path,
                 )
 
-                user_info = session.exec(
-                    select(UserInfo).where(
-                        UserInfo.user_id == self.authenticated_user.id
+                try:
+                    user_info = session.exec(
+                        select(UserInfo).where(
+                            UserInfo.user_id == self.authenticated_user.id
+                        )
+                    ).one_or_none()
+                except sqlalchemy.exc.MultipleResultsFound:
+                    self.error_message = (
+                        "Multiple user profiles found. Please contact support."
                     )
-                ).one_or_none()
+                    self.is_submitting = False
+                    audit_logger.error(
+                        "login_failed_multiple_userinfo",
+                        username=form_data["username"],
+                        error="Multiple UserInfo records found",
+                        ip_address=self.router.session.client_ip,
+                        method="POST",
+                        url=self.router.page.raw_path,
+                    )
+                    return
+
                 await asyncio.sleep(1)  # Adjusted for async
                 if user_info and user_info.is_admin:
                     return rx.redirect(routes.ADMIN_ROUTE)

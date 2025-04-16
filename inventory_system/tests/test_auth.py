@@ -11,7 +11,7 @@ from playwright.sync_api import Page, expect
 from reflex.testing import AppHarness
 from reflex_local_auth import LocalUser
 
-from inventory_system.models.user import UserInfo
+from inventory_system.models.user import Supplier, UserInfo
 
 # Test user constants
 TEST_USERNAME = "test_user"
@@ -63,13 +63,13 @@ def inventory_app():
                     print(f"Response status: {response.status_code} for {url}/login")
                     if response.status_code == 200:
                         print(
-                            f"Frontend responsive at {url} (status: {response.status_code})"
+                            f"Frontend responsive at {url} (status: {response.status_code})"  # noqa: E501
                         )
                         responsive_url = url
                         break
                 except requests.RequestException as e:
                     print(
-                        f"Waiting for frontend... ({time.time() - start_time:.1f}s, error: {e})"
+                        f"Waiting for frontend... ({time.time() - start_time:.1f}s, error: {e})"  # noqa: E501
                     )
                 time.sleep(1)
             if responsive_url:
@@ -83,13 +83,26 @@ def inventory_app():
 
 @pytest.fixture(scope="session")
 def test_users_cleaned_up():
-    """Clean up test users before tests."""
+    """Clean up test users, their UserInfo, and Supplier records before tests."""
     with rx.session() as session:
         for username in [TEST_USERNAME, ADMIN_USERNAME]:
+            # Delete LocalUser
             test_user = session.exec(
                 LocalUser.select().where(LocalUser.username == username)
             ).one_or_none()
             if test_user:
+                # Delete associated UserInfo
+                user_info = session.exec(
+                    UserInfo.select().where(UserInfo.user_id == test_user.id)
+                ).all()
+                for info in user_info:
+                    # Delete associated Supplier
+                    supplier = session.exec(
+                        Supplier.select().where(Supplier.user_info_id == info.id)
+                    ).all()
+                    for supp in supplier:
+                        session.delete(supp)
+                    session.delete(info)
                 session.delete(test_user)
         session.commit()
 

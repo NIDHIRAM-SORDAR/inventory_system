@@ -124,10 +124,8 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
         self.new_user_id = -1  # Ensure reset
 
         username = form_data.get("username", "N/A")
-        password = form_data.get("password", "N/A")  # Get password
-        confirm_password = form_data.get(
-            "confirm_password", "N/A"
-        )  # Get confirm_password
+        password = form_data.get("password", "N/A")
+        confirm_password = form_data.get("confirm_password", "N/A")
         email = form_data.get("email", "N/A")
         submitted_id = form_data.get("id", "N/A")
         ip_address = self.router.session.client_ip
@@ -146,7 +144,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                 self.registration_error = (
                     "Invalid ID or email. Please check your details."
                 )
-                audit_logger.warning(  # Log pre-validation failure
+                audit_logger.warning(
                     "registration_prevalidation_failed",
                     reason=self.registration_error,
                     username=username,
@@ -155,102 +153,123 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                     ip_address=ip_address,
                 )
                 self.is_submitting = False
-                return  # Stop if ID/email validation fails
+                return
 
             # 2. Custom Field Validation (Username, Password)
             if not self._validate_fields(username, password, confirm_password):
-                audit_logger.warning(  # Log custom validation failure
+                audit_logger.warning(
                     "registration_validation_failed",
                     reason=self.registration_error,
                     username=username,
                     ip_address=ip_address,
                 )
                 self.is_submitting = False
-                return  # Stop if custom validation fails
+                return
 
-            # 3. Register the user using the base _register_user
-            self._register_user(username, password)
+            with rx.session() as session:
+                try:
+                    # 3. Register the user using the base _register_user
+                    self._register_user(username, password)
 
-            # 4. Check if LocalUser was created successfully
-            if self.new_user_id >= 0:
-                audit_logger.info(
-                    "registration_localuser_created",
-                    username=username,
-                    user_id=self.new_user_id,
-                    ip_address=ip_address,
-                )
-                # 5. Create UserInfo
-                with rx.session() as session:
-                    try:
-                        existing_info = session.exec(
-                            select(UserInfo).where(UserInfo.user_id == self.new_user_id)
-                        ).first()
-                        if existing_info:
-                            audit_logger.warning(
-                                "registration_warning",
-                                reason="UserInfo already exists",
-                                username=username,
-                                user_id=self.new_user_id,
-                                ip_address=ip_address,
-                            )
-
-                        user_info = UserInfo(
-                            email=form_data["email"],
-                            user_id=self.new_user_id,
-                            profile_picture=DEFAULT_PROFILE_PICTURE,
-                        )
-                        user_info.set_role()
-                        session.add(user_info)
-                        session.commit()
-                        session.refresh(user_info)
-
-                        audit_logger.info(  # Log full success
-                            "success_registration",
-                            username=username,
-                            email=email,
-                            user_id=self.new_user_id,
-                            user_info_id=user_info.id,
-                            role=user_info.role,
-                            ip_address=ip_address,
-                        )
-
-                        # 6. Show success toast and trigger delayed redirect
-                        yield rx.toast.success(
-                            "Registration successful! Redirecting to login...",
-                            position="top-center",
-                            duration=1000,  # Toast visible for 2 seconds
-                        )
-                        # Yield the schedule_redirect event handler directly
-                        yield CustomRegisterState.schedule_redirect
-
-                    except Exception as db_error:
+                    # 4. Check if LocalUser was created successfully
+                    if self.new_user_id < 0:
                         self.registration_error = (
-                            "Registration partially failed: "
-                            "Could not save user details."
+                            "Registration failed: Could not create user account."
                         )
                         audit_logger.error(
-                            "registration_failed_userinfo",
-                            reason="Error creating UserInfo",
+                            "registration_failed_localuser",
+                            reason=self.registration_error,
                             username=username,
-                            user_id=self.new_user_id,
-                            error=str(db_error),
                             ip_address=ip_address,
                         )
-                        session.rollback()
                         self.is_submitting = False
+                        session.rollback()
                         return
 
-            else:
-                self.registration_error = (
-                    "Registration failed: Could not create user account."
-                )
-                audit_logger.error(
-                    "registration_failed_localuser",
-                    reason=self.registration_error,
-                    username=username,
-                    ip_address=ip_address,
-                )
-                self.is_submitting = False
+                    audit_logger.info(
+                        "registration_localuser_created",
+                        username=username,
+                        user_id=self.new_user_id,
+                        ip_address=ip_address,
+                    )
+
+                    # 5. Check for existing UserInfo
+                    existing_info = session.exec(
+                        select(UserInfo).where(UserInfo.user_id == self.new_user_id)
+                    ).one_or_none()
+                    if existing_info:
+                        # If UserInfo exists, this is an error
+                        # (should not happen with unique constraint)
+                        self.registration_error = (
+                            "Registration failed: User profile already "
+                            "exists for this account."
+                        )
+                        audit_logger.error(
+                            "registration_failed_userinfo_exists",
+                            reason=self.registration_error,
+                            username=username,
+                            user_id=self.new_user_id,
+                            existing_user_info_id=existing_info.id,
+                            ip_address=ip_address,
+                        )
+                        self.is_submitting = False
+                        session.rollback()  # Roll back LocalUser creation
+                        return
+
+                    # 6. Create new UserInfo
+                    user_info = UserInfo(
+                        email=form_data["email"],
+                        user_id=self.new_user_id,
+                        profile_picture=DEFAULT_PROFILE_PICTURE,
+                    )
+                    user_info.set_role()
+                    session.add(user_info)
+                    session.flush()  # Ensure user_info.id is available
+                    user_info_id = user_info.id
+
+                    audit_logger.info(
+                        "userinfo_created",
+                        username=username,
+                        user_id=self.new_user_id,
+                        user_info_id=user_info_id,
+                        ip_address=ip_address,
+                    )
+
+                    session.commit()
+
+                    audit_logger.info(
+                        "success_registration",
+                        username=username,
+                        email=email,
+                        user_id=self.new_user_id,
+                        user_info_id=user_info_id,
+                        role=user_info.role,
+                        ip_address=ip_address,
+                    )
+
+                    # 7. Show success toast and trigger delayed redirect
+                    yield rx.toast.success(
+                        "Registration successful! Redirecting to login...",
+                        position="top-center",
+                        duration=1000,  # Toast visible for 1 second
+                    )
+                    yield CustomRegisterState.schedule_redirect
+
+                except Exception as db_error:
+                    self.registration_error = (
+                        "Registration failed: Could not save user details."
+                    )
+                    audit_logger.error(
+                        "registration_failed_userinfo",
+                        reason="Error creating UserInfo",
+                        username=username,
+                        user_id=self.new_user_id,
+                        error=str(db_error),
+                        ip_address=ip_address,
+                    )
+                    session.rollback()
+                    self.is_submitting = False
+                    return
 
         except Exception as e:
             self.registration_error = "An unexpected error occurred. Please try again."
