@@ -13,7 +13,7 @@ def get_utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class LocalUser(BaseLocalUser, table=True):
+class LocalUser(BaseLocalUser):
     """User model for authentication, extending reflex_local_auth.LocalUser."""
 
     username: str = Field(

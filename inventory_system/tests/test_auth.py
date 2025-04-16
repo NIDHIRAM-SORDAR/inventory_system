@@ -9,9 +9,9 @@ import reflex as rx
 import requests
 from playwright.sync_api import Page, expect
 from reflex.testing import AppHarness
-from reflex_local_auth import LocalUser
+from sqlmodel import select
 
-from inventory_system.models.user import Supplier, UserInfo
+from inventory_system.models.user import LocalUser, Supplier, UserInfo
 
 # Test user constants
 TEST_USERNAME = "test_user"
@@ -85,20 +85,17 @@ def inventory_app():
 def test_users_cleaned_up():
     """Clean up test users, their UserInfo, and Supplier records before tests."""
     with rx.session() as session:
-        for username in [TEST_USERNAME, ADMIN_USERNAME]:
-            # Delete LocalUser
+        for username in [TEST_USERNAME, "admin_user"]:
             test_user = session.exec(
-                LocalUser.select().where(LocalUser.username == username)
+                select(LocalUser).where(LocalUser.username == username)
             ).one_or_none()
             if test_user:
-                # Delete associated UserInfo
                 user_info = session.exec(
-                    UserInfo.select().where(UserInfo.user_id == test_user.id)
+                    select(UserInfo).where(UserInfo.user_id == test_user.id)
                 ).all()
                 for info in user_info:
-                    # Delete associated Supplier
                     supplier = session.exec(
-                        Supplier.select().where(Supplier.user_info_id == info.id)
+                        select(Supplier).where(Supplier.user_info_id == info.id)
                     ).all()
                     for supp in supplier:
                         session.delete(supp)
