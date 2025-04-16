@@ -20,6 +20,8 @@ dependencies = [
     "psutil", # System utilities (often needed by dev server)
     "redis", # If used for caching/tasks
     "ruff>=0.11.5",
+    "pytest>=8.3.5",
+    "pytest-playwright>=0.7.0",
 ]
 requires-python = ">=3.10"
 
