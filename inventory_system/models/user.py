@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import reflex as rx
-from reflex_local_auth import LocalUser as BaseLocalUser
 from sqlmodel import Field, Relationship
 
 from inventory_system.logging.audit import enable_audit_logging_for_models
@@ -11,15 +10,6 @@ from inventory_system.logging.audit import enable_audit_logging_for_models
 def get_utc_now() -> datetime:
     """Return the current UTC timestamp."""
     return datetime.now(timezone.utc)
-
-
-class LocalUser(BaseLocalUser):
-    """User model for authentication, extending reflex_local_auth.LocalUser."""
-
-    username: str = Field(
-        unique=True, index=True
-    )  # Unique username with index for faster lookups
-    # Other fields (e.g., password_hash) are inherited from BaseLocalUser
 
 
 class UserInfo(rx.Model, table=True):

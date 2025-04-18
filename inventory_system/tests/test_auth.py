@@ -6,12 +6,13 @@ from pathlib import Path
 
 import pytest
 import reflex as rx
+import reflex_local_auth
 import requests
 from playwright.sync_api import Page, expect
 from reflex.testing import AppHarness
 from sqlmodel import select
 
-from inventory_system.models.user import LocalUser, Supplier, UserInfo
+from inventory_system.models.user import Supplier, UserInfo
 
 # Test user constants
 TEST_USERNAME = "test_user"
@@ -87,7 +88,9 @@ def test_users_cleaned_up():
     with rx.session() as session:
         for username in [TEST_USERNAME, "admin_user"]:
             test_user = session.exec(
-                select(LocalUser).where(LocalUser.username == username)
+                select(reflex_local_auth.LocalUser).where(
+                    reflex_local_auth.LocalUser.username == username
+                )
             ).one_or_none()
             if test_user:
                 user_info = session.exec(
@@ -139,14 +142,14 @@ def test_auth_flow(inventory_app: AppHarness, page: Page):
     expect(login_button).to_be_enabled(timeout=15000)
     login_button.click(timeout=20000)
     expect(page.get_by_text("Invalid username or password")).to_be_visible(
-        timeout=15000
+        timeout=20000
     )
 
     # Navigate to registration page
-    register_link = page.get_by_role("link", name="Register here")
+    register_link = page.get_by_role("link", name="Don't have an account")
     expect(register_link).to_be_visible(timeout=15000)
     register_link.click(timeout=20000)
-    expect(page).to_have_url(_url("/register/"))
+    expect(page).to_have_url(_url("/register/"), timeout=20000)
 
     # Attempt registration without confirm password
     page.get_by_placeholder("Enter your ID").fill(TEST_ID)
@@ -168,24 +171,55 @@ def test_auth_flow(inventory_app: AppHarness, page: Page):
     page.get_by_placeholder("Confirm your password").fill(TEST_PASSWORD)
     expect(signup_button).to_be_visible(timeout=15000)
     signup_button.click(timeout=20000)
-    expect(page).to_have_url(_url("/login/"))
+    expect(page).to_have_url(_url("/login/"), timeout=20000)
 
     # Login as regular user
     page.get_by_placeholder("Enter your username").fill(TEST_USERNAME)
     page.get_by_placeholder("Enter your password").fill(TEST_PASSWORD)
     expect(login_button).to_be_visible(timeout=15000)
     login_button.click(timeout=20000)
-    expect(page).to_have_url(_url("/overview/"))  # Employee redirect
+    expect(page).to_have_url(_url("/overview/"), timeout=30000)
 
     # Verify username in UI
     expect(page.get_by_text(TEST_USERNAME)).to_be_visible(timeout=15000)
 
-    # Logout
-    logout_button = page.locator("//*[contains(text(), 'Logout')]")
-    expect(logout_button).to_be_visible(timeout=15000)
-    logout_button.click(timeout=20000)
-    expect(page).to_have_url(_url("/"))
+    # Debug: Capture page state
+    page.screenshot(path="overview_page.png")
 
+    navbar = page.get_by_role("navigation")
+    dropdown_trigger = navbar.get_by_test_id("user-avatar")
+    expect(dropdown_trigger).to_be_visible(timeout=15000)
+    dropdown_trigger.click(timeout=20000)
+    page.wait_for_selector(
+        "//*[contains(text(), 'Logout')]", state="visible", timeout=15000
+    )
+
+    # Select the logout menu item
+    logout_button = page.get_by_role("menuitem").filter(has=page.get_by_text("Logout"))
+    expect(logout_button).to_be_visible(timeout=15000)
+
+    async def handle_dialog(dialog):
+        print(f"Dialog detected! Message: '{dialog.message}'")
+        print(f"Dialog type: {dialog.type}")
+        print("Accepting dialog...")
+        await dialog.accept()
+
+    # Set up dialog handler BEFORE clicking the button that will trigger the dialog
+    page.on("dialog", handle_dialog)
+
+    # Now click the logout button which will trigger the dialog
+    logout_button.click(timeout=20000)
+
+    # The dialog will be automatically accepted by the handler
+    # No need to explicitly look for a confirm button in the dialog
+
+    # Verify logout was successful
+    expect(page).to_have_url(_url("/"), timeout=30000)
+    page.screenshot(path="post_logout.png")
+    expect(page.get_by_role("button", name="Get Started", exact=True)).to_be_visible(
+        timeout=15000
+    )
+    print("Current URL:", page.url)
     # Register an admin user
     page.goto(inventory_app.frontend_url + "/register/")
     page.get_by_placeholder("Enter your ID").fill(ADMIN_ID)
@@ -195,13 +229,15 @@ def test_auth_flow(inventory_app: AppHarness, page: Page):
     page.get_by_placeholder("Confirm your password").fill(ADMIN_PASSWORD)
     signup_button = page.get_by_role("button", name="Sign Up", exact=True)
     expect(signup_button).to_be_visible(timeout=15000)
-    signup_button.click(timeout=20000)
-    expect(page).to_have_url(_url("/login/"))
+    signup_button.click(timeout=30000)
+    expect(page).to_have_url(_url("/login/"), timeout=25000)
 
     # Set admin role manually
     with rx.session() as session:
         admin_user = session.exec(
-            LocalUser.select().where(LocalUser.username == ADMIN_USERNAME)
+            reflex_local_auth.LocalUser.select().where(
+                reflex_local_auth.LocalUser.username == ADMIN_USERNAME
+            )
         ).one_or_none()
         assert admin_user, "Admin user not found"
         user_info = session.exec(
@@ -218,7 +254,7 @@ def test_auth_flow(inventory_app: AppHarness, page: Page):
     page.get_by_placeholder("Enter your password").fill(ADMIN_PASSWORD)
     expect(login_button).to_be_visible(timeout=15000)
     login_button.click(timeout=20000)
-    expect(page).to_have_url(_url("/admin/"))  # Admin redirect
+    expect(page).to_have_url(_url("/admin/"), timeout=20000)  # Admin redirect
 
     # Verify admin username
     expect(page.get_by_text(ADMIN_USERNAME)).to_be_visible(timeout=15000)

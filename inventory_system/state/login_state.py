@@ -1,4 +1,3 @@
-import asyncio
 from datetime import timedelta
 
 import reflex as rx
@@ -124,8 +123,6 @@ class CustomLoginState(AuthState):
                         url=self.router.page.raw_path,
                     )
                     return
-
-                await asyncio.sleep(1)  # Adjusted for async
                 if user_info and user_info.is_admin:
                     return rx.redirect(routes.ADMIN_ROUTE)
                 return rx.redirect(routes.OVERVIEW_ROUTE)

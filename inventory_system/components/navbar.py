@@ -109,6 +109,7 @@ def user_avatar() -> rx.Component:
                         src=ProfilePictureState.profile_picture,
                         name=AuthState.authenticated_user.username,
                         size="2",
+                        data_testid="user-avatar",  # Add data-testid
                     ),
                 ),
                 rx.menu.content(
