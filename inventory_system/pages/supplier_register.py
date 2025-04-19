@@ -1,118 +1,11 @@
 # inventory_system/pages/supplier_register.py
-import re
 
 import reflex as rx
 import reflex_local_auth
-from email_validator import EmailNotValidError, validate_email
-from sqlmodel import select
 
 from inventory_system import routes
-from inventory_system.models.user import Supplier
+from inventory_system.state.supplier_registerstater import SupplierRegisterState
 from inventory_system.templates.template import template
-
-MAX_COMPANY_NAME_LENGTH = 100  # Example limit
-MAX_DESCRIPTION_LENGTH = 500  # Example limit
-
-
-class SupplierRegisterState(rx.State):
-    company_name: str = ""
-    description: str = ""
-    contact_email: str = ""
-    contact_phone: str = ""
-    success_message: str = ""
-    error_message: str = ""
-    is_submitting: bool = False  # Added for loading state
-
-    def set_company_name(self, value: str):
-        self.company_name = value.strip()
-        self.clear_messages()
-
-    def set_description(self, value: str):
-        self.description = value.strip()
-        self.clear_messages()
-
-    def set_contact_email(self, value: str):
-        self.contact_email = value.strip()
-        self.clear_messages()
-
-    def set_contact_phone(self, value: str):
-        self.contact_phone = value.strip()
-        self.clear_messages()
-
-    def clear_messages(self):
-        self.success_message = ""
-        self.error_message = ""
-
-    def validate_form(self) -> bool:
-        if not self.company_name:
-            self.error_message = "Company name is required."
-            return False
-        if len(self.company_name) > MAX_COMPANY_NAME_LENGTH:
-            self.error_message = (
-                f"Company name cannot exceed {MAX_COMPANY_NAME_LENGTH} characters."
-            )
-            return False
-        if not self.description:
-            self.error_message = "Description is required."
-            return False
-        if len(self.description) > MAX_DESCRIPTION_LENGTH:
-            self.error_message = (
-                f"Description cannot exceed {MAX_DESCRIPTION_LENGTH} characters."
-            )
-            return False
-        if not self.contact_email:
-            self.error_message = "Contact email is required."
-            return False
-        if not self.contact_phone:
-            self.error_message = "Contact phone is required."
-            return False
-        phone_regex = r"^(?:\+88)?\d{7,}$"
-        if not re.match(phone_regex, self.contact_phone):
-            self.error_message = "Please enter a valid phone number format."
-            return False
-        try:
-            validate_email(self.contact_email)
-        except EmailNotValidError:
-            self.error_message = "Please enter a valid email address."
-            return False
-        return True
-
-    async def register_supplier(self):
-        self.clear_messages()
-        self.is_submitting = True  # Show loading state
-
-        if not self.validate_form():
-            self.is_submitting = False
-            return
-
-        with rx.session() as session:
-            existing_supplier = session.exec(
-                select(Supplier).where(Supplier.contact_email == self.contact_email)
-            ).first()
-            if existing_supplier:
-                self.error_message = "This email is already registered."
-                self.is_submitting = False
-                return
-
-            supplier = Supplier(
-                company_name=self.company_name,
-                description=self.description,
-                contact_email=self.contact_email,
-                contact_phone=self.contact_phone,
-                status="pending",
-            )
-            session.add(supplier)
-            session.commit()
-            session.refresh(supplier)
-
-            self.company_name = ""
-            self.description = ""
-            self.contact_email = ""
-            self.contact_phone = ""
-            self.success_message = (
-                "Registration successful! Please wait for admin approval."
-            )
-            self.is_submitting = False
 
 
 def supplier_registration_form() -> rx.Component:
@@ -128,7 +21,11 @@ def supplier_registration_form() -> rx.Component:
                     size="8",
                     color=rx.color("purple", 10),  # Changed "accent" to "purple"
                     style={
-                        "background": f"linear-gradient(45deg, {rx.color('purple', 10)}, {rx.color('purple', 8)})",  # Changed "accent" to "purple"
+                        "background": (
+                            f"linear-gradient(45deg, {rx.color('purple', 10)},"
+                            f"{rx.color('purple', 8)})"  # Changed "accent" to "purple"
+                        ),
+                        # Changed "accent" to "purple"
                         "-webkit-background-clip": "text",
                         "-webkit-text-fill-color": "transparent",
                     },
@@ -178,10 +75,13 @@ def supplier_registration_form() -> rx.Component:
                     variant="soft",
                     color_scheme="purple",  # Changed "accent" to "purple"
                     style={
-                        "border": f"1px solid {rx.color('purple', 4)}",  # Changed "accent" to "purple"
+                        "border": f"1px solid {rx.color('purple', 4)}",
+                        # Changed "accent" to "purple"
                         "_focus": {
-                            "border": f"2px solid {rx.color('purple', 6)}",  # Changed "accent" to "purple"
-                            "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",  # Changed "accent" to "purple"
+                            "border": f"2px solid {rx.color('purple', 6)}",
+                            # Changed "accent" to "purple"
+                            "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",
+                            # Changed "accent" to "purple"
                         },
                     },
                 ),
@@ -240,10 +140,13 @@ def supplier_registration_form() -> rx.Component:
                     variant="soft",
                     color_scheme="purple",  # Changed "accent" to "purple"
                     style={
-                        "border": f"1px solid {rx.color('purple', 4)}",  # Changed "accent" to "purple"
+                        "border": f"1px solid {rx.color('purple', 4)}",
+                        # Changed "accent" to "purple"
                         "_focus": {
-                            "border": f"2px solid {rx.color('purple', 6)}",  # Changed "accent" to "purple"
-                            "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",  # Changed "accent" to "purple"
+                            "border": f"2px solid {rx.color('purple', 6)}",
+                            # Changed "accent" to "purple"
+                            "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",
+                            # Changed "accent" to "purple"
                         },
                     },
                 ),
@@ -270,10 +173,13 @@ def supplier_registration_form() -> rx.Component:
                     variant="soft",
                     color_scheme="purple",  # Changed "accent" to "purple"
                     style={
-                        "border": f"1px solid {rx.color('purple', 4)}",  # Changed "accent" to "purple"
+                        "border": f"1px solid {rx.color('purple', 4)}",
+                        # Changed "accent" to "purple"
                         "_focus": {
-                            "border": f"2px solid {rx.color('purple', 6)}",  # Changed "accent" to "purple"
-                            "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",  # Changed "accent" to "purple"
+                            "border": f"2px solid {rx.color('purple', 6)}",
+                            # Changed "accent" to "purple"
+                            "box-shadow": f"0 0 0 3px {rx.color('purple', 3)}",
+                            # Changed "accent" to "purple"
                         },
                     },
                 ),
@@ -293,9 +199,16 @@ def supplier_registration_form() -> rx.Component:
                 color_scheme="purple",  # Changed "accent" to "purple"
                 variant="solid",
                 style={
-                    "background": f"linear-gradient(45deg, {rx.color('purple', 8)}, {rx.color('purple', 10)})",  # Changed "accent" to "purple"
+                    "background": (
+                        f"linear-gradient(45deg, {rx.color('purple', 8)},"
+                        f"{rx.color('purple', 10)})"
+                    ),  # Changed "accent" to "purple"
                     "_hover": {
-                        "background": f"linear-gradient(45deg, {rx.color('purple', 9)}, {rx.color('purple', 11)})",  # Changed "accent" to "purple"
+                        "background": (
+                            f"linear-gradient(45deg, {rx.color('purple', 9)},"
+                            f"{rx.color('purple', 11)})"
+                        ),
+                        # Changed "accent" to "purple"
                     },
                     "transition": "all 0.3s ease",
                 },
