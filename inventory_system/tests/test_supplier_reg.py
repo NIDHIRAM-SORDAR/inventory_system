@@ -1,15 +1,13 @@
 import re
 import time
-from pathlib import Path
 
 import pytest
 import reflex as rx
-import requests
-from playwright.sync_api import Page, expect, sync_playwright
-from reflex.testing import AppHarness
+from playwright.sync_api import expect
 from sqlmodel import select
 
 from inventory_system.models.user import Supplier
+from inventory_system.tests.test_utils import edge_page, inventory_app
 
 # Test supplier constants
 TEST_COMPANY_NAME = "TestSupplier123"
@@ -17,61 +15,6 @@ TEST_COMPANY_NAME_ALT = "TestSupplier1234"
 TEST_DESCRIPTION = "A test supplier for inventory system."
 TEST_EMAIL = "testsupplier@gmail.com"
 TEST_PHONE = "+8801234567890"
-
-
-def get_wsl_host():
-    """Get WSL2 host IP if running in WSL."""
-    try:
-        with open("/etc/resolv.conf") as f:
-            for line in f:
-                if "nameserver" in line:
-                    return line.strip().split()[1]
-    except Exception:
-        return "localhost"
-    return "localhost"
-
-
-@pytest.fixture(scope="session")
-def inventory_app():
-    """Start the inventory app using AppHarness."""
-    with AppHarness.create(
-        root=Path(__file__).parent.parent.parent, app_name="inventory_system"
-    ) as harness:
-        assert harness.frontend_url, "Frontend URL unavailable"
-        wsl_host = get_wsl_host()
-        frontend_urls = [
-            harness.frontend_url,
-            harness.frontend_url.replace("localhost", "127.0.0.1"),
-            harness.frontend_url.replace("localhost", wsl_host),
-        ]
-        print(f"Starting app, trying URLs: {frontend_urls}")
-        start_time = time.time()
-        timeout = 90
-        responsive_url = None
-        for url in frontend_urls:
-            print(f"Testing {url}/login")
-            while time.time() - start_time < timeout:
-                try:
-                    response = requests.get(
-                        f"{url}/login", timeout=5, allow_redirects=True
-                    )
-                    print(f"Response status: {response.status_code} for {url}/login")
-                    if response.status_code == 200:
-                        print(f"Frontend responsive at {url}")
-                        responsive_url = url
-                        break
-                except requests.RequestException as e:
-                    print(
-                        f"Waiting for frontend... ({time.time() - start_time:.1f}s, error: {e})"
-                    )
-                time.sleep(1)
-            if responsive_url:
-                break
-        else:
-            raise RuntimeError(f"Frontend did not respond within {timeout}s")
-        if responsive_url != harness.frontend_url:
-            harness.frontend_url = responsive_url
-        yield harness
 
 
 @pytest.fixture(scope="session")
@@ -86,23 +29,8 @@ def test_suppliers_cleaned_up():
         session.commit()
 
 
-@pytest.fixture
-def edge_page():
-    """Provide a Playwright page running in Microsoft Edge."""
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(channel="msedge", headless=False)
-        context = browser.new_context()
-        page = context.new_page()
-        page.set_default_timeout(20000)
-        page.set_default_navigation_timeout(25000)
-        page.on("console", lambda msg: print(f"Console: {msg.text}"))
-        yield page
-        context.close()
-        browser.close()
-
-
 @pytest.mark.usefixtures("test_suppliers_cleaned_up")
-def test_supplier_registration(inventory_app: AppHarness, edge_page: Page):
+def test_supplier_registration(inventory_app: inventory_app, edge_page: edge_page):
     """Test the supplier registration flow in Microsoft Edge."""
     assert inventory_app.frontend_url, "Frontend URL missing"
 
@@ -177,7 +105,7 @@ def test_supplier_registration(inventory_app: AppHarness, edge_page: Page):
         ).one_or_none()
         assert supplier, "Supplier not found in database"
         print(
-            f"Supplier found: company_name={supplier.company_name}, status={supplier.status}"
+            f"Supplier found: company_name={supplier.company_name}, status={supplier.status}"  # noqa: E501
         )
         assert supplier.company_name == TEST_COMPANY_NAME
         assert supplier.description == TEST_DESCRIPTION
