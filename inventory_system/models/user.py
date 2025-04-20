@@ -48,7 +48,7 @@ class Supplier(rx.Model, table=True):
     """Supplier model linked to UserInfo in a one-to-one relationship."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    company_name: str
+    company_name: str = Field(unique=True, index=True)
     description: str
     contact_email: str = Field(unique=True, index=True)  # Unique email for suppliers
     contact_phone: str
