@@ -4,7 +4,7 @@ import reflex as rx
 import reflex_local_auth
 
 from inventory_system import routes
-from inventory_system.state.supplier_registerstater import SupplierRegisterState
+from inventory_system.state.supplier_register_state import SupplierRegisterState
 from inventory_system.templates.template import template
 
 

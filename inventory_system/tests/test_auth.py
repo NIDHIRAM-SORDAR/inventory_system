@@ -109,8 +109,8 @@ def edge_page():
         page = context.new_page()
 
         # Set timeouts
-        page.set_default_timeout(10000)  # 10s for actions
-        page.set_default_navigation_timeout(15000)  # 15s for navigation
+        page.set_default_timeout(20000)  # 10s for actions
+        page.set_default_navigation_timeout(25000)  # 15s for navigation
 
         # Log console messages for debugging
         page.on("console", lambda msg: print(f"Console: {msg.text}"))
