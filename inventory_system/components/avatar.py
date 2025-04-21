@@ -21,15 +21,14 @@ def user_avatar() -> rx.Component:
         "width": "100%",
         "cursor": "pointer",  # Ensure pointer cursor for interactivity
         "_hover": {
-            "background_color": styles.accent_bg_color,  # Light gray background (gray.3)
+            "background_color": styles.accent_bg_color,
+            # Light gray background (gray.3)
             "color": styles.accent_text_color,  # Consistent text color (gray.11)
             "opacity": "1",  # Full opacity on hover
         },
         "opacity": "0.95",  # Slightly faded when not hovered
         "transition": "background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease",
         # Smooth transition
-        # Add specificity to override potential default styles
-        "display": "block",  # Ensure block display for consistent rendering
         "text_align": "left",  # Align text for dropdown
     }
 
