@@ -86,7 +86,7 @@ def inventory_app():
 def edge_page():
     """Provide a Playwright page running in Microsoft Edge."""
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(channel="msedge", headless=False)
+        browser = playwright.chromium.launch(channel="chromium", headless=False)
         context = browser.new_context()
         page = context.new_page()
         page.set_default_timeout(20000)

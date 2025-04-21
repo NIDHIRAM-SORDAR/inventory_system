@@ -3,10 +3,10 @@
 import reflex as rx
 
 from inventory_system import routes
+from inventory_system.components.avatar import user_avatar
 from inventory_system.state.auth import AuthState
 
 from .. import styles
-from .navbar import user_avatar
 
 
 def sidebar_header() -> rx.Component:
