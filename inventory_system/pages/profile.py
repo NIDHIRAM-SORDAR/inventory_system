@@ -91,6 +91,60 @@ def profile_upload_section() -> rx.Component:
     )
 
 
+def password_change_section() -> rx.Component:
+    """Render the password change section."""
+    return rx.vstack(
+        rx.hstack(
+            rx.icon("lock"),
+            rx.heading("Change Password", size="5"),
+            align="center",
+        ),
+        rx.text("Update your account password.", size="3"),
+        rx.cond(
+            ProfileState.password_error,
+            rx.callout(
+                ProfileState.password_error,
+                icon="triangle_alert",
+                color_scheme="red",
+            ),
+        ),
+        rx.form.root(
+            rx.vstack(
+                profile_input(
+                    "Current Password",
+                    "current_password",
+                    "Enter current password",
+                    "password",
+                    "lock",
+                ),
+                profile_input(
+                    "New Password",
+                    "new_password",
+                    "Enter new password",
+                    "password",
+                    "lock",
+                ),
+                profile_input(
+                    "Confirm New Password",
+                    "confirm_password",
+                    "Confirm new password",
+                    "password",
+                    "lock",
+                ),
+                rx.button("Change Password", type="submit", width="100%"),
+                width="100%",
+                spacing="5",
+            ),
+            on_submit=ProfileState.handle_password_change,
+            reset_on_submit=True,
+            width="100%",
+            max_width="325px",
+        ),
+        width="100%",
+        spacing="4",
+    )
+
+
 @template(route=routes.PROFILE_ROUTE, title="Profile")
 @reflex_local_auth.require_login
 def profile() -> rx.Component:
@@ -110,14 +164,6 @@ def profile() -> rx.Component:
                     ),
                     rx.form.root(
                         rx.vstack(
-                            profile_input(
-                                "Username",
-                                "username",
-                                "Your username",
-                                "text",
-                                "user",
-                                ProfileState.authenticated_user.username,
-                            ),
                             profile_input(
                                 "Email",
                                 "email",
@@ -162,6 +208,8 @@ def profile() -> rx.Component:
                 ),
                 rx.divider(),
                 profile_upload_section(),
+                rx.divider(),
+                password_change_section(),
                 rx.divider(),
                 rx.vstack(
                     rx.hstack(
