@@ -177,14 +177,24 @@ def profile() -> rx.Component:
                                 "email",
                                 "mail",
                                 ProfileState.email,
+                                on_blur=ProfileState.validate_email_input,
+                            ),
+                            rx.cond(
+                                ProfileState.email_error,
+                                rx.callout(
+                                    ProfileState.email_error,
+                                    icon="triangle_alert",
+                                    color_scheme="red",
+                                    role="alert",
+                                ),
                             ),
                             rx.button(
                                 rx.spinner(loading=ProfileState.is_updating_email),
                                 "Update",
                                 type="submit",
                                 width="100%",
-                                disabled=ProfileState.is_updating_email,
-                                # Disable during update
+                                disabled=ProfileState.is_updating_email
+                                | (ProfileState.email_error != ""),
                             ),
                             width="100%",
                             spacing="5",

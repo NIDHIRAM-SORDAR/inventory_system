@@ -8,6 +8,7 @@ def profile_input(
     type: str,
     icon: str,
     default_value: str = "",
+    on_blur=None,
 ) -> rx.Component:
     return rx.vstack(
         rx.hstack(
@@ -23,6 +24,7 @@ def profile_input(
             default_value=default_value,
             width="100%",
             name=name,
+            on_blur=on_blur,
         ),
         direction="column",
         spacing="1",
