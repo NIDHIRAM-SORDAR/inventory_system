@@ -131,7 +131,13 @@ def password_change_section() -> rx.Component:
                     "password",
                     "lock",
                 ),
-                rx.button("Change Password", type="submit", width="100%"),
+                rx.button(
+                    rx.spinner(loading=ProfileState.is_updating_password),
+                    "Change Password",
+                    type="submit",
+                    width="100%",
+                    disabled=ProfileState.is_updating_password,
+                ),
                 width="100%",
                 spacing="5",
             ),
@@ -145,7 +151,7 @@ def password_change_section() -> rx.Component:
     )
 
 
-@template(route=routes.PROFILE_ROUTE, title="Profile")
+@template(route=routes.PROFILE_ROUTE, title="Profile", on_load=ProfileState.get_email)
 @reflex_local_auth.require_login
 def profile() -> rx.Component:
     return rx.vstack(
@@ -170,14 +176,21 @@ def profile() -> rx.Component:
                                 "user@reflex.dev",
                                 "email",
                                 "mail",
-                                ProfileState.authenticated_user_info.email,
+                                ProfileState.email,
                             ),
-                            rx.button("Update", type="submit", width="100%"),
+                            rx.button(
+                                rx.spinner(loading=ProfileState.is_updating_email),
+                                "Update",
+                                type="submit",
+                                width="100%",
+                                disabled=ProfileState.is_updating_email,
+                                # Disable during update
+                            ),
                             width="100%",
                             spacing="5",
                         ),
                         on_submit=ProfileState.handle_submit,
-                        reset_on_submit=True,
+                        reset_on_submit=False,
                         width="100%",
                         max_width="325px",
                     ),

@@ -17,49 +17,42 @@ class ProfileState(AuthState):
     password_error: str = ""
     email_error: str = ""
 
+    email: str = ""
+    is_updating_email: bool = False  # New loading state
+    is_updating_password: bool = False  # New loading state
+
+    def get_email(self) -> str:
+        """Initialize email state on page load."""
+        if self.is_authenticated and self.authenticated_user_info:
+            self.email = self.authenticated_user_info.email
+
     def handle_submit(self, form_data: dict):
         if not self.is_authenticated:
             return rx.redirect(routes.LOGIN_ROUTE)
 
-        # Log profile update request
-        audit_logger.info(
-            "profile_update_request",
-            user_id=self.authenticated_user.id,
-            username=self.authenticated_user.username,
-            ip_address=self.router.session.client_ip,
-            method="POST",
-            url=self.router.page.raw_path,
-            data=form_data,
-        )
-
-        email = form_data["email"]
-
-        # Validate email using email-validator
+        self.is_updating_email = True  # Set loading state
         try:
-            validate_email(email, check_deliverability=False)
-        except EmailNotValidError as e:
-            self.email_error = str(e)
-            audit_logger.error(
-                "profile_update_failed",
+            # Log profile update request
+            audit_logger.info(
+                "profile_update_request",
                 user_id=self.authenticated_user.id,
                 username=self.authenticated_user.username,
                 ip_address=self.router.session.client_ip,
                 method="POST",
                 url=self.router.page.raw_path,
-                error=self.email_error,
+                data=form_data,
             )
-            return rx.toast.error(self.email_error, position="top-center")
 
-        with rx.session() as session:
-            # Check if the email is already in use by another user
-            existing_user = session.exec(
-                select(UserInfo).where(
-                    UserInfo.email == email,
-                    UserInfo.user_id != self.authenticated_user.id,
-                )
-            ).one_or_none()
-            if existing_user:
-                self.email_error = "This email is already in use by another user"
+            email = form_data["email"]
+            previous_email = self.email
+            self.email = email  # Optimistic update
+
+            # Validate email using email-validator
+            try:
+                validate_email(email, check_deliverability=False)
+            except EmailNotValidError as e:
+                self.email_error = str(e)
+                self.email = previous_email
                 audit_logger.error(
                     "profile_update_failed",
                     user_id=self.authenticated_user.id,
@@ -71,35 +64,66 @@ class ProfileState(AuthState):
                 )
                 return rx.toast.error(self.email_error, position="top-center")
 
-            user_info = session.exec(
-                select(UserInfo).where(UserInfo.user_id == self.authenticated_user.id)
-            ).one_or_none()
-            if user_info:
-                user_info.email = email
-                session.add(user_info)
-            else:
-                new_user_info = UserInfo(
-                    user_id=self.authenticated_user.id,
-                    email=email,
-                    role="employee",
-                )
-                session.add(new_user_info)
+            with rx.session() as session:
+                existing_user = session.exec(
+                    select(UserInfo).where(
+                        UserInfo.email == email,
+                        UserInfo.user_id != self.authenticated_user.id,
+                    )
+                ).one_or_none()
+                if existing_user:
+                    self.email_error = "This email is already in use by another user"
+                    self.email = previous_email
+                    audit_logger.error(
+                        "profile_update_failed",
+                        user_id=self.authenticated_user.id,
+                        username=self.authenticated_user.username,
+                        ip_address=self.router.session.client_ip,
+                        method="POST",
+                        url=self.router.page.raw_path,
+                        error=self.email_error,
+                    )
+                    return rx.toast.error(self.email_error, position="top-center")
 
-            session.commit()
+                user_info = session.exec(
+                    select(UserInfo).where(
+                        UserInfo.user_id == self.authenticated_user.id
+                    )
+                ).one_or_none()
+                if user_info:
+                    user_info.email = email
+                    session.add(user_info)
+                    session.commit()
+                    session.refresh(user_info)
+                else:
+                    self.email = previous_email
+                    self.email_error = "Failed to update email"
+                    audit_logger.error(
+                        "profile_update_failed",
+                        user_id=self.authenticated_user.id,
+                        username=self.authenticated_user.username,
+                        ip_address=self.router.session.client_ip,
+                        method="POST",
+                        url=self.router.page.raw_path,
+                        error=self.email_error,
+                    )
+                    return rx.toast.error(self.email_error, position="top-center")
 
-        # Log profile update success
-        audit_logger.info(
-            "profile_update_success",
-            user_id=self.authenticated_user.id,
-            username=self.authenticated_user.username,
-            ip_address=self.router.session.client_ip,
-            method="POST",
-            url=self.router.page.raw_path,
-        )
+            # Log profile update success
+            audit_logger.info(
+                "profile_update_success",
+                user_id=self.authenticated_user.id,
+                username=self.authenticated_user.username,
+                ip_address=self.router.session.client_ip,
+                method="POST",
+                url=self.router.page.raw_path,
+            )
 
-        return rx.toast.success(
-            "Profile email updated successfully", position="top-center"
-        )
+            return rx.toast.success(
+                "Profile email updated successfully", position="top-center"
+            )
+        finally:
+            self.is_updating_email = False  # Reset loading state
 
     def _validate_password(self, new_password, confirm_password) -> bool:
         # --- Password Constraints ---
@@ -135,66 +159,57 @@ class ProfileState(AuthState):
         if not self.is_authenticated:
             return rx.redirect(routes.LOGIN_ROUTE)
 
-        # Log password change request
-        audit_logger.info(
-            "password_change_request",
-            user_id=self.authenticated_user.id,
-            username=self.authenticated_user.username,
-            ip_address=self.router.session.client_ip,
-            method="POST",
-            url=self.router.page.raw_path,
-        )
-
-        current_password = form_data["current_password"]
-        new_password = form_data["new_password"]
-        confirm_password = form_data["confirm_password"]
-
-        if not self._validate_password(new_password, confirm_password):
-            audit_logger.error(
-                "password_change_failed",
+        self.is_updating_password = True
+        try:
+            audit_logger.info(
+                "password_change_request",
                 user_id=self.authenticated_user.id,
                 username=self.authenticated_user.username,
                 ip_address=self.router.session.client_ip,
                 method="POST",
                 url=self.router.page.raw_path,
-                error=self.password_error,
             )
-            return
 
-        with rx.session() as session:
-            user = session.exec(
-                select(reflex_local_auth.LocalUser).where(
-                    reflex_local_auth.LocalUser.id == self.authenticated_user.id
+            current_password = form_data["current_password"]
+            new_password = form_data["new_password"]
+            confirm_password = form_data["confirm_password"]
+
+            if not self._validate_password(new_password, confirm_password):
+                return self._handle_error("password", self.password_error)
+
+            with rx.session() as session:
+                user = session.exec(
+                    select(reflex_local_auth.LocalUser).where(
+                        reflex_local_auth.LocalUser.id == self.authenticated_user.id
+                    )
+                ).one()
+
+                if not user.verify(current_password):
+                    return self._handle_error(
+                        "password", "Current password is incorrect"
+                    )
+
+                user.password_hash = reflex_local_auth.LocalUser.hash_password(
+                    new_password
                 )
-            ).one()
+                session.add(user)
+                session.commit()
+                session.refresh(user)
 
-            if not user.verify(current_password):
-                self.password_error = "Current password is incorrect"
-                audit_logger.error(
-                    "password_change_failed",
-                    user_id=self.authenticated_user.id,
-                    username=self.authenticated_user.username,
-                    ip_address=self.router.session.client_ip,
-                    method="POST",
-                    url=self.router.page.raw_path,
-                    error=self.password_error,
-                )
-                return
-            user.password_hash = reflex_local_auth.LocalUser.hash_password(new_password)
-            session.add(user)
-            session.commit()
-            session.refresh(user)
-
-        self.password_error = ""
-        audit_logger.info(
-            "password_change_success",
-            user_id=self.authenticated_user.id,
-            username=self.authenticated_user.username,
-            ip_address=self.router.session.client_ip,
-            method="POST",
-            url=self.router.page.raw_path,
-        )
-        return rx.toast.success("Password updated successfully", position="top-center")
+            self.password_error = ""
+            audit_logger.info(
+                "password_change_success",
+                user_id=self.authenticated_user.id,
+                username=self.authenticated_user.username,
+                ip_address=self.router.session.client_ip,
+                method="POST",
+                url=self.router.page.raw_path,
+            )
+            return rx.toast.success(
+                "Password updated successfully", position="top-center"
+            )
+        finally:
+            self.is_updating_password = False
 
     def toggle_notifications(self):
         self.set_notifications(not self.notifications)

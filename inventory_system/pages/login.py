@@ -94,11 +94,8 @@ def login_form() -> rx.Component:
                 width="100%",
             ),
             rx.button(
-                rx.cond(
-                    CustomLoginState.is_submitting,
-                    rx.spinner(size="2"),
-                    rx.text("Login"),
-                ),
+                rx.spinner(loading=CustomLoginState.is_submitting),
+                "Login",
                 type="submit",
                 width="100%",
                 size="3",
