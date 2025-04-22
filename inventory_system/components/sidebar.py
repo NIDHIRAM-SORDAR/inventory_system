@@ -3,27 +3,21 @@
 import reflex as rx
 
 from inventory_system import routes
-from inventory_system.components.avatar import user_avatar
 from inventory_system.state.auth import AuthState
+from inventory_system.state.logout_state import LogoutState
+from inventory_system.state.profile_picture_state import ProfilePictureState
 
 from .. import styles
 
 
 def sidebar_header() -> rx.Component:
-    """Sidebar header.
-
-    Returns:
-        The sidebar header component.
-
-    """
+    """Sidebar header."""
     return rx.hstack(
-        # The logo.
         rx.color_mode_cond(
             rx.image(src="/reflex_black.svg", height="1.5em"),
             rx.image(src="/reflex_white.svg", height="1.5em"),
         ),
         rx.spacer(),
-        user_avatar(),  # Add the user avatar here
         align="center",
         width="100%",
         padding="0.35em",
@@ -32,12 +26,7 @@ def sidebar_header() -> rx.Component:
 
 
 def sidebar_footer() -> rx.Component:
-    """Sidebar footer.
-
-    Returns:
-        The sidebar footer component.
-
-    """
+    """Sidebar footer."""
     return rx.hstack(
         rx.link(
             rx.text("Docs", size="3"),
@@ -64,22 +53,15 @@ def sidebar_item_icon(icon: str) -> rx.Component:
     return rx.icon(icon, size=18)
 
 
-def sidebar_item(text: str, url: str) -> rx.Component:
-    """Sidebar item."""
+def sidebar_item(text: str, icon: str, url: str) -> rx.Component:
+    """Sidebar item with icon support."""
     active = (rx.State.router.page.path == url.lower()) | (
-        (rx.State.router.page.path == routes.OVERVIEW_ROUTE) & text == "Overview"
+        (rx.State.router.page.path == routes.OVERVIEW_ROUTE) & (text == "Overview")
     )
 
     return rx.link(
         rx.hstack(
-            rx.match(
-                text,
-                ("Overview", sidebar_item_icon("home")),
-                ("Table", sidebar_item_icon("table-2")),
-                ("About", sidebar_item_icon("book-open")),
-                ("Admin Dashboard", sidebar_item_icon("shield")),
-                sidebar_item_icon("layout-dashboard"),
-            ),
+            sidebar_item_icon(icon),  # Use the provided icon
             rx.text(text, size="3", weight="regular"),
             color=rx.cond(
                 active,
@@ -111,10 +93,104 @@ def sidebar_item(text: str, url: str) -> rx.Component:
             width="100%",
             spacing="2",
             padding="0.35em",
-            transition="background-color 0.2s ease, color 0.2s ease",  # Smooth hover
+            transition="background-color 0.2s ease, color 0.2s ease",
         ),
         underline="none",
         href=url,
+        width="100%",
+    )
+
+
+def sidebar_bottom_profile() -> rx.Component:
+    """Sidebar bottom profile section."""
+
+    # Define a helper to create a sidebar item with on_click instead of href
+    def sidebar_item_with_onclick(
+        text: str, icon: str, on_click: rx.EventHandler
+    ) -> rx.Component:
+        active = False  # Log out doesn't have an active state
+        return rx.link(
+            rx.hstack(
+                sidebar_item_icon(icon),
+                rx.text(text, size="3", weight="regular"),
+                color=rx.cond(
+                    active,
+                    styles.accent_text_color,
+                    styles.text_color,
+                ),
+                style={
+                    "_hover": {
+                        "background_color": rx.cond(
+                            active,
+                            styles.accent_bg_color,
+                            styles.gray_bg_color,
+                        ),
+                        "color": rx.cond(
+                            active,
+                            styles.accent_text_color,
+                            styles.text_color,
+                        ),
+                        "opacity": "1",
+                    },
+                    "opacity": rx.cond(
+                        active,
+                        "1",
+                        "0.95",
+                    ),
+                },
+                align="center",
+                border_radius=styles.border_radius,
+                width="100%",
+                spacing="2",
+                padding="0.35em",
+                transition="background-color 0.2s ease, color 0.2s ease",
+            ),
+            on_click=on_click,
+            underline="none",
+            width="100%",
+        )
+
+    return rx.vstack(
+        rx.divider(),
+        rx.vstack(
+            sidebar_item("Settings", "settings", routes.SETTINGS_ROUTE),
+            sidebar_item("Profile", "user-round-pen", routes.PROFILE_ROUTE),
+            sidebar_item_with_onclick("Log out", "log-out", LogoutState.toggle_dialog),
+            spacing="1",
+            width="100%",
+        ),
+        rx.hstack(
+            rx.avatar(
+                src=ProfilePictureState.profile_picture,
+                name=AuthState.authenticated_user.username,
+                size="2",
+                radius="full",
+            ),
+            rx.vstack(
+                rx.box(
+                    rx.text(
+                        AuthState.authenticated_user.username,
+                        size="3",
+                        weight="bold",
+                    ),
+                    rx.text(
+                        AuthState.authenticated_user_info.email,
+                        size="1",
+                        weight="medium",
+                    ),
+                    width="100%",
+                ),
+                spacing="0",
+                align="start",
+                justify="start",
+                width="100%",
+            ),
+            padding_x="0.5rem",
+            align="center",
+            justify="start",
+            width="100%",
+        ),
+        spacing="3",
         width="100%",
     )
 
@@ -123,7 +199,6 @@ def sidebar() -> rx.Component:
     """The sidebar."""
     from reflex.page import get_decorated_pages
 
-    # Define ordered page routes
     ordered_page_routes = [
         routes.OVERVIEW_ROUTE,
         routes.TABLE_ROUTE,
@@ -132,7 +207,6 @@ def sidebar() -> rx.Component:
     ]
 
     pages = get_decorated_pages()
-    # Filter pages to include only those in ordered_page_routes
     filtered_pages = [page for page in pages if page["route"] in ordered_page_routes]
     ordered_pages = sorted(
         filtered_pages,
@@ -152,6 +226,7 @@ def sidebar() -> rx.Component:
                         AuthState.is_admin & (page["route"] == routes.ADMIN_ROUTE),
                         sidebar_item(
                             text=page.get("title", "Admin Dashboard"),
+                            icon="shield",  # Add icon for Admin Dashboard
                             url=page["route"],
                         ),
                         rx.cond(
@@ -160,6 +235,11 @@ def sidebar() -> rx.Component:
                                 text=page.get(
                                     "title", page["route"].strip("/").capitalize()
                                 ),
+                                icon={
+                                    routes.OVERVIEW_ROUTE: "home",
+                                    routes.TABLE_ROUTE: "table-2",
+                                    routes.ABOUT_ROUTE: "book-open",
+                                }.get(page["route"], "layout-dashboard"),
                                 url=page["route"],
                             ),
                             rx.fragment(),
@@ -171,6 +251,7 @@ def sidebar() -> rx.Component:
                 width="100%",
             ),
             rx.spacer(),
+            sidebar_bottom_profile(),
             sidebar_footer(),
             justify="end",
             align="end",
@@ -188,5 +269,6 @@ def sidebar() -> rx.Component:
         left="0px",
         flex="1",
         bg=rx.color("gray", 2),
-        transition="width 0.3s ease",  # Smooth transition
+        transition="width 0.3s ease",
+        z_index="5",
     )
