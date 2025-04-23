@@ -174,7 +174,7 @@ def sidebar_bottom_profile() -> rx.Component:
                         weight="bold",
                     ),
                     rx.text(
-                        AuthState.authenticated_user_info.email,
+                        AuthState.user_email,
                         size="1",
                         weight="medium",
                     ),

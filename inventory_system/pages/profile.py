@@ -151,7 +151,9 @@ def password_change_section() -> rx.Component:
     )
 
 
-@template(route=routes.PROFILE_ROUTE, title="Profile", on_load=ProfileState.get_email)
+@template(
+    route=routes.PROFILE_ROUTE, title="Profile", on_load=ProfileState.load_user_data
+)
 @reflex_local_auth.require_login
 def profile() -> rx.Component:
     return rx.vstack(
@@ -176,7 +178,7 @@ def profile() -> rx.Component:
                                 "user@reflex.dev",
                                 "email",
                                 "mail",
-                                ProfileState.email,
+                                ProfileState.user_email,
                                 on_blur=ProfileState.validate_email_input,
                             ),
                             rx.cond(

@@ -8,7 +8,6 @@ from sqlmodel import select
 
 from inventory_system import routes
 from inventory_system.logging.logging import audit_logger
-from inventory_system.models.user import UserInfo
 from inventory_system.state.auth import AuthState
 
 
@@ -16,15 +15,8 @@ class ProfileState(AuthState):
     notifications: bool = True
     password_error: str = ""
     email_error: str = ""
-
-    email: str = ""
     is_updating_email: bool = False  # New loading state
     is_updating_password: bool = False  # New loading state
-
-    def get_email(self) -> str:
-        """Initialize email state on page load."""
-        if self.is_authenticated and self.authenticated_user_info:
-            self.email = self.authenticated_user_info.email
 
     def _handle_error(
         self, error_type: str, error_message: str, previous_email: str = None
@@ -44,78 +36,6 @@ class ProfileState(AuthState):
             error=error_message,
         )
         return rx.toast.error(error_message, position="top-center")
-
-    def handle_submit(self, form_data: dict):
-        if not self.is_authenticated:
-            return rx.redirect(routes.LOGIN_ROUTE)
-
-        self.is_updating_email = True
-        try:
-            audit_logger.info(
-                "profile_update_request",
-                user_id=self.authenticated_user.id,
-                username=self.authenticated_user.username,
-                ip_address=self.router.session.client_ip,
-                method="POST",
-                url=self.router.page.raw_path,
-                data=form_data,
-            )
-
-            email = form_data["email"]
-            previous_email = self.email
-            self.email = email
-
-            try:
-                validate_email(email, check_deliverability=False)
-            except EmailNotValidError as e:
-                return self._handle_error("email", str(e), previous_email)
-
-            with rx.session() as session:
-                # Check for existing email and fetch user_info in one transaction
-                existing_user = session.exec(
-                    select(UserInfo).where(
-                        UserInfo.email == email,
-                        UserInfo.user_id != self.authenticated_user.id,
-                    )
-                ).one_or_none()
-                if existing_user:
-                    return self._handle_error(
-                        "email",
-                        "This email is already in use by another user",
-                        previous_email,
-                    )
-
-                user_info = session.exec(
-                    select(UserInfo).where(
-                        UserInfo.user_id == self.authenticated_user.id
-                    )
-                ).one_or_none()
-                if not user_info:
-                    return self._handle_error(
-                        "email", "Failed to update email", previous_email
-                    )
-
-                user_info.email = email
-                session.add(user_info)
-                session.commit()
-                session.refresh(user_info)
-
-            audit_logger.info(
-                "profile_update_success",
-                user_id=self.authenticated_user.id,
-                username=self.authenticated_user.username,
-                ip_address=self.router.session.client_ip,
-                method="POST",
-                url=self.router.page.raw_path,
-                old_email=previous_email,
-                new_email=email,
-            )
-
-            return rx.toast.success(
-                "Profile email updated successfully", position="top-center"
-            )
-        finally:
-            self.is_updating_email = False
 
     def _validate_password(self, new_password, confirm_password) -> bool:
         errors = []
@@ -208,17 +128,49 @@ class ProfileState(AuthState):
         )
 
     def validate_email_input(self, email: str):
-        """Validate email input in real-time as the user types.
-
-        Args:
-            email: The email string entered by the user.
-        """
-        self.email = email  # Update the email state to reflect user input
+        self.user_email = email  # Update shared state
         if not email:
-            self.email_error = "Email is required"  # Clear error if field is empty
+            self.email_error = "Email is required"
             return
         try:
             validate_email(email, check_deliverability=False)
-            self.email_error = ""  # Clear error if valid
+            self.email_error = ""
         except EmailNotValidError as e:
-            self.email_error = str(e)  # Set error message if invalid
+            self.email_error = str(e)
+
+    def handle_submit(self, form_data: dict):
+        if not self.is_authenticated:
+            return rx.redirect(routes.LOGIN_ROUTE)
+        self.is_updating_email = True
+        try:
+            audit_logger.info(
+                "profile_update_request",
+                user_id=self.authenticated_user.id,
+                username=self.authenticated_user.username,
+                ip_address=self.router.session.client_ip,
+                method="POST",
+                url=self.router.page.raw_path,
+                data=form_data,
+            )
+            email = form_data["email"]
+            previous_email = self.user_email
+            try:
+                self.set_user_email(email)
+            except ValueError as e:
+                self.user_email = previous_email
+                return self._handle_error("email", str(e), previous_email)
+            audit_logger.info(
+                "profile_update_success",
+                user_id=self.authenticated_user.id,
+                username=self.authenticated_user.username,
+                ip_address=self.router.session.client_ip,
+                method="POST",
+                url=self.router.page.raw_path,
+                old_email=previous_email,
+                new_email=email,
+            )
+            return rx.toast.success(
+                "Profile email updated successfully", position="top-center"
+            )
+        finally:
+            self.is_updating_email = False
