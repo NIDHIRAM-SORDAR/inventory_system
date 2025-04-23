@@ -107,7 +107,7 @@ def test_logout_flow(inventory_app: inventory_app, edge_page: edge_page):
     # Wait for the logout dialog
     dialog_locator = page.locator(
         '[role="alertdialog"][data-state="open"]:has-text("Log Out")'
-    ).nth(1)
+    )  # .nth(1)(wsl)
     dialog_locator.wait_for(state="visible", timeout=20000)
 
     expect(dialog_locator).to_contain_text(
@@ -115,7 +115,7 @@ def test_logout_flow(inventory_app: inventory_app, edge_page: edge_page):
     )
 
     # Click the Confirm button
-    confirm_button = dialog_locator.locator('button:has-text("Confirm")').first
+    confirm_button = dialog_locator.locator('button:has-text("Confirm")')  # .first(wsl)
     expect(confirm_button).to_be_visible(timeout=3000)
     confirm_button.click(timeout=50000)
 

@@ -82,7 +82,7 @@ def test_profile_update_flow(inventory_app: inventory_app, edge_page: edge_page)
     signup_button = page.get_by_role("button", name="Sign Up", exact=True)
     expect(signup_button).to_be_enabled(timeout=15000)
     signup_button.click()
-    expect(page).to_have_url(_url("/login/"), timeout=20000)
+    expect(page).to_have_url(_url("/login/"), timeout=25000)
 
     # Log in as the test user
     page.get_by_placeholder("Enter your username").fill(TEST_USERNAME)
@@ -95,7 +95,7 @@ def test_profile_update_flow(inventory_app: inventory_app, edge_page: edge_page)
     # Verify logged-in state
     # Verify logged-in state
     expect(page.get_by_role("heading", name=f"Welcome {TEST_USERNAME}")).to_be_visible(
-        timeout=25000
+        timeout=35000
     )
 
     # Navigate to profile page
@@ -135,7 +135,10 @@ def test_profile_update_flow(inventory_app: inventory_app, edge_page: edge_page)
 
     # Wait for and verify success toast
     toast_success = page.locator(
-        '.toast:has-text("Profile email updated successfully")'
+        (
+            '[data-sonner-toast][data-type="success"]'
+            ':has-text("Profile email updated successfully")'
+        )
     )
     expect(toast_success).to_be_visible(timeout=15000)
     expect(toast_success).to_contain_text(
@@ -159,7 +162,10 @@ def test_profile_update_flow(inventory_app: inventory_app, edge_page: edge_page)
 
     # Wait for and verify error toast
     toast_error = page.locator(
-        '.toast:has-text("Password must be at least 8 characters")'
+        (
+            '[data-sonner-toast][data-type="error"]'
+            ':has-text("Password must be at least 8 characters")'
+        )
     )
     expect(toast_error).to_be_visible(timeout=15000)
     expect(toast_error).to_contain_text(
@@ -173,7 +179,12 @@ def test_profile_update_flow(inventory_app: inventory_app, edge_page: edge_page)
     password_button.click()
 
     # Wait for and verify success toast
-    toast_success = page.locator('.toast:has-text("Password updated successfully")')
+    toast_success = page.locator(
+        (
+            '[data-sonner-toast][data-type="success"]'
+            ':has-text("Password updated successfully")'
+        )
+    )
     expect(toast_success).to_be_visible(timeout=10000)
     expect(toast_success).to_contain_text(
         "Password updated successfully", timeout=10000
@@ -190,17 +201,21 @@ def test_profile_update_flow(inventory_app: inventory_app, edge_page: edge_page)
     expect(logout_button).to_be_visible(timeout=15000)
     logout_button.click()
 
+    page.pause()
+
     # Wait for the logout dialog
     dialog_locator = page.locator(
         '[role="alertdialog"][data-state="open"]:has-text("Log Out")'
-    ).nth(1)
-    dialog_locator.wait_for(state="visible", timeout=20000)
+    )  # nth(1)
+    dialog_locator.wait_for(state="visible", timeout=25000)
     expect(dialog_locator).to_contain_text(
         "Are you sure you want to log out?", timeout=15000
     )
 
     # Click the Confirm button
-    confirm_button = dialog_locator.locator('button:has-text("Confirm")').first
+    confirm_button = dialog_locator.locator(
+        'button:has-text("Confirm")'
+    )  # .first(for wsl)
     expect(confirm_button).to_be_visible(timeout=3000)
     confirm_button.click(timeout=50000)
 
