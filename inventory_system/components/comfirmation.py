@@ -1,6 +1,7 @@
 # components/confirmation.py
 import reflex as rx
 
+
 def confirmation_dialog(
     state: rx.State,
     dialog_open_var: rx.Var,
@@ -22,7 +23,7 @@ def confirmation_dialog(
                         "Cancel",
                         variant="soft",
                         color_scheme="gray",
-                        on_click=cancel_handler  # Add the cancel handler
+                        on_click=cancel_handler,  # Add the cancel handler
                     )
                 ),
                 rx.alert_dialog.action(

@@ -80,14 +80,15 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
             target_id_var=UserManagementState.target_user_id,
             target_id=user["id"],
             title="Make Employee",
-            description=f"Are you sure you want to make {user['username']} an employee?",
+            description=f"Are you sure you want to make {user['username']} an employee?",  # noqa: E501
             confirm_color="green",
         ),
         rx.alert_dialog.root(
             rx.alert_dialog.content(
                 rx.alert_dialog.title("Delete User"),
                 rx.alert_dialog.description(
-                    f"Are you sure you want to delete user {user['username']}? This action cannot be undone."
+                    f"Are you sure you want to delete user {user['username']}?"
+                    "This action cannot be undone."
                 ),
                 rx.hstack(
                     rx.alert_dialog.cancel(
