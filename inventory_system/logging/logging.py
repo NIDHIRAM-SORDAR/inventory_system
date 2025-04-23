@@ -1,14 +1,15 @@
 import json
 import os
 import sys
+import time
 from datetime import datetime
+from typing import Any, Dict
 
 from loguru import logger
 
 from inventory_system.constants import LOG_DIR
 
 
-# Custom JSON encoder to handle datetime objects
 class DateTimeEncoder(json.JSONEncoder):
     """JSON encoder that handles datetime objects."""
 
@@ -18,126 +19,151 @@ class DateTimeEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
-def ensure_log_dir_exists():
+def get_log_file_path() -> str:
+    """Generate the log file path with the current date."""
+    log_dir_template = os.getenv("LOG_DIR", LOG_DIR)
+    if "{time}" not in log_dir_template:
+        logger.error(
+            f"Invalid LOG_DIR format: '{log_dir_template}'. Expected '{time}' placeholder."  # noqa: E501
+        )
+        raise ValueError("LOG_DIR must contain '{time}' placeholder")
+    try:
+        return log_dir_template.format(time=datetime.now().strftime("%Y-%m-%d"))
+    except ValueError as e:
+        logger.error(
+            f"Failed to format log file path with template '{log_dir_template}': {e}"
+        )
+        raise
+
+
+def ensure_log_dir_exists() -> bool:
     """Ensure the log directory exists, recreating it if necessary."""
-    log_dir = os.path.dirname(LOG_DIR.format(time=datetime.now()))
+    log_dir = os.path.dirname(get_log_file_path())
     try:
         os.makedirs(log_dir, mode=0o755, exist_ok=True)
         return True
     except (OSError, PermissionError) as e:
-        print(f"Failed to create log directory {log_dir}: {e}")
+        logger.error(f"Failed to create log directory {log_dir}: {e}")
         return False
 
 
-def filter_unwanted_messages(record):
+def filter_unwanted_messages(record: Dict[str, Any]) -> bool:
     """Filter out log messages containing '1 change detected'."""
     return "1 change detected" not in record["message"]
 
 
-def format_record(record):
+def format_json_record(record: Dict[str, Any]) -> str:
+    """Format the record as JSON for machine-readable output."""
+    log_entry = {
+        "timestamp": record["time"].isoformat(),
+        "level": record["level"].name,
+        "message": record["message"],
+        "extras": record["extra"],
+        "file": record["file"].path,
+        "line": record["line"],
+    }
+    return json.dumps(log_entry, cls=DateTimeEncoder)
+
+
+def format_record(record: Dict[str, Any]) -> str:
     """Format the record into a readable message with context."""
-    # Format the timestamp
     timestamp = record["time"].strftime("%Y-%m-%d %H:%M:%S")
-
-    # Get the log message
     message = record["message"]
-
-    # Start building the formatted log
     log_parts = [f"[{timestamp}] {message}"]
+    extras = record.get("extra", {})
 
-    # Add context based on the type of log
-    extras = record["extra"]
+    try:
+        if "method" in extras and "url" in extras:
+            http_context = []
+            for field in [
+                "method",
+                "url",
+                "status_code",
+                "user_id",
+                "ip_address",
+                "username",
+            ]:
+                if field in extras and extras[field] is not None:
+                    http_context.append(f"{field}={extras[field]}")
+            if http_context:
+                log_parts.append(" | " + " ".join(http_context))
 
-    if "method" in extras and "url" in extras:
-        # HTTP request/response logs
-        http_context = []
-        for field in [
-            "method",
-            "url",
-            "status_code",
-            "user_id",
-            "ip_address",
-            "username",
-        ]:
-            if field in extras and extras[field] is not None:
-                http_context.append(f"{field}={extras[field]}")
+        elif "entity_type" in extras and "entity_id" in extras:
+            db_context = [
+                f"entity={extras.get('entity_type')}",
+                f"id={extras.get('entity_id')}",
+                f"username={extras.get('username', 'unknown')}",
+            ]
+            if "user_id" in extras and extras["user_id"] is not None:
+                db_context.append(f"user_id={extras['user_id']}")
+            log_parts.append(" | " + " ".join(db_context))
+            if "details" in extras:
+                log_parts.append(
+                    "\n" + json.dumps(extras["details"], indent=2, cls=DateTimeEncoder)
+                )
 
-        if http_context:
-            log_parts.append(" | " + " ".join(http_context))
+        else:
+            extra_fields = []
+            for key, value in extras.items():
+                if key != "formatted_message" and value is not None:
+                    extra_fields.append(f"{key}={value}")
+            if extra_fields:
+                log_parts.append(" | " + " ".join(extra_fields))
 
-    elif "entity_type" in extras and "entity_id" in extras:
-        # Database operation logs
-        db_context = [
-            f"entity={extras['entity_type']}",
-            f"id={extras['entity_id']}",
-            f"username={extras['username']}",
-        ]
+    except Exception as e:
+        log_parts.append(f" | formatting_error={str(e)}")
 
-        if "user_id" in extras and extras["user_id"] is not None:
-            db_context.append(f"user_id={extras['user_id']}")
-
-        log_parts.append(" | " + " ".join(db_context))
-
-        # Add operation details if present
-        if "details" in extras:
-            details = extras["details"]
-            # Use custom encoder for datetime objects
-            log_parts.append("\n" + json.dumps(details, indent=2, cls=DateTimeEncoder))
-
-    # For other types of logs, add any non-None extra fields
-    else:
-        extra_fields = []
-        for key, value in extras.items():
-            if key != "formatted_message" and value is not None:
-                extra_fields.append(f"{key}={value}")
-
-        if extra_fields:
-            log_parts.append(" | " + " ".join(extra_fields))
-
-    # Return the formatted message
     return "".join(log_parts)
 
 
-def patch_logger(record):
+def patch_logger(record: Dict[str, Any]) -> None:
     """Add formatted message to record extras."""
     record["extra"]["formatted_message"] = format_record(record)
 
 
 def setup_loguru():
     """Set up Loguru logging."""
-    # Remove default handler
-    logger.remove()
+    # Load configuration from environment variables
+    log_config = {
+        "level": os.getenv("LOG_LEVEL", "INFO").upper(),
+        "format": os.getenv("LOG_FORMAT", "human").lower(),
+        "rotation": os.getenv("LOG_ROTATION", "1 day"),
+        "retention": os.getenv("LOG_RETENTION", "30 days"),
+        "compression": os.getenv("LOG_COMPRESSION", "zip"),
+    }
 
-    # Patch the logger with our formatter
+    file_format = (
+        format_json_record
+        if log_config["format"] == "json"
+        else "{extra[formatted_message]}"
+    )
+
+    logger.remove()
     patched_logger = logger.patch(patch_logger)
 
-    # Ensure log directory exists before adding file handler
     if ensure_log_dir_exists():
-        # Add file handler with daily rotation
         patched_logger.add(
-            LOG_DIR,
-            level="INFO",
+            get_log_file_path(),
+            level=log_config["level"],
             filter=filter_unwanted_messages,
-            format="{extra[formatted_message]}",
+            format=file_format,
             catch=True,
             encoding="utf-8",
-            rotation="1 day",
-            retention="30 days",
-            compression="zip",
+            rotation=log_config["rotation"],
+            retention=log_config["retention"],
+            compression=log_config["compression"],
             backtrace=True,
             diagnose=True,
-            enqueue=True,  # Use a queue to avoid blocking
+            enqueue=True,
         )
     else:
-        # Log a warning to console if we can't set up file logging
         patched_logger.warning(
             "Failed to set up file logging. Logs will only be sent to console."
         )
 
-    # Add console handler - always works even if file logging fails
     patched_logger.add(
         sys.stderr,
-        level="INFO",
+        level=log_config["level"],
         filter=filter_unwanted_messages,
         format="{extra[formatted_message]}",
         catch=True,
@@ -147,5 +173,4 @@ def setup_loguru():
     return patched_logger
 
 
-# Set up and export the audit logger
 audit_logger = setup_loguru()
