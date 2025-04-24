@@ -3,9 +3,7 @@ import reflex_local_auth
 
 from inventory_system import routes
 from inventory_system.state.user_mgmt_state import UserManagementState
-
-from ..components.comfirmation import confirmation_dialog
-from ..templates import template
+from inventory_system.templates.template import template
 
 
 def _header_cell(text: str, icon: str) -> rx.Component:
@@ -19,96 +17,171 @@ def _header_cell(text: str, icon: str) -> rx.Component:
     )
 
 
+def _edit_dialog(user: rx.Var) -> rx.Component:
+    return rx.alert_dialog.root(
+        rx.alert_dialog.trigger(
+            rx.icon_button(
+                rx.icon("square-pen"),
+                on_click=lambda: UserManagementState.open_edit_dialog(
+                    user["id"], user["role"]
+                ),
+                color_scheme="blue",
+                size="2",
+                variant="solid",
+                disabled=(user["role"] == "supplier"),
+            )
+        ),
+        rx.alert_dialog.content(
+            rx.vstack(
+                rx.alert_dialog.title("Change User Role"),
+                rx.alert_dialog.description(
+                    f"Select a new role for {user['username']}.",
+                    size="2",
+                ),
+                rx.inset(
+                    rx.table.root(
+                        rx.table.header(
+                            rx.table.row(
+                                rx.table.column_header_cell("Username"),
+                                rx.table.column_header_cell("Email"),
+                                rx.table.column_header_cell("Role"),
+                            ),
+                        ),
+                        rx.table.body(
+                            rx.table.row(
+                                rx.table.row_header_cell(user["username"]),
+                                rx.table.cell(user["email"]),
+                                rx.table.cell(rx.text(user["role"])),
+                            ),
+                        ),
+                        width="100%",
+                    ),
+                    side="x",
+                    margin_y="16px",
+                ),
+                rx.radio(
+                    ["admin", "employee"],
+                    value=UserManagementState.selected_role,
+                    on_change=UserManagementState.set_selected_role,
+                    direction="column",
+                    spacing="2",
+                    width="100%",
+                ),
+                rx.flex(
+                    rx.alert_dialog.cancel(
+                        rx.button(
+                            "Cancel",
+                            variant="soft",
+                            color_scheme="gray",
+                            size="2",
+                            on_click=UserManagementState.cancel_edit_dialog,
+                        )
+                    ),
+                    rx.alert_dialog.action(
+                        rx.button(
+                            "Confirm",
+                            color_scheme="blue",
+                            size="2",
+                            on_click=lambda: UserManagementState.change_user_role(
+                                user["id"], UserManagementState.selected_role
+                            ),
+                        )
+                    ),
+                    direction="column",
+                    spacing="3",
+                    width="100%",
+                    align="stretch",
+                ),
+                spacing="4",
+                width="100%",
+                padding="16px",
+            ),
+            style={"max_width": "90vw", "width": "400px"},
+        ),
+    )
+
+
 def _show_user(user: rx.Var, index: int) -> rx.Component:
     bg_color = rx.cond(index % 2 == 0, rx.color("gray", 1), rx.color("accent", 2))
     hover_color = rx.cond(index % 2 == 0, rx.color("gray", 3), rx.color("accent", 3))
     return rx.table.row(
         rx.table.row_header_cell(user["username"]),
         rx.table.cell(user["email"]),
-        rx.table.cell(user["role"]),
+        rx.table.cell(rx.text(user["role"])),
         rx.table.cell(
             rx.hstack(
-                rx.button(
-                    "Make Admin",
-                    on_click=lambda: UserManagementState.confirm_change_role(
-                        user["id"], True
-                    ),
-                    color_scheme="blue",
-                    disabled=(user["role"] == "admin") | (user["role"] == "supplier"),
-                ),
-                rx.button(
-                    "Make Employee",
-                    on_click=lambda: UserManagementState.confirm_change_role(
-                        user["id"], False
-                    ),
-                    color_scheme="green",
-                    disabled=(user["role"] == "employee")
-                    | (user["role"] == "supplier"),
-                ),
-                rx.button(
-                    "Delete",
+                _edit_dialog(user),
+                rx.icon_button(
+                    rx.icon("trash-2"),
                     on_click=lambda: UserManagementState.confirm_delete_user(
                         user["id"]
                     ),
                     color_scheme="red",
+                    size="2",
+                    variant="solid",
                 ),
                 spacing="2",
-                justify="center",
-            ),
-        ),
-        # Updated confirmation dialogs with direct Var access
-        confirmation_dialog(
-            state=UserManagementState,
-            dialog_open_var=UserManagementState.show_admin_dialog,
-            action_handler=lambda: UserManagementState.change_user_role(
-                user["id"], True
-            ),
-            cancel_handler=UserManagementState.cancel_role_change,
-            target_id_var=UserManagementState.target_user_id,
-            target_id=user["id"],
-            title="Make Admin",
-            description=f"Are you sure you want to make {user['username']} an admin?",
-            confirm_color="blue",
-        ),
-        confirmation_dialog(
-            state=UserManagementState,
-            dialog_open_var=UserManagementState.show_employee_dialog,
-            action_handler=lambda: UserManagementState.change_user_role(
-                user["id"], False
-            ),
-            cancel_handler=UserManagementState.cancel_role_change,
-            target_id_var=UserManagementState.target_user_id,
-            target_id=user["id"],
-            title="Make Employee",
-            description=f"Are you sure you want to make {user['username']} an employee?",  # noqa: E501
-            confirm_color="green",
+                align="center",
+            )
         ),
         rx.alert_dialog.root(
             rx.alert_dialog.content(
-                rx.alert_dialog.title("Delete User"),
-                rx.alert_dialog.description(
-                    f"Are you sure you want to delete user {user['username']}?"
-                    "This action cannot be undone."
-                ),
-                rx.hstack(
-                    rx.alert_dialog.cancel(
-                        rx.button(
-                            "Cancel",
-                            on_click=UserManagementState.cancel_delete,
-                            variant="soft",
-                            color_scheme="gray",
-                        )
+                rx.vstack(
+                    rx.alert_dialog.title("Delete User"),
+                    rx.alert_dialog.description(
+                        f"Are you sure you want to delete user {user['username']}? "
+                        "This action cannot be undone.",
+                        size="2",
                     ),
-                    rx.alert_dialog.action(
-                        rx.button(
-                            "Delete",
-                            on_click=UserManagementState.delete_user,
-                            color_scheme="red",
-                        )
+                    rx.inset(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("Username"),
+                                    rx.table.column_header_cell("Email"),
+                                    rx.table.column_header_cell("Role"),
+                                ),
+                            ),
+                            rx.table.body(
+                                rx.table.row(
+                                    rx.table.row_header_cell(user["username"]),
+                                    rx.table.cell(user["email"]),
+                                    rx.table.cell(rx.text(user["role"])),
+                                ),
+                            ),
+                            width="100%",
+                        ),
+                        side="x",
+                        margin_y="16px",
                     ),
-                    spacing="3",
-                    justify="end",
+                    rx.flex(
+                        rx.alert_dialog.cancel(
+                            rx.button(
+                                "Cancel",
+                                variant="soft",
+                                color_scheme="gray",
+                                size="2",
+                                on_click=UserManagementState.cancel_delete,
+                            )
+                        ),
+                        rx.alert_dialog.action(
+                            rx.button(
+                                "Delete",
+                                color_scheme="red",
+                                size="2",
+                                on_click=UserManagementState.delete_user,
+                            )
+                        ),
+                        direction="column",
+                        spacing="3",
+                        width="100%",
+                        align="stretch",
+                    ),
+                    spacing="4",
+                    width="100%",
+                    padding="16px",
                 ),
+                style={"max_width": "90vw", "width": "400px"},
             ),
             open=UserManagementState.show_delete_dialog
             & (UserManagementState.user_to_delete == user["id"]),
@@ -197,9 +270,18 @@ def user_management() -> rx.Component:
     return rx.box(
         rx.flex(
             rx.hstack(
-                rx.heading("Admin Management", size="3"),
+                rx.heading("User Management", size="3"),
                 rx.spacer(),
+                rx.button(
+                    "Back to Admin",
+                    rx.icon("arrow-left"),
+                    color_scheme="blue",
+                    variant="soft",
+                    size="2",
+                    on_click=lambda: rx.redirect(routes.ADMIN_ROUTE),
+                ),
                 width="100%",
+                align="center",
             ),
             rx.flex(
                 rx.cond(
@@ -245,20 +327,18 @@ def user_management() -> rx.Component:
                     color_scheme="gray",
                     on_change=UserManagementState.set_search_value,
                 ),
+                flex_direction=["column", "column", "row"],
                 align="center",
                 justify="end",
                 spacing="3",
+                width="100%",
             ),
+            direction="column",
             spacing="3",
             justify="between",
             wrap="wrap",
             width="100%",
             padding_bottom="1em",
-        ),
-        rx.cond(
-            UserManagementState.admin_error_message,
-            rx.text(UserManagementState.admin_error_message, color="red"),
-            rx.fragment(),
         ),
         rx.table.root(
             rx.table.header(
