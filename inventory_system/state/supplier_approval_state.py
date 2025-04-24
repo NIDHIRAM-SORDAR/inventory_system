@@ -76,22 +76,7 @@ class SupplierApprovalState(AuthState):
             ]
         self.is_loading = False
 
-    def show_toast(self, message: str, is_error: bool = False):
-        """Helper method to display toast notifications."""
-        if is_error:
-            rx.toast.error(
-                message,
-                position="bottom-right",
-                # duration=5000,
-            )
-        else:
-            rx.toast.success(
-                message,
-                position="bottom-right",
-                # duration=5000,
-            )
-
-    def send_welcome_email(self, email: str, username: str, password: str):
+    async def send_welcome_email(self, email: str, username: str, password: str):
         self.supplier_error_message = ""
         self.supplier_success_message = ""
         try:
@@ -103,14 +88,20 @@ class SupplierApprovalState(AuthState):
                 f"Temporary password for {username}: {password} "
                 "(Email not sent - dummy)"
             )
-            self.show_toast(self.supplier_success_message)
-            self.supplier_success_message = ""
+            return rx.toast.success(
+                self.supplier_success_message, position="bottom-right", duration=5000
+            )
         except Exception as e:
             self.supplier_error_message = f"Failed to send email: {str(e)}"
-            self.show_toast(self.supplier_error_message, is_error=True)
+            return rx.toast.error(
+                self.supplier_error_message, position="bottom-right", duration=5000
+            )
+        finally:
+            self.supplier_success_message = ""
             self.supplier_error_message = ""
 
-    def delete_supplier(self, supplier_id: int):
+    @rx.event
+    async def delete_supplier(self, supplier_id: int):
         self.is_loading = True
         self.supplier_error_message = ""
         self.supplier_success_message = ""
@@ -134,7 +125,9 @@ class SupplierApprovalState(AuthState):
             ).one_or_none()
             if not supplier:
                 self.supplier_error_message = "Supplier not found."
-                self.show_toast(self.supplier_error_message, is_error=True)
+                yield rx.toast.error(
+                    self.supplier_error_message, position="bottom-right", duration=5000
+                )
                 self.is_loading = False
                 audit_logger.error(
                     "fail_delete_supplier",
@@ -196,12 +189,18 @@ class SupplierApprovalState(AuthState):
                 )
                 if associated_user_id:
                     self.supplier_success_message += " Associated user account deleted."
-                self.show_toast(self.supplier_success_message)
+                yield rx.toast.success(
+                    self.supplier_success_message,
+                    position="bottom-right",
+                    duration=5000,
+                )
                 self.supplier_success_message = ""
 
             except Exception as e:
                 self.supplier_error_message = f"Error deleting supplier: {str(e)}"
-                self.show_toast(self.supplier_error_message, is_error=True)
+                yield rx.toast.error(
+                    self.supplier_error_message, position="bottom-right", duration=5000
+                )
                 audit_logger.error(
                     "fail_delete_supplier",
                     acting_user_id=acting_user_id,
@@ -218,7 +217,8 @@ class SupplierApprovalState(AuthState):
             self.show_delete_dialog = False
             self.target_supplier_id = None
 
-    def approve_supplier(self, supplier_id: int):
+    @rx.event
+    async def approve_supplier(self, supplier_id: int):
         self.is_loading = True
         self.supplier_error_message = ""
         self.supplier_success_message = ""
@@ -242,7 +242,9 @@ class SupplierApprovalState(AuthState):
             ).one_or_none()
             if not supplier:
                 self.supplier_error_message = "Supplier not found."
-                self.show_toast(self.supplier_error_message, is_error=True)
+                yield rx.toast.error(
+                    self.supplier_error_message, position="bottom-right", duration=5000
+                )
                 self.is_loading = False
                 audit_logger.error(
                     "fail_approve_supplier",
@@ -294,7 +296,7 @@ class SupplierApprovalState(AuthState):
                         created_user_id=new_user_id,
                         ip_address=ip_address,
                     )
-                    self.send_welcome_email(
+                    yield await self.send_welcome_email(
                         supplier.contact_email,
                         supplier.company_name,
                         default_password,
@@ -303,14 +305,22 @@ class SupplierApprovalState(AuthState):
                         f"Supplier {target_supplier_company_name} approved and "
                         "user account created."
                     )
-                    self.show_toast(self.supplier_success_message)
+                    yield rx.toast.success(
+                        self.supplier_success_message,
+                        position="bottom-right",
+                        duration=5000,
+                    )
                     self.supplier_success_message = ""
 
                 except Exception as e:
                     self.supplier_error_message = (
                         f"Failed to register supplier user: {str(e)}"
                     )
-                    self.show_toast(self.supplier_error_message, is_error=True)
+                    yield rx.toast.error(
+                        self.supplier_error_message,
+                        position="bottom-right",
+                        duration=5000,
+                    )
                     audit_logger.error(
                         "fail_register_supplier_user",
                         acting_user_id=acting_user_id,
@@ -339,14 +349,22 @@ class SupplierApprovalState(AuthState):
                         f"Supplier {target_supplier_company_name} status set to "
                         "approved."
                     )
-                    self.show_toast(self.supplier_success_message)
+                    yield rx.toast.success(
+                        self.supplier_success_message,
+                        position="bottom-right",
+                        duration=5000,
+                    )
                     self.supplier_success_message = ""
                 except Exception as e:
                     session.rollback()
                     self.supplier_error_message = (
                         f"Failed to update supplier status: {e}"
                     )
-                    self.show_toast(self.supplier_error_message, is_error=True)
+                    yield rx.toast.error(
+                        self.supplier_error_message,
+                        position="bottom-right",
+                        duration=5000,
+                    )
                     audit_logger.error(
                         "fail_approve_supplier_existing_user",
                         acting_user_id=acting_user_id,
@@ -362,7 +380,8 @@ class SupplierApprovalState(AuthState):
             self.show_approve_dialog = False
             self.target_supplier_id = None
 
-    def revoke_supplier(self, supplier_id: int):
+    @rx.event
+    async def revoke_supplier(self, supplier_id: int):
         self.is_loading = True
         self.supplier_error_message = ""
         self.supplier_success_message = ""
@@ -386,7 +405,9 @@ class SupplierApprovalState(AuthState):
             ).one_or_none()
             if not supplier:
                 self.supplier_error_message = "Supplier not found."
-                self.show_toast(self.supplier_error_message, is_error=True)
+                yield rx.toast.error(
+                    self.supplier_error_message, position="bottom-right", duration=5000
+                )
                 self.is_loading = False
                 audit_logger.error(
                     "fail_revoke_supplier",
@@ -455,14 +476,20 @@ class SupplierApprovalState(AuthState):
                 )
                 if associated_user_id:
                     self.supplier_success_message += " Associated user account deleted."
-                self.show_toast(self.supplier_success_message)
+                yield rx.toast.success(
+                    self.supplier_success_message,
+                    position="bottom-right",
+                    duration=5000,
+                )
                 self.supplier_success_message = ""
 
             except Exception as e:
                 self.supplier_error_message = (
                     f"Error rejecting/revoking supplier: {str(e)}"
                 )
-                self.show_toast(self.supplier_error_message, is_error=True)
+                yield rx.toast.error(
+                    self.supplier_error_message, position="bottom-right", duration=5000
+                )
                 audit_logger.error(
                     "fail_revoke_supplier",
                     acting_user_id=acting_user_id,
