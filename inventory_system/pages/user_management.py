@@ -18,8 +18,8 @@ def _header_cell(text: str, icon: str) -> rx.Component:
 
 
 def _edit_dialog(user: rx.Var) -> rx.Component:
-    return rx.alert_dialog.root(
-        rx.alert_dialog.trigger(
+    return rx.dialog.root(
+        rx.dialog.trigger(
             rx.icon_button(
                 rx.icon("square-pen"),
                 on_click=lambda: UserManagementState.open_edit_dialog(
@@ -31,72 +31,107 @@ def _edit_dialog(user: rx.Var) -> rx.Component:
                 disabled=(user["role"] == "supplier"),
             )
         ),
-        rx.alert_dialog.content(
+        rx.dialog.content(
             rx.vstack(
-                rx.alert_dialog.title("Change User Role"),
-                rx.alert_dialog.description(
+                rx.dialog.title("Change User Role"),
+                rx.dialog.description(
                     f"Select a new role for {user['username']}.",
                     size="2",
                 ),
-                rx.inset(
-                    rx.table.root(
-                        rx.table.header(
-                            rx.table.row(
-                                rx.table.column_header_cell("Username"),
-                                rx.table.column_header_cell("Email"),
-                                rx.table.column_header_cell("Role"),
+                rx.desktop_only(
+                    rx.inset(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("Username"),
+                                    rx.table.column_header_cell("Email"),
+                                    rx.table.column_header_cell("Role"),
+                                ),
                             ),
-                        ),
-                        rx.table.body(
-                            rx.table.row(
-                                rx.table.row_header_cell(user["username"]),
-                                rx.table.cell(user["email"]),
-                                rx.table.cell(rx.text(user["role"])),
+                            rx.table.body(
+                                rx.table.row(
+                                    rx.table.row_header_cell(user["username"]),
+                                    rx.table.cell(user["email"]),
+                                    rx.table.cell(rx.text(user["role"])),
+                                ),
                             ),
+                            width="100%",
                         ),
-                        width="100%",
+                        side="x",
+                        margin_y="24px",
                     ),
-                    side="x",
-                    margin_y="16px",
                 ),
-                rx.radio(
-                    ["admin", "employee"],
-                    value=UserManagementState.selected_role,
-                    on_change=UserManagementState.set_selected_role,
-                    direction="column",
-                    spacing="2",
-                    width="100%",
+                rx.mobile_and_tablet(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.text("Username:", weight="bold"),
+                            rx.text(user["username"]),
+                            spacing="2",
+                            align="center",
+                        ),
+                        rx.hstack(
+                            rx.text("Email:", weight="bold"),
+                            rx.text(user["email"]),
+                            spacing="2",
+                            align="center",
+                        ),
+                        rx.hstack(
+                            rx.text("Role:", weight="bold"),
+                            rx.text(user["role"]),
+                            spacing="2",
+                            align="center",
+                        ),
+                        spacing="4",
+                        width="100%",
+                        padding_y="16px",
+                    ),
                 ),
                 rx.flex(
-                    rx.alert_dialog.cancel(
+                    rx.select(
+                        ["admin", "employee"],
+                        value=UserManagementState.selected_role,
+                        on_change=UserManagementState.set_selected_role,
+                        placeholder="Select a role",
+                        size="3",
+                        width=rx.breakpoints(initial="100%", lg="70%"),
+                    ),
+                    rx.button(
+                        "Update Role",
+                        color_scheme="blue",
+                        size="2",
+                        on_click=lambda: UserManagementState.change_user_role(
+                            user["id"], UserManagementState.selected_role
+                        ),
+                        width=rx.breakpoints(initial="100%", lg="auto"),
+                    ),
+                    direction=rx.breakpoints(initial="column", lg="row"),
+                    flex_wrap="wrap",
+                    spacing="3",
+                    width="100%",
+                    align="center",
+                ),
+                rx.flex(
+                    rx.dialog.close(
                         rx.button(
-                            "Cancel",
+                            "Close",
                             variant="soft",
                             color_scheme="gray",
                             size="2",
-                            on_click=UserManagementState.cancel_edit_dialog,
+                            width=rx.breakpoints(initial="100%", md="120px"),
                         )
                     ),
-                    rx.alert_dialog.action(
-                        rx.button(
-                            "Confirm",
-                            color_scheme="blue",
-                            size="2",
-                            on_click=lambda: UserManagementState.change_user_role(
-                                user["id"], UserManagementState.selected_role
-                            ),
-                        )
-                    ),
-                    direction="column",
-                    spacing="3",
+                    justify=rx.breakpoints(initial="center", md="end"),
                     width="100%",
-                    align="stretch",
+                    margin_top="16px",
                 ),
                 spacing="4",
                 width="100%",
                 padding="16px",
             ),
-            style={"max_width": "90vw", "width": "400px"},
+            style={
+                "max_width": rx.breakpoints(initial="90vw", md="500px"),
+                "width": "100%",
+            },
         ),
     )
 
