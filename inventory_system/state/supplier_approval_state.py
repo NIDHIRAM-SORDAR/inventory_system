@@ -21,10 +21,12 @@ class SupplierApprovalState(AuthState):
     sort_value: str = "username"
     sort_reverse: bool = False
     search_value: str = ""
-    show_approve_dialog: bool = False
-    show_revoke_dialog: bool = False
+    show_edit_dialog: bool = False
     show_delete_dialog: bool = False
-    target_supplier_id: Optional[int] = None
+    edit_supplier_id: Optional[int] = None
+    approve_checked: bool = False
+    revoke_checked: bool = False
+    current_status: str = ""
 
     @rx.var
     def total_pages(self) -> int:
@@ -68,7 +70,8 @@ class SupplierApprovalState(AuthState):
                 {
                     "id": row.id,
                     "email": row.email,
-                    "role": row.role if row.role else row.status,
+                    "status": row.status,  # Supplier status
+                    "role": row.role,  # UserInfo role, if exists
                     "username": row.username,
                     "user_id": row.user_id,
                 }
@@ -138,7 +141,7 @@ class SupplierApprovalState(AuthState):
                     ip_address=ip_address,
                 )
                 self.show_delete_dialog = False
-                self.target_supplier_id = None
+                self.edit_supplier_id = None
                 return
 
             target_supplier_company_name = supplier.company_name
@@ -215,7 +218,7 @@ class SupplierApprovalState(AuthState):
             self.check_auth_and_load()
             self.is_loading = False
             self.show_delete_dialog = False
-            self.target_supplier_id = None
+            self.edit_supplier_id = None
 
     @rx.event
     async def approve_supplier(self, supplier_id: int):
@@ -254,8 +257,8 @@ class SupplierApprovalState(AuthState):
                     reason="Supplier not found",
                     ip_address=ip_address,
                 )
-                self.show_approve_dialog = False
-                self.target_supplier_id = None
+                self.show_edit_dialog = False
+                self.edit_supplier_id = None
                 return
 
             target_supplier_company_name = supplier.company_name
@@ -282,6 +285,8 @@ class SupplierApprovalState(AuthState):
                     new_user_info = session.exec(
                         select(UserInfo).where(UserInfo.user_id == new_user_id)
                     ).one()
+                    new_user_info.is_supplier = True  # Set is_supplier flag
+                    session.add(new_user_info)
                     supplier.user_info_id = new_user_info.id
                     supplier.status = "approved"
                     session.add(supplier)
@@ -377,8 +382,8 @@ class SupplierApprovalState(AuthState):
 
             self.check_auth_and_load()
             self.is_loading = False
-            self.show_approve_dialog = False
-            self.target_supplier_id = None
+            self.show_edit_dialog = False
+            self.edit_supplier_id = None
 
     @rx.event
     async def revoke_supplier(self, supplier_id: int):
@@ -417,8 +422,8 @@ class SupplierApprovalState(AuthState):
                     reason="Supplier not found",
                     ip_address=ip_address,
                 )
-                self.show_revoke_dialog = False
-                self.target_supplier_id = None
+                self.show_edit_dialog = False
+                self.edit_supplier_id = None
                 return
 
             target_supplier_company_name = supplier.company_name
@@ -488,7 +493,9 @@ class SupplierApprovalState(AuthState):
                     f"Error rejecting/revoking supplier: {str(e)}"
                 )
                 yield rx.toast.error(
-                    self.supplier_error_message, position="bottom-right", duration=5000
+                    self.supplier_error_message,
+                    position="bottom-right",
+                    duration=5000,
                 )
                 audit_logger.error(
                     "fail_revoke_supplier",
@@ -503,8 +510,56 @@ class SupplierApprovalState(AuthState):
 
             self.check_auth_and_load()
             self.is_loading = False
-            self.show_revoke_dialog = False
-            self.target_supplier_id = None
+            self.show_edit_dialog = False
+            self.edit_supplier_id = None
+
+    @rx.event
+    def handle_submit(self, form_data: dict):
+        supplier_id = int(form_data.get("supplier_id", 0))
+        approve = self.approve_checked
+        revoke = self.revoke_checked
+        if approve and revoke:
+            self.supplier_error_message = "Cannot approve and revoke simultaneously."
+            yield rx.toast.error(
+                self.supplier_error_message, position="bottom-right", duration=5000
+            )
+            return
+        if approve:
+            return SupplierApprovalState.approve_supplier(supplier_id)
+        elif revoke:
+            return SupplierApprovalState.revoke_supplier(supplier_id)
+        else:
+            self.show_edit_dialog = False
+            self.edit_supplier_id = None
+            self.check_auth_and_load()
+
+    def open_edit_dialog(self, supplier_id: int):
+        self.show_edit_dialog = True
+        self.edit_supplier_id = supplier_id
+        supplier = next((u for u in self.users_data if u["id"] == supplier_id), None)
+        if supplier:
+            self.current_status = supplier["status"]
+            self.approve_checked = supplier["role"] == "approved"
+            self.revoke_checked = supplier["role"] == "revoked"
+
+    def toggle_approve(self, value: bool):
+        self.approve_checked = value
+        if value and self.current_status != "pending":
+            self.revoke_checked = False
+
+    def toggle_revoke(self, value: bool):
+        self.revoke_checked = value
+        if value and self.current_status != "pending":
+            self.approve_checked = False
+
+    def cancel_dialog(self):
+        self.show_edit_dialog = False
+        self.show_delete_dialog = False
+        self.edit_supplier_id = None
+
+    def open_delete_dialog(self, supplier_id: int):
+        self.show_delete_dialog = True
+        self.edit_supplier_id = supplier_id
 
     def set_sort_value(self, value: str):
         self.sort_value = value
@@ -529,9 +584,3 @@ class SupplierApprovalState(AuthState):
 
     def last_page(self):
         self.page_number = self.total_pages
-
-    def cancel_supplier_action(self):
-        self.show_approve_dialog = False
-        self.show_revoke_dialog = False
-        self.show_delete_dialog = False
-        self.target_supplier_id = None

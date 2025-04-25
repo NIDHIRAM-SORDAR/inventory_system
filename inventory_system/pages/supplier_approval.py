@@ -3,6 +3,7 @@ import reflex_local_auth
 
 from inventory_system import routes
 from inventory_system.state.supplier_approval_state import SupplierApprovalState
+from inventory_system.styles import border_radius
 from inventory_system.templates.template import template
 
 from ..components.status_badge import status_badge
@@ -19,117 +20,242 @@ def _header_cell(text: str, icon: str) -> rx.Component:
     )
 
 
-def _create_dialog(
-    user: rx.Var,
-    icon_name: str,
-    color_scheme: str,
-    dialog_title: str,
-    action_handler: rx.EventHandler,
-    disabled: rx.Var[bool] = rx.Var.create(False),
-) -> rx.Component:
-    return rx.alert_dialog.root(
-        rx.alert_dialog.trigger(
+def _edit_dialog(user: rx.Var) -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.trigger(
             rx.icon_button(
-                rx.icon(icon_name),
-                color_scheme=color_scheme,
-                size="2",
-                variant="solid",
-                disabled=disabled,
+                rx.icon("square-pen"),
+                color_scheme="blue",
+                size=rx.breakpoints(initial="1", md="2"),
+                variant="soft",
+                on_click=SupplierApprovalState.open_edit_dialog(user["id"]),
             )
         ),
-        rx.alert_dialog.content(
-            rx.alert_dialog.title(dialog_title),
-            rx.alert_dialog.description(
-                f"Are you sure you want to {dialog_title.lower()} for {user['username']}? "  # noqa: E501
-                "This action cannot be undone.",
-                size="2",
-            ),
-            rx.inset(
-                rx.table.root(
-                    rx.table.header(
-                        rx.table.row(
-                            rx.table.column_header_cell("Username"),
-                            rx.table.column_header_cell("Email"),
-                            rx.table.column_header_cell("Status"),
+        rx.dialog.content(
+            rx.vstack(
+                rx.dialog.title("Edit Supplier"),
+                rx.desktop_only(
+                    rx.inset(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("Username"),
+                                    rx.table.column_header_cell("Email"),
+                                    rx.table.column_header_cell("Status"),
+                                ),
+                            ),
+                            rx.table.body(
+                                rx.table.row(
+                                    rx.table.row_header_cell(user["username"]),
+                                    rx.table.cell(user["email"]),
+                                    rx.table.cell(status_badge(user["status"].to(str))),
+                                ),
+                            ),
+                            width="100%",
                         ),
-                    ),
-                    rx.table.body(
-                        rx.table.row(
-                            rx.table.row_header_cell(user["username"]),
-                            rx.table.cell(user["email"]),
-                            rx.table.cell(status_badge(user["role"].to(str))),
-                        ),
+                        side="x",
+                        margin_y="24px",
                     ),
                 ),
-                side="x",
-                margin_top="24px",
-                margin_bottom="24px",
-            ),
-            rx.flex(
-                rx.alert_dialog.cancel(
+                rx.mobile_and_tablet(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.text("Username:", weight="bold"),
+                            rx.text(user["username"]),
+                            spacing="2",
+                            align="center",
+                        ),
+                        rx.hstack(
+                            rx.text("Email:", weight="bold"),
+                            rx.text(user["email"]),
+                            spacing="2",
+                            align="center",
+                        ),
+                        rx.hstack(
+                            rx.text("Status:", weight="bold"),
+                            rx.text(user["status"]),
+                            spacing="2",
+                            align="center",
+                        ),
+                        spacing="4",
+                        width="100%",
+                        padding_y="16px",
+                    ),
+                ),
+                rx.form.root(
+                    rx.vstack(
+                        rx.el.input(
+                            type="hidden",
+                            name="supplier_id",
+                            value=user["id"],
+                        ),
+                        rx.checkbox(
+                            "Approve Supplier",
+                            name="approve",
+                            checked=SupplierApprovalState.approve_checked,
+                            on_change=SupplierApprovalState.toggle_approve,
+                        ),
+                        rx.checkbox(
+                            "Revoke Supplier",
+                            name="revoke",
+                            checked=SupplierApprovalState.revoke_checked,
+                            on_change=SupplierApprovalState.toggle_revoke,
+                        ),
+                        rx.button(
+                            "Save",
+                            type="submit",
+                            color_scheme="blue",
+                            size="2",
+                            width=rx.breakpoints(initial="100%", md="auto"),
+                            border_radius=border_radius,
+                        ),
+                        spacing="3",
+                        width="100%",
+                    ),
+                    on_submit=SupplierApprovalState.handle_submit,
+                    reset_on_submit=True,
+                ),
+                rx.dialog.close(
                     rx.button(
-                        "Cancel",
+                        "Close",
                         variant="soft",
                         color_scheme="gray",
                         size="2",
-                        on_click=SupplierApprovalState.cancel_supplier_action,
-                    )
+                        width=rx.breakpoints(initial="100%", md="120px"),
+                        border_radius=border_radius,
+                        on_click=SupplierApprovalState.cancel_dialog,
+                    ),
+                    justify=rx.breakpoints(initial="center", md="end"),
+                    width="100%",
+                    margin_top="16px",
                 ),
-                rx.alert_dialog.action(
-                    rx.button(
-                        "Confirm",
-                        color_scheme=color_scheme,
-                        size="2",
-                        on_click=action_handler,
-                    )
-                ),
-                spacing="3",
-                justify="end",
+                spacing="4",
+                width="100%",
+                padding="16px",
             ),
-            style={"max_width": 500},
+            style={
+                "max_width": rx.breakpoints(initial="90vw", md="500px"),
+                "width": "100%",
+            },
         ),
-    )
-
-
-def _approve_dialog(user: rx.Var) -> rx.Component:
-    return _create_dialog(
-        user,
-        "check",
-        "grass",
-        "Approve Supplier",
-        SupplierApprovalState.approve_supplier(user["id"]),
-        disabled=(user["role"] == "supplier") | (user["role"] == "admin"),
-    )
-
-
-def _revoke_dialog(user: rx.Var) -> rx.Component:
-    return _create_dialog(
-        user,
-        "ban",
-        "tomato",
-        "Revoke Supplier",
-        SupplierApprovalState.revoke_supplier(user["id"]),
-        disabled=user["role"] != "supplier",
+        open=SupplierApprovalState.show_edit_dialog
+        & (SupplierApprovalState.edit_supplier_id == user["id"]),
     )
 
 
 def _delete_dialog(user: rx.Var) -> rx.Component:
-    return _create_dialog(
-        user,
-        "trash-2",
-        "tomato",
-        "Delete Supplier",
-        SupplierApprovalState.delete_supplier(user["id"]),
+    return rx.dialog.root(
+        rx.dialog.trigger(
+            rx.icon_button(
+                rx.icon("trash-2"),
+                color_scheme="tomato",
+                size=rx.breakpoints(initial="1", md="2"),
+                variant="soft",
+                on_click=SupplierApprovalState.open_delete_dialog(user["id"]),
+            )
+        ),
+        rx.dialog.content(
+            rx.vstack(
+                rx.dialog.title("Delete Supplier"),
+                rx.dialog.description(
+                    f"Are you sure you want to delete supplier {user['username']}? "
+                    "This action cannot be undone.",
+                    size="2",
+                ),
+                rx.desktop_only(
+                    rx.inset(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    rx.table.column_header_cell("Username"),
+                                    rx.table.column_header_cell("Email"),
+                                    rx.table.column_header_cell("Status"),
+                                ),
+                            ),
+                            rx.table.body(
+                                rx.table.row(
+                                    rx.table.row_header_cell(user["username"]),
+                                    rx.table.cell(user["email"]),
+                                    rx.table.cell(status_badge(user["status"].to(str))),
+                                ),
+                            ),
+                            width="100%",
+                        ),
+                        side="x",
+                        margin_y="24px",
+                    ),
+                ),
+                rx.mobile_and_tablet(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.text("Username:", weight="bold"),
+                            rx.text(user["username"]),
+                            spacing="2",
+                            align="center",
+                        ),
+                        rx.hstack(
+                            rx.text("Email:", weight="bold"),
+                            rx.text(user["email"]),
+                            spacing="2",
+                            align="center",
+                        ),
+                        rx.hstack(
+                            rx.text("Status:", weight="bold"),
+                            rx.text(user["status"]),
+                            spacing="2",
+                            align="center",
+                        ),
+                        spacing="4",
+                        width="100%",
+                        padding_y="16px",
+                    ),
+                ),
+                rx.flex(
+                    rx.dialog.close(
+                        rx.button(
+                            "Cancel",
+                            variant="soft",
+                            color_scheme="gray",
+                            size="2",
+                            width=rx.breakpoints(initial="100%", md="120px"),
+                            border_radius=border_radius,
+                            on_click=SupplierApprovalState.cancel_dialog,
+                        )
+                    ),
+                    rx.button(
+                        "Delete",
+                        color_scheme="tomato",
+                        size="2",
+                        width=rx.breakpoints(initial="100%", md="auto"),
+                        border_radius=border_radius,
+                        on_click=SupplierApprovalState.delete_supplier(user["id"]),
+                    ),
+                    direction=rx.breakpoints(initial="column", sm="row"),
+                    spacing="3",
+                    justify=rx.breakpoints(initial="center", md="end"),
+                    width="100%",
+                    padding_top="16px",
+                ),
+                spacing="4",
+                width="100%",
+                padding="16px",
+            ),
+            style={
+                "max_width": rx.breakpoints(initial="90vw", md="500px"),
+                "width": "100%",
+            },
+        ),
+        open=SupplierApprovalState.show_delete_dialog
+        & (SupplierApprovalState.edit_supplier_id == user["id"]),
     )
 
 
 def _dialog_group(user: rx.Var) -> rx.Component:
     return rx.hstack(
-        _approve_dialog(user),
-        _revoke_dialog(user),
+        _edit_dialog(user),
         _delete_dialog(user),
         align="center",
-        spacing="2",
+        spacing="1",
         width="100%",
     )
 
@@ -140,7 +266,7 @@ def _show_supplier(user: rx.Var, index: int) -> rx.Component:
     return rx.table.row(
         rx.table.row_header_cell(user["username"]),
         rx.table.cell(user["email"]),
-        rx.table.cell(status_badge(user["role"].to(str))),
+        rx.table.cell(status_badge(user["status"].to(str))),
         rx.table.cell(_dialog_group(user)),
         style={"_hover": {"bg": hover_color}, "bg": bg_color},
         align="center",
@@ -212,6 +338,7 @@ def _pagination_view() -> rx.Component:
             spacing="2",
             justify="end",
         ),
+        flex_direction=rx.breakpoints(initial="column", sm="row"),
         spacing="5",
         margin_top="1em",
         align="center",
@@ -287,10 +414,13 @@ def supplier_approval() -> rx.Component:
                     color_scheme="gray",
                     on_change=SupplierApprovalState.set_search_value,
                 ),
+                flex_direction=["column", "column", "row"],
                 align="center",
                 justify="end",
                 spacing="3",
+                width="100%",
             ),
+            direction="column",
             spacing="3",
             justify="between",
             wrap="wrap",
@@ -314,9 +444,10 @@ def supplier_approval() -> rx.Component:
             ),
             variant="surface",
             size="3",
-            width="100%",
+            width=rx.breakpoints(initial="100%", md="90%"),
         ),
         _pagination_view(),
         width="100%",
-        padding="16px",
+        padding_x=["auto", "auto", "2em"],
+        padding_top=["1em", "1em", "2em"],
     )
