@@ -271,41 +271,27 @@ def test_role_permissions(session: Session):
         role.set_permissions(["manage_users", "invalid"], session)
 
 
-#### Test in production
-# def test_concurrent_role_assignment(session: Session):
-#     """Test concurrent role assignments to ensure atomicity."""
-#     role1 = Role(name="admin", description="Administrator role")
-#     role2 = Role(name="employee", description="Employee role")
-#     user = UserInfo(email="test@example.com", user_id=1)
-#     session.add_all([role1, role2, user])
-#     session.commit()
+def test_userinfo_permissions(session: Session):
+    # Setup: Create permissions, roles, and a user
+    perm1 = Permission(name="manage_users")
+    perm2 = Permission(name="view_inventory")
+    role1 = Role(name="admin")
+    role2 = Role(name="employee")
+    user = UserInfo(email="test@example.com", user_id=1)
+    session.add_all([perm1, perm2, role1, role2, user])
+    session.commit()
 
-#     errors = []
+    # Assign permissions to roles and roles to user
+    role1.set_permissions(["manage_users"], session)
+    role2.set_permissions(["view_inventory"], session)
+    user.set_roles(["admin", "employee"], session)
+    session.commit()
 
-#     def assign_roles(role_names, user_id=user.id):
-#         try:
-#             # Use the provided session instead of rx.session()
-#             user = session.exec(
-#                 select(UserInfo).where(UserInfo.id == user_id).with_for_update()
-#             ).one()
-#             user.set_roles(role_names, session)
-#             session.commit()
-#         except Exception as e:
-#             errors.append(str(e))
-
-#     thread1 = threading.Thread(target=assign_roles, args=(["admin"],))
-#     thread2 = threading.Thread(target=assign_roles, args=(["employee"],))
-#     thread1.start()
-#     thread2.start()
-#     thread1.join()
-#     thread2.join()
-
-#     assert not errors, f"Errors in threads: {errors}"
-
-#     user = session.exec(select(UserInfo).where(UserInfo.id == user.id)).one()
-#     roles = user.get_roles()
-#     assert len(roles) == 1
-#     assert roles[0] in ["admin", "employee"]
+    # Assertions
+    assert set(user.get_permissions()) == {"manage_users", "view_inventory"}
+    assert user.has_permission("manage_users") is True
+    assert user.has_permission("view_inventory") is True
+    assert user.has_permission("delete_inventory") is False
 
 
 def test_audit_logging_roles(session: Session):

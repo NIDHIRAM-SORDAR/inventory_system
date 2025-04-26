@@ -1,4 +1,5 @@
 # inventory_system/auth.py
+from functools import wraps
 from typing import Optional
 
 import reflex as rx
@@ -8,6 +9,19 @@ from email_validator import EmailNotValidError, validate_email
 from sqlmodel import select
 
 from inventory_system.models.user import UserInfo
+
+
+def has_permission(permission_name: str):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            if permission_name in self.user_permissions:
+                return func(self, *args, **kwargs)
+            return rx.toast.error("Permission denied")
+
+        return wrapper
+
+    return decorator
 
 
 class AuthState(reflex_local_auth.LocalAuthState):
@@ -61,3 +75,10 @@ class AuthState(reflex_local_auth.LocalAuthState):
                 return result
         finally:
             self.is_computing = False
+
+    @rx.var(cache=True)
+    def user_permissions(self) -> list[str]:
+        """Get the authenticated user's permissions."""
+        if self.authenticated_user_info:
+            return self.authenticated_user_info.get_permissions()
+        return []

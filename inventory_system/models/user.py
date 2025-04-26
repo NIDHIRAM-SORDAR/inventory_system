@@ -164,6 +164,17 @@ class UserInfo(rx.Model, table=True):
             session.rollback()
             raise ValueError(f"Failed to set roles: {str(e)}")
 
+    def get_permissions(self) -> list[str]:
+        """Get all permissions from the user's roles."""
+        permissions = set()
+        for role in self.roles:
+            permissions.update(role.get_permissions())
+        return list(permissions)
+
+    def has_permission(self, permission_name: str) -> bool:
+        """Check if the user has a specific permission."""
+        return permission_name in self.get_permissions()
+
 
 class Supplier(rx.Model, table=True):
     """Supplier model linked to UserInfo in a one-to-one relationship."""
