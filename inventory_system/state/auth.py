@@ -1,4 +1,4 @@
-# app/models.py
+# inventory_system/auth.py
 from typing import Optional
 
 import reflex as rx
@@ -64,6 +64,6 @@ class AuthState(reflex_local_auth.LocalAuthState):
 
     @rx.var(cache=True)
     def is_admin(self) -> bool:
-        """Check if the authenticated user is an admin."""
+        """Check if the authenticated user has the 'Admin' role."""
         user_info = self.authenticated_user_info
-        return user_info.is_admin if user_info else False
+        return "admin" in user_info.get_roles() if user_info else False

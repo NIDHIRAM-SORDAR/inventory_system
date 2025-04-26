@@ -1,10 +1,6 @@
-"""
-Audit logging module for SQLModel/SQLAlchemy models.
-Provides functions to automatically log database operations.
-"""
-
+# inventory_system/logging/audit.py
 import reflex as rx
-import reflex_local_auth  # Import LocalUser for username lookup
+import reflex_local_auth
 from sqlalchemy import event, inspect
 from sqlalchemy.orm import Mapper
 from sqlmodel import select
@@ -28,18 +24,31 @@ def get_username_by_user_id(user_id):
         return None
 
 
+def get_entity_id(target):
+    """Generate an entity_id for a model, handling association tables."""
+    if hasattr(target, "id"):
+        return target.id
+    # Handle association tables like UserRole and RolePermission
+    if target.__tablename__ == "userrole":
+        return f"{target.user_id}-{target.role_id}"
+    if target.__tablename__ == "rolepermission":
+        return f"{target.role_id}-{target.permission_id}"
+    return None  # Fallback for unexpected cases
+
+
 def log_insert(mapper: Mapper, connection, target):
     """Log insertion of a new record."""
     user_id = getattr(target, "user_id", None)
     username = get_username_by_user_id(user_id) if user_id else None
-
-    details = {"new": {k: v for k, v in target.dict().items() if not k.startswith("_")}}
+    details = {
+        "new": {k: v for k, v in target.__dict__.items() if not k.startswith("_")}
+    }
 
     audit_logger.info(
         f"create_{target.__tablename__}",
         user_id=user_id,
         entity_type=target.__tablename__,
-        entity_id=target.id,
+        entity_id=get_entity_id(target),
         username=username,
         details=details,
     )
@@ -50,7 +59,6 @@ def log_update(mapper: Mapper, connection, target):
     state = inspect(target)
     user_id = getattr(target, "user_id", None)
     username = get_username_by_user_id(user_id) if user_id else None
-
     changes = {}
     for attr in state.attrs:
         if attr.history.has_changes():
@@ -58,18 +66,14 @@ def log_update(mapper: Mapper, connection, target):
                 "old": attr.history.deleted[0] if attr.history.deleted else None,
                 "new": attr.value,
             }
-
-    # Only log if there are actual changes
     if not changes:
         return
-
     details = {"changes": changes}
-
     audit_logger.info(
         f"update_{target.__tablename__}",
         user_id=user_id,
         entity_type=target.__tablename__,
-        entity_id=target.id,
+        entity_id=get_entity_id(target),
         username=username,
         details=details,
     )
@@ -79,7 +83,6 @@ def log_delete(mapper: Mapper, connection, target):
     """Log deletion of a record."""
     user_id = getattr(target, "user_id", None)
     username = get_username_by_user_id(user_id) if user_id else None
-
     details = {
         "deleted": {
             attr: getattr(target, attr)
@@ -87,29 +90,18 @@ def log_delete(mapper: Mapper, connection, target):
             if not attr.startswith("_")
         }
     }
-
     audit_logger.info(
         f"delete_{target.__tablename__}",
         user_id=user_id,
         entity_type=target.__tablename__,
-        entity_id=target.id,
+        entity_id=get_entity_id(target),
         username=username,
         details=details,
     )
 
 
 def attach_audit_logging(model_class):
-    """
-    Attach audit logging to a SQLModel model class.
-
-    Example usage:
-        from inventory_system.audit import attach_audit_logging
-
-        class MyModel(rx.Model, table=True):
-            # model definition...
-
-        attach_audit_logging(MyModel)
-    """
+    """Attach audit logging to a SQLModel model class."""
     event.listen(model_class, "after_insert", log_insert)
     event.listen(model_class, "after_update", log_update)
     event.listen(model_class, "before_delete", log_delete)
@@ -117,13 +109,6 @@ def attach_audit_logging(model_class):
 
 
 def enable_audit_logging_for_models(*model_classes):
-    """
-    Enable audit logging for multiple model classes at once.
-
-    Example usage:
-        from inventory_system.audit import enable_audit_logging_for_models
-
-        enable_audit_logging_for_models(User, Order, Product)
-    """
+    """Enable audit logging for multiple model classes at once."""
     for model_class in model_classes:
         attach_audit_logging(model_class)
