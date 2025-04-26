@@ -1,5 +1,3 @@
-"""The admin page for managing users and suppliers."""
-
 import reflex as rx
 import reflex_local_auth
 from sqlmodel import select
@@ -9,8 +7,6 @@ from inventory_system.state.auth import AuthState
 
 
 class AdminState(AuthState):
-    """State for the admin page."""
-
     is_loading: bool = False
     users_data: list[dict] = []
     suppliers_data: list[dict] = []
@@ -18,13 +14,19 @@ class AdminState(AuthState):
     supplier_stats: dict = {"total": 0, "pending": 0, "approved": 0, "rejected": 0}
 
     def check_auth_and_load(self):
-        """Check if the user is authenticated and an admin, then load user and supplier data."""
-        if not self.is_authenticated or not self.is_admin:
+        """Check if the user is authenticated and
+        has required permissions, then load data."""
+        if not self.is_authenticated or not (
+            self.authenticated_user_info
+            and (
+                "manage_users" in self.authenticated_user_info.get_permissions()
+                or "manage_suppliers" in self.authenticated_user_info.get_permissions()
+            )
+        ):
             return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
 
-        self.is_loading = True
+        self.setvar("is_loading", True)
         with rx.session() as session:
-            # Load user data (excluding the current user)
             current_user_id = (
                 self.authenticated_user_info.user_id
                 if self.authenticated_user_info
@@ -44,24 +46,24 @@ class AdminState(AuthState):
                     "username": username,
                     "id": user_info.user_id,
                     "email": user_info.email,
-                    "role": user_info.role,
+                    "role": user_info.get_roles()[0]
+                    if user_info.get_roles()
+                    else "none",  # Handle multiple roles in Step 6
                 }
                 for user_info, username in user_results
             ]
 
-            # Calculate user stats
             self.user_stats = {
                 "total": len(self.users_data),
-                "admin": sum(1 for user in self.users_data if user["role"] == "admin"),
+                "admin": sum(1 for user in self.users_data if "admin" in user["role"]),
                 "supplier": sum(
-                    1 for user in self.users_data if user["role"] == "supplier"
+                    1 for user in self.users_data if "supplier" in user["role"]
                 ),
                 "employee": sum(
-                    1 for user in self.users_data if user["role"] == "employee"
+                    1 for user in self.users_data if "employee" in user["role"]
                 ),
             }
 
-            # Load supplier data
             stmt_suppliers = select(Supplier)
             supplier_results = session.exec(stmt_suppliers).all()
             self.suppliers_data = [
@@ -73,7 +75,6 @@ class AdminState(AuthState):
                 for supplier in supplier_results
             ]
 
-            # Calculate supplier stats
             self.supplier_stats = {
                 "total": len(self.suppliers_data),
                 "pending": sum(
@@ -93,4 +94,4 @@ class AdminState(AuthState):
                 ),
             }
 
-        self.is_loading = False
+        self.setvar("is_loading", False)

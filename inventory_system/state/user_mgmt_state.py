@@ -26,32 +26,10 @@ class UserManagementState(AuthState):
     selected_role: str = ""
     current_user_role: str = ""
 
-    @rx.var
-    def total_pages(self) -> int:
-        return max(1, (len(self.filtered_users) + self.page_size - 1) // self.page_size)
-
-    @rx.var
-    def filtered_users(self) -> List[Dict[str, Any]]:
-        data = self.users_data
-        if self.search_value:
-            data = [
-                u
-                for u in data
-                if self.search_value.lower() in u["username"].lower()
-                or self.search_value.lower() in u["email"].lower()
-                or self.search_value.lower() in u["role"].lower()
-            ]
-        return sorted(data, key=lambda x: x[self.sort_value], reverse=self.sort_reverse)
-
-    @rx.var
-    def current_page(self) -> List[Dict[str, Any]]:
-        start = (self.page_number - 1) * self.page_size
-        end = start + self.page_size
-        return self.filtered_users[start:end]
-
     def check_auth_and_load(self):
-        if not self.is_authenticated or (
-            self.authenticated_user_info and not self.authenticated_user_info.is_admin
+        if not self.is_authenticated or not (
+            self.authenticated_user_info
+            and "manage_users" in self.authenticated_user_info.get_permissions()
         ):
             return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
         self.is_loading = True
@@ -75,7 +53,9 @@ class UserManagementState(AuthState):
                     "username": username,
                     "id": user_info.user_id,
                     "email": user_info.email,
-                    "role": user_info.role,
+                    "role": user_info.get_roles()[0]
+                    if user_info.get_roles()
+                    else "none",  # Handle multiple roles in Step 6
                 }
                 for user_info, username in results
             ]
@@ -84,8 +64,8 @@ class UserManagementState(AuthState):
     @rx.event
     async def change_user_role(self, user_id: int, selected_role: str):
         self.is_loading = True
-        self.admin_error_message = ""
-        self.admin_success_message = ""
+        self.setvar("admin_error_message", "")
+        self.setvar("admin_success_message", "")
         acting_user_id = self.authenticated_user.id if self.authenticated_user else None
         acting_username = (
             self.authenticated_user.username if self.authenticated_user else "Unknown"
@@ -101,104 +81,108 @@ class UserManagementState(AuthState):
             ip_address=ip_address,
         )
         with rx.session() as session:
-            user_info = session.exec(
-                select(UserInfo).where(UserInfo.user_id == user_id)
-            ).one_or_none()
-            if not user_info:
-                self.admin_error_message = "User info not found."
-                audit_logger.error(
-                    "fail_change_role",
-                    acting_user_id=acting_user_id,
-                    acting_username=acting_username,
-                    target_user_id=user_id,
-                    reason="User info not found",
-                    ip_address=ip_address,
-                )
-                self.is_loading = False
-                return rx.toast.error(
-                    self.admin_error_message, position="bottom-right", duration=5000
-                )
-            local_user = session.exec(
-                select(reflex_local_auth.LocalUser).where(
-                    reflex_local_auth.LocalUser.id == user_id
-                )
-            ).one_or_none()
-            if not local_user:
-                self.admin_error_message = "User not found."
-                audit_logger.error(
-                    "fail_change_role",
-                    acting_user_id=acting_user_id,
-                    acting_username=acting_username,
-                    target_user_id=user_id,
-                    reason="Local user not found",
-                    ip_address=ip_address,
-                )
-                self.is_loading = False
-                return rx.toast.error(
-                    self.admin_error_message, position="bottom-right", duration=5000
-                )
-            target_username = local_user.username
-            original_role = user_info.role
-            if original_role == selected_role:
-                self.is_loading = False
-                return rx.toast.info(
-                    f"No change: User {target_username}"
-                    "already has role {selected_role}.",
-                    position="bottom-right",
-                    duration=5000,
-                )
-            # Update role based on selected_role
-            if selected_role == "admin":
-                user_info.is_admin = True
-                user_info.is_supplier = False
-            elif selected_role == "employee":
-                user_info.is_admin = False
-                user_info.is_supplier = False
-            user_info.set_role()
-            session.add(user_info)
             try:
+                # Lock UserInfo to prevent concurrent updates
+                user_info = session.exec(
+                    select(UserInfo)
+                    .where(UserInfo.user_id == user_id)
+                    .with_for_update()
+                ).one_or_none()
+                if not user_info:
+                    self.setvar("admin_error_message", "User info not found.")
+                    audit_logger.error(
+                        "fail_change_role",
+                        acting_user_id=acting_user_id,
+                        acting_username=acting_username,
+                        target_user_id=user_id,
+                        reason="User info not found",
+                        ip_address=ip_address,
+                    )
+                    self.setvar("is_loading", False)
+                    return rx.toast.error(
+                        self.admin_error_message, position="bottom-right", duration=5000
+                    )
+
+                local_user = session.exec(
+                    select(reflex_local_auth.LocalUser).where(
+                        reflex_local_auth.LocalUser.id == user_id
+                    )
+                ).one_or_none()
+                if not local_user:
+                    self.setvar("admin_error_message", "User not found.")
+                    audit_logger.error(
+                        "fail_change_role",
+                        acting_user_id=acting_user_id,
+                        acting_username=acting_username,
+                        target_user_id=user_id,
+                        reason="Local user not found",
+                        ip_address=ip_address,
+                    )
+                    self.setvar("is_loading", False)
+                    return rx.toast.error(
+                        self.admin_error_message, position="bottom-right", duration=5000
+                    )
+
+                target_username = local_user.username
+                original_roles = user_info.get_roles()
+                if selected_role in original_roles:
+                    self.setvar("is_loading", False)
+                    return rx.toast.info(
+                        f"No change: User {target_username}"
+                        "already has role {selected_role}.",
+                        position="bottom-right",
+                        duration=5000,
+                    )
+
+                # Use set_roles for atomic role update
+                user_info.set_roles([selected_role], session)
+                session.add(user_info)
                 session.commit()
+
                 audit_logger.info(
                     "success_change_role",
                     acting_user_id=acting_user_id,
                     acting_username=acting_username,
                     target_user_id=user_id,
-                    original_role=original_role,
-                    new_role=user_info.role,
+                    original_roles=original_roles,
+                    new_role=selected_role,
                     ip_address=ip_address,
                 )
-                self.admin_success_message = (
-                    f"User {target_username} role changed to {selected_role}."
+                self.setvar(
+                    "admin_success_message",
+                    f"User {target_username} role changed to {selected_role}.",
                 )
                 self.check_auth_and_load()
-                self.is_loading = False
-                self.show_edit_dialog = False
-                self.target_user_id = None
+                self.setvar("is_loading", False)
+                self.setvar("show_edit_dialog", False)
+                self.setvar("target_user_id", None)
                 return rx.toast.success(
                     self.admin_success_message, position="bottom-right", duration=5000
                 )
+
             except Exception as e:
                 session.rollback()
-                self.admin_error_message = f"Failed to change role: {e}"
+                self.setvar("admin_error_message", f"Failed to change role: {str(e)}")
                 audit_logger.error(
                     "fail_change_role",
                     acting_user_id=acting_user_id,
                     acting_username=acting_username,
                     target_user_id=user_id,
-                    reason=f"Database error: {e}",
+                    reason=f"Database error: {str(e)}",
                     ip_address=ip_address,
                 )
-                self.is_loading = False
+                self.setvar("is_loading", False)
                 return rx.toast.error(
                     self.admin_error_message, position="bottom-right", duration=5000
                 )
 
+    @rx.event
     async def delete_user(self):
         if self.user_to_delete is None:
             return
         self.is_loading = True
-        self.admin_error_message = ""
-        self.admin_success_message = ""
+        self.setvar("admin_error_message", "")
+        self.setvar("admin_success_message", "")
         acting_user_id = self.authenticated_user.id if self.authenticated_user else None
         acting_username = (
             self.authenticated_user.username if self.authenticated_user else "Unknown"
@@ -214,48 +198,54 @@ class UserManagementState(AuthState):
             ip_address=ip_address,
         )
         with rx.session() as session:
-            user_info = session.exec(
-                select(UserInfo).where(UserInfo.user_id == self.user_to_delete)
-            ).one_or_none()
-            if not user_info:
-                self.admin_error_message = "User not found."
-                audit_logger.error(
-                    "fail_delete_user",
-                    acting_user_id=acting_user_id,
-                    acting_username=acting_username,
-                    target_user_id=target_user_id,
-                    reason="User not found",
-                    ip_address=ip_address,
-                )
-                self.is_loading = False
-                return rx.toast.error(
-                    self.admin_error_message, position="bottom-right", duration=5000
-                )
-            local_user = session.exec(
-                select(reflex_local_auth.LocalUser).where(
-                    reflex_local_auth.LocalUser.id == user_info.user_id
-                )
-            ).one_or_none()
-            if not local_user:
-                self.admin_error_message = "Local user not found."
-                audit_logger.error(
-                    "fail_delete_user",
-                    acting_user_id=acting_user_id,
-                    acting_username=acting_username,
-                    target_user_id=target_user_id,
-                    reason="Local user not found",
-                    ip_address=ip_address,
-                )
-                self.is_loading = False
-                return rx.toast.error(
-                    self.admin_error_message, position="bottom-right", duration=5000
-                )
-            target_username = local_user.username
-            if local_user:
-                session.delete(local_user)
-            session.delete(user_info)
             try:
+                # Lock UserInfo to prevent concurrent updates
+                user_info = session.exec(
+                    select(UserInfo)
+                    .where(UserInfo.user_id == self.user_to_delete)
+                    .with_for_update()
+                ).one_or_none()
+                if not user_info:
+                    self.setvar("admin_error_message", "User not found.")
+                    audit_logger.error(
+                        "fail_delete_user",
+                        acting_user_id=acting_user_id,
+                        acting_username=acting_username,
+                        target_user_id=target_user_id,
+                        reason="User not found",
+                        ip_address=ip_address,
+                    )
+                    self.setvar("is_loading", False)
+                    return rx.toast.error(
+                        self.admin_error_message, position="bottom-right", duration=5000
+                    )
+
+                local_user = session.exec(
+                    select(reflex_local_auth.LocalUser).where(
+                        reflex_local_auth.LocalUser.id == user_info.user_id
+                    )
+                ).one_or_none()
+                if not local_user:
+                    self.setvar("admin_error_message", "Local user not found.")
+                    audit_logger.error(
+                        "fail_delete_user",
+                        acting_user_id=acting_user_id,
+                        acting_username=acting_username,
+                        target_user_id=target_user_id,
+                        reason="Local user not found",
+                        ip_address=ip_address,
+                    )
+                    self.setvar("is_loading", False)
+                    return rx.toast.error(
+                        self.admin_error_message, position="bottom-right", duration=5000
+                    )
+
+                target_username = local_user.username
+                if local_user:
+                    session.delete(local_user)
+                session.delete(user_info)
                 session.commit()
+
                 audit_logger.info(
                     "success_delete_user",
                     acting_user_id=acting_user_id,
@@ -263,31 +253,56 @@ class UserManagementState(AuthState):
                     target_user_id=target_user_id,
                     ip_address=ip_address,
                 )
-                self.admin_success_message = (
-                    f"User {target_username} deleted successfully."
+                self.setvar(
+                    "admin_success_message",
+                    f"User {target_username} deleted successfully.",
                 )
                 self.check_auth_and_load()
-                self.is_loading = False
-                self.show_delete_dialog = False
-                self.user_to_delete = None
+                self.setvar("is_loading", False)
+                self.setvar("show_delete_dialog", False)
+                self.setvar("user_to_delete", None)
                 return rx.toast.success(
                     self.admin_success_message, position="bottom-right", duration=5000
                 )
+
             except Exception as e:
                 session.rollback()
-                self.admin_error_message = f"Failed to delete user: {e}"
+                self.setvar("admin_error_message", f"Failed to delete user: {str(e)}")
                 audit_logger.error(
                     "fail_delete_user",
                     acting_user_id=acting_user_id,
                     acting_username=acting_username,
                     target_user_id=target_user_id,
-                    reason=f"Database error: {e}",
+                    reason=f"Database error: {str(e)}",
                     ip_address=ip_address,
                 )
-                self.is_loading = False
+                self.setvar("is_loading", False)
                 return rx.toast.error(
                     self.admin_error_message, position="bottom-right", duration=5000
                 )
+
+    @rx.var
+    def total_pages(self) -> int:
+        return max(1, (len(self.filtered_users) + self.page_size - 1) // self.page_size)
+
+    @rx.var
+    def filtered_users(self) -> List[Dict[str, Any]]:
+        data = self.users_data
+        if self.search_value:
+            data = [
+                u
+                for u in data
+                if self.search_value.lower() in u["username"].lower()
+                or self.search_value.lower() in u["email"].lower()
+                or self.search_value.lower() in u["role"].lower()
+            ]
+        return sorted(data, key=lambda x: x[self.sort_value], reverse=self.sort_reverse)
+
+    @rx.var
+    def current_page(self) -> List[Dict[str, Any]]:
+        start = (self.page_number - 1) * self.page_size
+        end = start + self.page_size
+        return self.filtered_users[start:end]
 
     def open_edit_dialog(self, user_id: int, current_role: str):
         self.target_user_id = user_id

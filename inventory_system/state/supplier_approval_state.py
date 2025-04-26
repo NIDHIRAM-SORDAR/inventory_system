@@ -28,6 +28,329 @@ class SupplierApprovalState(AuthState):
     revoke_checked: bool = False
     current_status: str = ""
 
+    def check_auth_and_load(self):
+        if not self.is_authenticated or not (
+            self.authenticated_user_info
+            and "manage_suppliers" in self.authenticated_user_info.get_permissions()
+        ):
+            return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
+        self.setvar("is_loading", True)
+        with rx.session() as session:
+            stmt = select(
+                Supplier.id,
+                Supplier.company_name.label("username"),
+                Supplier.contact_email.label("email"),
+                Supplier.status,
+                UserInfo.role,
+                UserInfo.user_id,
+            ).outerjoin(UserInfo, Supplier.user_info_id == UserInfo.id)
+            results = session.exec(stmt).all()
+            self.users_data = [
+                {
+                    "id": row.id,
+                    "email": row.email,
+                    "status": row.status,
+                    "role": row.role if row.role else "none",
+                    "username": row.username,
+                    "user_id": row.user_id,
+                }
+                for row in results
+            ]
+        self.setvar("is_loading", False)
+
+    @rx.event
+    async def approve_supplier(self, supplier_id: int):
+        self.setvar("is_loading", True)
+        self.setvar("supplier_error_message", "")
+        self.setvar("supplier_success_message", "")
+        acting_user_id = self.authenticated_user.id if self.authenticated_user else None
+        acting_username = (
+            self.authenticated_user.username if self.authenticated_user else "Unknown"
+        )
+        ip_address = self.router.session.client_ip
+
+        audit_logger.info(
+            "attempt_approve_supplier",
+            acting_user_id=acting_user_id,
+            acting_username=acting_username,
+            target_supplier_id=supplier_id,
+            ip_address=ip_address,
+        )
+
+        with rx.session() as session:
+            try:
+                # Lock Supplier to prevent concurrent updates
+                supplier = session.exec(
+                    select(Supplier).where(Supplier.id == supplier_id).with_for_update()
+                ).one_or_none()
+                if not supplier:
+                    self.setvar("supplier_error_message", "Supplier not found.")
+                    yield rx.toast.error(
+                        self.supplier_error_message,
+                        position="bottom-right",
+                        duration=5000,
+                    )
+                    self.setvar("is_loading", False)
+                    audit_logger.error(
+                        "fail_approve_supplier",
+                        acting_user_id=acting_user_id,
+                        acting_username=acting_username,
+                        target_supplier_id=supplier_id,
+                        reason="Supplier not found",
+                        ip_address=ip_address,
+                    )
+                    self.setvar("show_edit_dialog", False)
+                    self.setvar("edit_supplier_id", None)
+                    return
+
+                target_supplier_company_name = supplier.company_name
+
+                if not supplier.user_info_id:
+                    default_password = "Supplier123!"
+                    audit_logger.info(
+                        "attempt_register_supplier_user",
+                        acting_user_id=acting_user_id,
+                        acting_username=acting_username,
+                        supplier_id=supplier_id,
+                        supplier_company_name=target_supplier_company_name,
+                        supplier_email=supplier.contact_email,
+                        ip_address=ip_address,
+                    )
+
+                    new_user_id = register_supplier(
+                        supplier.company_name,
+                        supplier.contact_email,
+                        default_password,
+                        session,
+                    )
+                    new_user_info = session.exec(
+                        select(UserInfo)
+                        .where(UserInfo.user_id == new_user_id)
+                        .with_for_update()
+                    ).one()
+                    new_user_info.set_roles(["supplier"], session)
+                    session.add(new_user_info)
+                    supplier.user_info_id = new_user_info.id
+                    supplier.status = "approved"
+                    session.add(supplier)
+                    session.commit()
+
+                    audit_logger.info(
+                        "success_approve_supplier_new_user",
+                        acting_user_id=acting_user_id,
+                        acting_username=acting_username,
+                        target_supplier_id=supplier_id,
+                        target_supplier_company_name=target_supplier_company_name,
+                        created_user_id=new_user_id,
+                        ip_address=ip_address,
+                    )
+                    yield await self.send_welcome_email(
+                        supplier.contact_email,
+                        supplier.company_name,
+                        default_password,
+                    )
+                    self.setvar(
+                        "supplier_success_message",
+                        f"Supplier {target_supplier_company_name}"
+                        "approved and user account created.",
+                    )
+                    yield rx.toast.success(
+                        self.supplier_success_message,
+                        position="bottom-right",
+                        duration=5000,
+                    )
+                    self.setvar("supplier_success_message", "")
+
+                else:
+                    supplier.status = "approved"
+                    session.add(supplier)
+                    session.commit()
+                    audit_logger.info(
+                        "success_approve_supplier_existing_user",
+                        acting_user_id=acting_user_id,
+                        acting_username=acting_username,
+                        target_supplier_id=supplier_id,
+                        target_supplier_company_name=target_supplier_company_name,
+                        associated_user_info_id=supplier.user_info_id,
+                        ip_address=ip_address,
+                    )
+                    self.setvar(
+                        "supplier_success_message",
+                        f"Supplier {target_supplier_company_name}"
+                        "status set to approved.",
+                    )
+                    yield rx.toast.success(
+                        self.supplier_success_message,
+                        position="bottom-right",
+                        duration=5000,
+                    )
+                    self.setvar("supplier_success_message", "")
+
+            except Exception as e:
+                session.rollback()
+                self.setvar(
+                    "supplier_error_message",
+                    f"Failed to approve supplier: {str(e)}",
+                )
+                yield rx.toast.error(
+                    self.supplier_error_message,
+                    position="bottom-right",
+                    duration=5000,
+                )
+                audit_logger.error(
+                    "fail_approve_supplier",
+                    acting_user_id=acting_user_id,
+                    acting_username=acting_username,
+                    target_supplier_id=supplier_id,
+                    target_supplier_company_name=target_supplier_company_name,
+                    reason=f"Database error: {str(e)}",
+                    ip_address=ip_address,
+                )
+
+            self.check_auth_and_load()
+            self.setvar("is_loading", False)
+            self.setvar("show_edit_dialog", False)
+            self.setvar("edit_supplier_id", None)
+
+    @rx.event
+    async def revoke_supplier(self, supplier_id: int):
+        self.setvar("is_loading", True)
+        self.setvar("supplier_error_message", "")
+        self.setvar("supplier_success_message", "")
+        acting_user_id = self.authenticated_user.id if self.authenticated_user else None
+        acting_username = (
+            self.authenticated_user.username if self.authenticated_user else "Unknown"
+        )
+        ip_address = self.router.session.client_ip
+
+        audit_logger.info(
+            "attempt_revoke_supplier",
+            acting_user_id=acting_user_id,
+            acting_username=acting_username,
+            target_supplier_id=supplier_id,
+            ip_address=ip_address,
+        )
+
+        with rx.session() as session:
+            try:
+                # Lock Supplier to prevent concurrent updates
+                supplier = session.exec(
+                    select(Supplier).where(Supplier.id == supplier_id).with_for_update()
+                ).one_or_none()
+                if not supplier:
+                    self.setvar("supplier_error_message", "Supplier not found.")
+                    yield rx.toast.error(
+                        self.supplier_error_message,
+                        position="bottom-right",
+                        duration=5000,
+                    )
+                    self.setvar("is_loading", False)
+                    audit_logger.error(
+                        "fail_revoke_supplier",
+                        acting_user_id=acting_user_id,
+                        acting_username=acting_username,
+                        target_supplier_id=supplier_id,
+                        reason="Supplier not found",
+                        ip_address=ip_address,
+                    )
+                    self.setvar("show_edit_dialog", False)
+                    self.setvar("edit_supplier_id", None)
+                    return
+
+                target_supplier_company_name = supplier.company_name
+                associated_user_id = None
+                associated_local_user_id = None
+
+                if supplier.user_info_id:
+                    audit_logger.info(
+                        "attempt_delete_associated_supplier_user",
+                        acting_user_id=acting_user_id,
+                        acting_username=acting_username,
+                        supplier_id=supplier_id,
+                        supplier_company_name=target_supplier_company_name,
+                        associated_user_info_id=supplier.user_info_id,
+                        ip_address=ip_address,
+                    )
+                    user_info = session.exec(
+                        select(UserInfo)
+                        .where(UserInfo.id == supplier.user_info_id)
+                        .with_for_update()
+                    ).one_or_none()
+                    if user_info:
+                        associated_user_id = user_info.id
+                        associated_local_user_id = user_info.user_id
+                        local_user = session.exec(
+                            select(reflex_local_auth.LocalUser).where(
+                                reflex_local_auth.LocalUser.id == user_info.user_id
+                            )
+                        ).one_or_none()
+                        if local_user:
+                            session.delete(local_user)
+                            session.flush()
+                        session.delete(user_info)
+                    supplier.user_info_id = None
+                    supplier.status = "revoked"
+                    session.add(supplier)
+                else:
+                    supplier.status = "revoked"
+                    session.add(supplier)
+
+                session.commit()
+                audit_logger.info(
+                    "success_revoke_supplier",
+                    acting_user_id=acting_user_id,
+                    acting_username=acting_username,
+                    target_supplier_id=supplier_id,
+                    target_supplier_company_name=target_supplier_company_name,
+                    deleted_user_info_id=associated_user_id,
+                    deleted_local_user_id=associated_local_user_id,
+                    new_status=supplier.status,
+                    ip_address=ip_address,
+                )
+                self.setvar(
+                    "supplier_success_message",
+                    f"Supplier {target_supplier_company_name}"
+                    "status updated to {supplier.status}.",
+                )
+                if associated_user_id:
+                    self.setvar(
+                        "supplier_success_message",
+                        self.supplier_success_message
+                        + " Associated user account deleted.",
+                    )
+                yield rx.toast.success(
+                    self.supplier_success_message,
+                    position="bottom-right",
+                    duration=5000,
+                )
+                self.setvar("supplier_success_message", "")
+
+            except Exception as e:
+                session.rollback()
+                self.setvar(
+                    "supplier_error_message",
+                    f"Error rejecting/revoking supplier: {str(e)}",
+                )
+                yield rx.toast.error(
+                    self.supplier_error_message,
+                    position="bottom-right",
+                    duration=5000,
+                )
+                audit_logger.error(
+                    "fail_revoke_supplier",
+                    acting_user_id=acting_user_id,
+                    acting_username=acting_username,
+                    target_supplier_id=supplier_id,
+                    target_supplier_company_name=target_supplier_company_name,
+                    reason=f"Database error: {str(e)}",
+                    ip_address=ip_address,
+                )
+
+            self.check_auth_and_load()
+            self.setvar("is_loading", False)
+            self.setvar("show_edit_dialog", False)
+            self.setvar("edit_supplier_id", None)
+
     @rx.var
     def total_pages(self) -> int:
         return max(1, (len(self.filtered_users) + self.page_size - 1) // self.page_size)
@@ -49,35 +372,6 @@ class SupplierApprovalState(AuthState):
         start = (self.page_number - 1) * self.page_size
         end = start + self.page_size
         return self.filtered_users[start:end]
-
-    def check_auth_and_load(self):
-        if not self.is_authenticated or (
-            self.authenticated_user_info and not self.authenticated_user_info.is_admin
-        ):
-            return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
-        self.is_loading = True
-        with rx.session() as session:
-            stmt = select(
-                Supplier.id,
-                Supplier.company_name.label("username"),
-                Supplier.contact_email.label("email"),
-                Supplier.status,
-                UserInfo.role,
-                UserInfo.user_id,
-            ).outerjoin(UserInfo, Supplier.user_info_id == UserInfo.id)
-            results = session.exec(stmt).all()
-            self.users_data = [
-                {
-                    "id": row.id,
-                    "email": row.email,
-                    "status": row.status,  # Supplier status
-                    "role": row.role,  # UserInfo role, if exists
-                    "username": row.username,
-                    "user_id": row.user_id,
-                }
-                for row in results
-            ]
-        self.is_loading = False
 
     async def send_welcome_email(self, email: str, username: str, password: str):
         self.supplier_error_message = ""
@@ -124,7 +418,7 @@ class SupplierApprovalState(AuthState):
 
         with rx.session() as session:
             supplier = session.exec(
-                select(Supplier).where(Supplier.id == supplier_id)
+                select(Supplier).where(Supplier.id == supplier_id).with_for_update()
             ).one_or_none()
             if not supplier:
                 self.supplier_error_message = "Supplier not found."
@@ -160,15 +454,17 @@ class SupplierApprovalState(AuthState):
                         ip_address=ip_address,
                     )
                     user_info = session.exec(
-                        select(UserInfo).where(UserInfo.id == supplier.user_info_id)
+                        select(UserInfo)
+                        .where(UserInfo.id == supplier.user_info_id)
+                        .with_for_update()
                     ).one_or_none()
                     if user_info:
                         associated_user_id = user_info.id
                         associated_local_user_id = user_info.user_id
                         local_user = session.exec(
-                            select(reflex_local_auth.LocalUser).where(
-                                reflex_local_auth.LocalUser.id == user_info.user_id
-                            )
+                            select(reflex_local_auth.LocalUser)
+                            .where(reflex_local_auth.LocalUser.id == user_info.user_id)
+                            .with_for_update()
                         ).one_or_none()
                         if local_user:
                             session.delete(local_user)
@@ -218,299 +514,6 @@ class SupplierApprovalState(AuthState):
             self.check_auth_and_load()
             self.is_loading = False
             self.show_delete_dialog = False
-            self.edit_supplier_id = None
-
-    @rx.event
-    async def approve_supplier(self, supplier_id: int):
-        self.is_loading = True
-        self.supplier_error_message = ""
-        self.supplier_success_message = ""
-        acting_user_id = self.authenticated_user.id if self.authenticated_user else None
-        acting_username = (
-            self.authenticated_user.username if self.authenticated_user else "Unknown"
-        )
-        ip_address = self.router.session.client_ip
-
-        audit_logger.info(
-            "attempt_approve_supplier",
-            acting_user_id=acting_user_id,
-            acting_username=acting_username,
-            target_supplier_id=supplier_id,
-            ip_address=ip_address,
-        )
-
-        with rx.session() as session:
-            supplier = session.exec(
-                select(Supplier).where(Supplier.id == supplier_id)
-            ).one_or_none()
-            if not supplier:
-                self.supplier_error_message = "Supplier not found."
-                yield rx.toast.error(
-                    self.supplier_error_message, position="bottom-right", duration=5000
-                )
-                self.is_loading = False
-                audit_logger.error(
-                    "fail_approve_supplier",
-                    acting_user_id=acting_user_id,
-                    acting_username=acting_username,
-                    target_supplier_id=supplier_id,
-                    reason="Supplier not found",
-                    ip_address=ip_address,
-                )
-                self.show_edit_dialog = False
-                self.edit_supplier_id = None
-                return
-
-            target_supplier_company_name = supplier.company_name
-
-            if not supplier.user_info_id:
-                default_password = "Supplier123!"
-                try:
-                    audit_logger.info(
-                        "attempt_register_supplier_user",
-                        acting_user_id=acting_user_id,
-                        acting_username=acting_username,
-                        supplier_id=supplier_id,
-                        supplier_company_name=target_supplier_company_name,
-                        supplier_email=supplier.contact_email,
-                        ip_address=ip_address,
-                    )
-
-                    new_user_id = register_supplier(
-                        supplier.company_name,
-                        supplier.contact_email,
-                        default_password,
-                        session,
-                    )
-                    new_user_info = session.exec(
-                        select(UserInfo).where(UserInfo.user_id == new_user_id)
-                    ).one()
-                    new_user_info.is_supplier = True  # Set is_supplier flag
-                    session.add(new_user_info)
-                    supplier.user_info_id = new_user_info.id
-                    supplier.status = "approved"
-                    session.add(supplier)
-                    session.commit()
-
-                    audit_logger.info(
-                        "success_approve_supplier_new_user",
-                        acting_user_id=acting_user_id,
-                        acting_username=acting_username,
-                        target_supplier_id=supplier_id,
-                        target_supplier_company_name=target_supplier_company_name,
-                        created_user_id=new_user_id,
-                        ip_address=ip_address,
-                    )
-                    yield await self.send_welcome_email(
-                        supplier.contact_email,
-                        supplier.company_name,
-                        default_password,
-                    )
-                    self.supplier_success_message = (
-                        f"Supplier {target_supplier_company_name} approved and "
-                        "user account created."
-                    )
-                    yield rx.toast.success(
-                        self.supplier_success_message,
-                        position="bottom-right",
-                        duration=5000,
-                    )
-                    self.supplier_success_message = ""
-
-                except Exception as e:
-                    self.supplier_error_message = (
-                        f"Failed to register supplier user: {str(e)}"
-                    )
-                    yield rx.toast.error(
-                        self.supplier_error_message,
-                        position="bottom-right",
-                        duration=5000,
-                    )
-                    audit_logger.error(
-                        "fail_register_supplier_user",
-                        acting_user_id=acting_user_id,
-                        acting_username=acting_username,
-                        target_supplier_id=supplier_id,
-                        target_supplier_company_name=target_supplier_company_name,
-                        reason=f"Error during registration: {e}",
-                        ip_address=ip_address,
-                    )
-                    session.rollback()
-            else:
-                try:
-                    supplier.status = "approved"
-                    session.add(supplier)
-                    session.commit()
-                    audit_logger.info(
-                        "success_approve_supplier_existing_user",
-                        acting_user_id=acting_user_id,
-                        acting_username=acting_username,
-                        target_supplier_id=supplier_id,
-                        target_supplier_company_name=target_supplier_company_name,
-                        associated_user_info_id=supplier.user_info_id,
-                        ip_address=ip_address,
-                    )
-                    self.supplier_success_message = (
-                        f"Supplier {target_supplier_company_name} status set to "
-                        "approved."
-                    )
-                    yield rx.toast.success(
-                        self.supplier_success_message,
-                        position="bottom-right",
-                        duration=5000,
-                    )
-                    self.supplier_success_message = ""
-                except Exception as e:
-                    session.rollback()
-                    self.supplier_error_message = (
-                        f"Failed to update supplier status: {e}"
-                    )
-                    yield rx.toast.error(
-                        self.supplier_error_message,
-                        position="bottom-right",
-                        duration=5000,
-                    )
-                    audit_logger.error(
-                        "fail_approve_supplier_existing_user",
-                        acting_user_id=acting_user_id,
-                        acting_username=acting_username,
-                        target_supplier_id=supplier_id,
-                        target_supplier_company_name=target_supplier_company_name,
-                        reason=f"Database error: {e}",
-                        ip_address=ip_address,
-                    )
-
-            self.check_auth_and_load()
-            self.is_loading = False
-            self.show_edit_dialog = False
-            self.edit_supplier_id = None
-
-    @rx.event
-    async def revoke_supplier(self, supplier_id: int):
-        self.is_loading = True
-        self.supplier_error_message = ""
-        self.supplier_success_message = ""
-        acting_user_id = self.authenticated_user.id if self.authenticated_user else None
-        acting_username = (
-            self.authenticated_user.username if self.authenticated_user else "Unknown"
-        )
-        ip_address = self.router.session.client_ip
-
-        audit_logger.info(
-            "attempt_revoke_supplier",
-            acting_user_id=acting_user_id,
-            acting_username=acting_username,
-            target_supplier_id=supplier_id,
-            ip_address=ip_address,
-        )
-
-        with rx.session() as session:
-            supplier = session.exec(
-                select(Supplier).where(Supplier.id == supplier_id)
-            ).one_or_none()
-            if not supplier:
-                self.supplier_error_message = "Supplier not found."
-                yield rx.toast.error(
-                    self.supplier_error_message, position="bottom-right", duration=5000
-                )
-                self.is_loading = False
-                audit_logger.error(
-                    "fail_revoke_supplier",
-                    acting_user_id=acting_user_id,
-                    acting_username=acting_username,
-                    target_supplier_id=supplier_id,
-                    reason="Supplier not found",
-                    ip_address=ip_address,
-                )
-                self.show_edit_dialog = False
-                self.edit_supplier_id = None
-                return
-
-            target_supplier_company_name = supplier.company_name
-            associated_user_id = None
-            associated_local_user_id = None
-
-            try:
-                if supplier.user_info_id:
-                    audit_logger.info(
-                        "attempt_delete_associated_supplier_user",
-                        acting_user_id=acting_user_id,
-                        acting_username=acting_username,
-                        supplier_id=supplier_id,
-                        supplier_company_name=target_supplier_company_name,
-                        associated_user_info_id=supplier.user_info_id,
-                        ip_address=ip_address,
-                    )
-                    user_info = session.exec(
-                        select(UserInfo).where(UserInfo.id == supplier.user_info_id)
-                    ).one_or_none()
-                    if user_info:
-                        associated_user_id = user_info.id
-                        associated_local_user_id = user_info.user_id
-                        local_user = session.exec(
-                            select(reflex_local_auth.LocalUser).where(
-                                reflex_local_auth.LocalUser.id == user_info.user_id
-                            )
-                        ).one_or_none()
-                        if local_user:
-                            session.delete(local_user)
-                            session.flush()
-                        session.delete(user_info)
-                    supplier.user_info_id = None
-                    supplier.status = "revoked"
-                    session.add(supplier)
-                else:
-                    supplier.status = "revoked"
-                    session.add(supplier)
-
-                session.commit()
-                audit_logger.info(
-                    "success_revoke_supplier",
-                    acting_user_id=acting_user_id,
-                    acting_username=acting_username,
-                    target_supplier_id=supplier_id,
-                    target_supplier_company_name=target_supplier_company_name,
-                    deleted_user_info_id=associated_user_id,
-                    deleted_local_user_id=associated_local_user_id,
-                    new_status=supplier.status,
-                    ip_address=ip_address,
-                )
-                self.supplier_success_message = (
-                    f"Supplier {target_supplier_company_name} status updated to "
-                    f"{supplier.status}."
-                )
-                if associated_user_id:
-                    self.supplier_success_message += " Associated user account deleted."
-                yield rx.toast.success(
-                    self.supplier_success_message,
-                    position="bottom-right",
-                    duration=5000,
-                )
-                self.supplier_success_message = ""
-
-            except Exception as e:
-                self.supplier_error_message = (
-                    f"Error rejecting/revoking supplier: {str(e)}"
-                )
-                yield rx.toast.error(
-                    self.supplier_error_message,
-                    position="bottom-right",
-                    duration=5000,
-                )
-                audit_logger.error(
-                    "fail_revoke_supplier",
-                    acting_user_id=acting_user_id,
-                    acting_username=acting_username,
-                    target_supplier_id=supplier_id,
-                    target_supplier_company_name=target_supplier_company_name,
-                    reason=f"Database error: {e}",
-                    ip_address=ip_address,
-                )
-                session.rollback()
-
-            self.check_auth_and_load()
-            self.is_loading = False
-            self.show_edit_dialog = False
             self.edit_supplier_id = None
 
     @rx.event

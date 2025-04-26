@@ -61,9 +61,3 @@ class AuthState(reflex_local_auth.LocalAuthState):
                 return result
         finally:
             self.is_computing = False
-
-    @rx.var(cache=True)
-    def is_admin(self) -> bool:
-        """Check if the authenticated user has the 'Admin' role."""
-        user_info = self.authenticated_user_info
-        return "admin" in user_info.get_roles() if user_info else False
