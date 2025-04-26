@@ -584,3 +584,8 @@ class SupplierApprovalState(AuthState):
 
     def last_page(self):
         self.page_number = self.total_pages
+
+    def clear_search_value(self):
+        """Clear the search value and reset to first page."""
+        self.setvar("search_value", "")
+        self.setvar("page_number", 1)
