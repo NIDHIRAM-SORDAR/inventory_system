@@ -89,24 +89,47 @@ def _edit_dialog(user: rx.Var) -> rx.Component:
                             name="supplier_id",
                             value=user["id"],
                         ),
-                        rx.checkbox(
-                            "Approve Supplier",
-                            name="approve",
-                            checked=SupplierApprovalState.approve_checked,
-                            on_change=SupplierApprovalState.toggle_approve,
-                        ),
-                        rx.checkbox(
-                            "Revoke Supplier",
-                            name="revoke",
-                            checked=SupplierApprovalState.revoke_checked,
-                            on_change=SupplierApprovalState.toggle_revoke,
+                        rx.match(
+                            SupplierApprovalState.current_status,
+                            (
+                                "approved",
+                                rx.checkbox(
+                                    "Revoke Supplier",
+                                    name="revoke",
+                                    checked=SupplierApprovalState.revoke_checked,
+                                    on_change=SupplierApprovalState.toggle_revoke,
+                                ),
+                            ),
+                            (
+                                "revoked",
+                                rx.checkbox(
+                                    "Approve Supplier",
+                                    name="approve",
+                                    checked=SupplierApprovalState.approve_checked,
+                                    on_change=SupplierApprovalState.toggle_approve,
+                                ),
+                            ),
+                            rx.box(
+                                rx.checkbox(
+                                    "Approve Supplier",
+                                    name="approve",
+                                    checked=SupplierApprovalState.approve_checked,
+                                    on_change=SupplierApprovalState.toggle_approve,
+                                ),
+                                rx.checkbox(
+                                    "Revoke Supplier",
+                                    name="revoke",
+                                    checked=SupplierApprovalState.revoke_checked,
+                                    on_change=SupplierApprovalState.toggle_revoke,
+                                ),
+                            ),
                         ),
                         rx.button(
                             "Save",
                             type="submit",
                             color_scheme="blue",
                             size="2",
-                            width=rx.breakpoints(initial="100%", md="auto"),
+                            width=rx.breakpoints(initial="100%", md="120px"),
                             border_radius=border_radius,
                         ),
                         spacing="3",
@@ -115,15 +138,17 @@ def _edit_dialog(user: rx.Var) -> rx.Component:
                     on_submit=SupplierApprovalState.handle_submit,
                     reset_on_submit=True,
                 ),
-                rx.dialog.close(
-                    rx.button(
-                        "Close",
-                        variant="soft",
-                        color_scheme="gray",
-                        size="2",
-                        width=rx.breakpoints(initial="100%", md="120px"),
-                        border_radius=border_radius,
-                        on_click=SupplierApprovalState.cancel_dialog,
+                rx.flex(
+                    rx.dialog.close(
+                        rx.button(
+                            "Close",
+                            variant="soft",
+                            color_scheme="gray",
+                            size="2",
+                            border_radius=border_radius,
+                            on_click=SupplierApprovalState.cancel_dialog,
+                            width=rx.breakpoints(initial="100%", md="120px"),
+                        ),
                     ),
                     justify=rx.breakpoints(initial="center", md="end"),
                     width="100%",

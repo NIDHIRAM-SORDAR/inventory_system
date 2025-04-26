@@ -539,8 +539,8 @@ class SupplierApprovalState(AuthState):
         supplier = next((u for u in self.users_data if u["id"] == supplier_id), None)
         if supplier:
             self.current_status = supplier["status"]
-            self.approve_checked = supplier["role"] == "approved"
-            self.revoke_checked = supplier["role"] == "revoked"
+            self.approve_checked = supplier["status"] == "approved"
+            self.revoke_checked = supplier["status"] == "revoked"
 
     def toggle_approve(self, value: bool):
         self.approve_checked = value
