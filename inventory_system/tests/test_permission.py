@@ -150,25 +150,95 @@ def test_role_users_relationship(session: Session):
 
 
 def test_seed_permissions(session: Session):
-    """Test seeding permissions."""
     from inventory_system.scripts.seed_permissions import seed_permissions
-
-    permissions_before = session.exec(select(Permission)).all()
-    print(f"Permissions before seeding: {len(permissions_before)}")
 
     seed_permissions(session=session)
     permissions = session.exec(select(Permission)).all()
-    print(f"Seeded permissions: {len(permissions)}")
-    print(f"Permissions: {[p.name for p in permissions]}")
-    assert len(permissions) >= 9
+    assert (
+        len(permissions) >= 16
+    )  # Updated count including manage_users, manage_suppliers, manage_supplier_approval
     perm_names = {p.name for p in permissions}
-    assert "manage_users" in perm_names
-    assert "create_inventory" in perm_names
-    assert "update_inventory" in perm_names
-    assert "delete_inventory" in perm_names
-    assert any(p.description for p in permissions if p.name == "manage_users")
+    assert {
+        "manage_users",
+        "manage_suppliers",
+        "manage_supplier_approval",
+        "view_supplier",
+        "edit_user",
+        "create_inventory",
+    }.issubset(perm_names)
+    assert any(p.description for p in permissions if p.name == "view_supplier")
     assert all(isinstance(p.created_at, datetime) for p in permissions)
     assert all(isinstance(p.updated_at, datetime) for p in permissions)
+
+
+def test_seed_roles(session: Session):
+    """Test seeding roles with permissions."""
+    from inventory_system.scripts.seed_permissions import seed_permissions
+    from inventory_system.scripts.seed_roles import seed_roles
+
+    # Seed permissions first
+    seed_permissions(session=session)
+    seed_roles(session=session)
+
+    roles = session.exec(select(Role)).all()
+    assert (
+        len(roles) >= 6
+    )  # admin, employee, supplier, inventory_manager, supplier_manager, auditor
+    role_names = {r.name for r in roles}
+    assert {
+        "admin",
+        "employee",
+        "supplier",
+        "inventory_manager",
+        "supplier_manager",
+        "auditor",
+    }.issubset(role_names)
+
+    # Verify admin permissions
+    admin = session.exec(select(Role).where(Role.name == "admin")).first()
+    assert set(admin.get_permissions()) == {
+        "manage_users",
+        "view_user",
+        "create_user",
+        "edit_user",
+        "delete_user",
+        "manage_suppliers",
+        "view_supplier",
+        "create_supplier",
+        "edit_supplier",
+        "delete_supplier",
+        "manage_supplier_approval",
+        "view_inventory",
+        "create_inventory",
+        "update_inventory",
+        "delete_inventory",
+        "manage_roles",
+        "view_profile",
+        "edit_profile",
+    }
+
+    # Verify employee permissions
+    employee = session.exec(select(Role).where(Role.name == "employee")).first()
+    assert set(employee.get_permissions()) == {
+        "view_inventory",
+        "create_inventory",
+        "update_inventory",
+        "view_supplier",
+        "view_profile",
+        "edit_profile",
+    }
+
+    # Verify supplier permissions
+    supplier = session.exec(select(Role).where(Role.name == "supplier")).first()
+    assert set(supplier.get_permissions()) == {
+        "view_supplier",
+        "edit_supplier",
+        "view_inventory",
+        "create_inventory",
+        "update_inventory",
+        "view_profile",
+        "edit_profile",
+    }
 
 
 def test_permission_audit_logging(session: Session):

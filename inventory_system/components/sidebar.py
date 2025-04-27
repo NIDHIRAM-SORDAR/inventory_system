@@ -223,7 +223,10 @@ def sidebar() -> rx.Component:
             rx.vstack(
                 *[
                     rx.cond(
-                        AuthState.is_admin & (page["route"] == routes.ADMIN_ROUTE),
+                        (
+                            AuthState.user_permissions.contains("manage_users")
+                            & (page["route"] == routes.ADMIN_ROUTE)
+                        ),
                         sidebar_item(
                             text=page.get("title", "Admin Dashboard"),
                             icon="shield",  # Add icon for Admin Dashboard

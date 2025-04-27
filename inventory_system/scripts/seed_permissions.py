@@ -32,6 +32,15 @@ def seed_permissions(session: Optional[Session] = None):
             "description": "Edit own user profile (email, password, etc.)",
         },
         {"name": "manage_roles", "description": "Create, read, update, delete roles"},
+        {"name": "manage_users", "description": "Manage all user-related actions"},
+        {
+            "name": "manage_suppliers",
+            "description": "Manage all supplier-related actions",
+        },
+        {
+            "name": "manage_supplier_approval",
+            "description": "Approve or reject supplier registrations",
+        },
     ]
 
     try:

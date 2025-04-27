@@ -242,13 +242,19 @@ def profile() -> rx.Component:
                         rx.heading("Account Role", size="5"),
                         align="center",
                     ),
-                    rx.text(
+                    rx.hstack(
                         rx.cond(
-                            ProfileState.authenticated_user_info,
-                            f"Role: {ProfileState.authenticated_user_info.role}",
-                            "Role: N/A",
+                            ProfileState.authenticated_user_info
+                            & ProfileState.user_roles,
+                            rx.foreach(
+                                ProfileState.user_roles,
+                                lambda role: rx.badge(
+                                    role, color_scheme="blue", size="2"
+                                ),
+                            ),
+                            rx.text("Role: N/A", size="3"),
+                            spacing="2",
                         ),
-                        size="3",
                     ),
                     width="100%",
                 ),

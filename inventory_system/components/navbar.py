@@ -133,7 +133,10 @@ def menu_button() -> rx.Component:
                     rx.divider(),
                     *[
                         rx.cond(
-                            AuthState.is_admin & (page["route"] == routes.ADMIN_ROUTE),
+                            (
+                                AuthState.user_permissions.contains("manage_users")
+                                & (page["route"] == routes.ADMIN_ROUTE)
+                            ),
                             menu_item(
                                 text=page.get("title", "Admin Dashboard"),
                                 url=page["route"],

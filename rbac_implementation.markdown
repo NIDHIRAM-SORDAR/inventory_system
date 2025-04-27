@@ -96,16 +96,14 @@ Audit logging, implemented in `inventory_system/logging/audit.py`, tracks all ro
 - **Production Testing**:
   - Planned for PostgreSQL environment to simulate concurrent role assignments and supplier approvals.
 
-## ## Step 4: Implement Permission Checks
-
+## Step 4: Implement Permission Checks
 **Status**: Completed  
 **Details**:  
-
-- Added `get_permissions()` to `UserInfo` to aggregate permissions from roles.  
-- Added `has_permission(permission_name: str) -> bool` to `UserInfo` for permission checks.  
-- Added `user_permissions` computed var to `AuthState` for state class access.  
-- Optimized with `selectinload` for permission queries.  
-- Existing tests in `test_permission.py` passed; concurrency testing deferred to production.  
+- Added `get_permissions()` and `has_permission()` to `UserInfo`.  
+- Added `user_permissions` to `AuthState` with eager loading.  
+- Enhanced `seed_permissions.py` with action-specific permissions (e.g., `view_supplier`, `delete_user`) and legacy permissions (`manage_users`, `manage_suppliers`).  
+- Created `seed_roles.py` for `admin`, `employee`, `supplier`, `inventory_manager`, `supplier_manager`, `auditor` roles.  
+- Updated `test_permission.py` with tests for new permissions and roles.  
 
 ## Next Steps
 
