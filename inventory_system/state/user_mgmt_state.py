@@ -55,7 +55,7 @@ class UserManagementState(AuthState):
                     "email": user_info.email,
                     "role": user_info.get_roles()[0]
                     if user_info.get_roles()
-                    else "none",  # Handle multiple roles in Step 6
+                    else "none",
                 }
                 for user_info, username in results
             ]
@@ -63,6 +63,11 @@ class UserManagementState(AuthState):
 
     @rx.event
     async def change_user_role(self, user_id: int, selected_role: str):
+        if "edit_user" not in self.authenticated_user_info.get_permissions():
+            yield rx.toast.error(
+                "Permission denied: Cannot change user role", position="bottom-right"
+            )
+            return
         self.is_loading = True
         self.setvar("admin_error_message", "")
         self.setvar("admin_success_message", "")
@@ -82,7 +87,6 @@ class UserManagementState(AuthState):
         )
         with rx.session() as session:
             try:
-                # Lock UserInfo to prevent concurrent updates
                 user_info = session.exec(
                     select(UserInfo)
                     .where(UserInfo.user_id == user_id)
@@ -128,13 +132,12 @@ class UserManagementState(AuthState):
                 if selected_role in original_roles:
                     self.setvar("is_loading", False)
                     return rx.toast.info(
-                        f"No change: User {target_username}"
+                        f"No change: User {target_username} "
                         "already has role {selected_role}.",
                         position="bottom-right",
                         duration=5000,
                     )
 
-                # Use set_roles for atomic role update
                 user_info.set_roles([selected_role], session)
                 session.add(user_info)
                 session.commit()
@@ -178,6 +181,11 @@ class UserManagementState(AuthState):
 
     @rx.event
     async def delete_user(self):
+        if "delete_user" not in self.authenticated_user_info.get_permissions():
+            yield rx.toast.error(
+                "Permission denied: Cannot delete user", position="bottom-right"
+            )
+            return
         if self.user_to_delete is None:
             return
         self.is_loading = True
@@ -199,7 +207,6 @@ class UserManagementState(AuthState):
         )
         with rx.session() as session:
             try:
-                # Lock UserInfo to prevent concurrent updates
                 user_info = session.exec(
                     select(UserInfo)
                     .where(UserInfo.user_id == self.user_to_delete)

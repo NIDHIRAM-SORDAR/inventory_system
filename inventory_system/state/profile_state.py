@@ -176,9 +176,9 @@ class ProfileState(AuthState):
             self.is_updating_email = False
 
     @rx.var
-    def user_roles(self) -> str:
+    def user_roles(self) -> list[str]:
         return (
-            ", ".join(self.authenticated_user_info.get_roles())
-            if self.authenticated_user_info and self.authenticated_user_info.get_roles()
-            else "N/A"
+            self.authenticated_user_info.get_roles()
+            if self.authenticated_user_info
+            else []
         )

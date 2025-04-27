@@ -108,9 +108,121 @@ Audit logging, implemented in `inventory_system/logging/audit.py`, tracks all ro
 ## Next Steps
 
 - 
-- **Step 5: Update Authorization Logic**:
-  - Ensure all pages/routes check permissions via `get_permissions`.
-  - Update `auth_state.py` (if exists) for permission-based authorization.
+# Step 5: Transition to Permission-Based Authorization - Status and Completion
+
+## Overview
+Step 5 focuses on updating the inventory system's authorization logic to replace legacy flag-based checks (e.g., `is_admin`, `is_supplier`) with permission-based checks, aligning with the Role-Based Access Control (RBAC) system. This step enhances security, scalability, and maintainability in a multi-user environment. Below is the status of completion, detailing what has been accomplished and what remains to be done before moving to Step 6.
+
+## Completion Status
+
+### Completed Tasks
+The following components have been successfully updated to use permission-based authorization, ensuring alignment with Reflex best practices for state management, event handling, and responsive UI:
+
+1. **Authentication and Registration Modules**  
+   - **Status**: Completed  
+   - **Files Updated**: `auth.py`, `register_state.py`, `register.py`, `supplier_register_state.py`, `supplier_register.py`  
+   - **Details**: 
+     - Replaced flag-based checks with permission checks using `set_roles` and `get_permissions()`. 
+     - Registration logic assigns roles like `"employee"` or defers to approval for suppliers, supporting RBAC. 
+     - UI components use `rx.cond` for conditional rendering, with responsive design (e.g., `width=["100%", "50%"]`) and dark/light theme support. 
+     - Optimistic updates (e.g., `is_submitting=True`) enhance UX.  
+   - **RBAC Alignment**: Fully transitioned to permission-based checks, ensuring secure user creation and role assignment.
+
+2. **Login and Logout Functionality**  
+   - **Status**: Completed  
+   - **Files Updated**: `login_state.py`, `logout_state.py`, `login.py`, `logout.py`  
+   - **Details**: 
+     - Updated redirection logic to use permissions (e.g., `"manage_users"`) instead of flags like `is_admin`. 
+     - Logout remains permission-agnostic, as appropriate. 
+     - UI components use `rx.cond` for reactive feedback (e.g., spinners, toasts), with responsive design and theme support. 
+     - Optimistic updates improve perceived performance.  
+   - **RBAC Alignment**: All flag-based checks removed, ensuring secure access control.
+
+3. **Profile Management Interfaces**  
+   - **Status**: Completed  
+   - **Files Updated**: `profile_input.py`, `profile.py`, `profile_picture_state.py`, `profile_state.py`  
+   - **Details**: 
+     - Profile management inherently RBAC-compatible, with no flag-based checks. 
+     - Uses `user_roles` from `get_roles()`, rendered as badges with `rx.foreach`. 
+     - UI is responsive (e.g., `flex_direction=["column", "column", "row"]`) and theme-aware. 
+     - Optimistic updates (e.g., loading states) implemented.  
+   - **RBAC Alignment**: No changes needed, fully aligned with permission-based system.
+
+4. **Supplier Approval Processes**  
+   - **Status**: Completed  
+   - **Files Updated**: `supplier_approval.py`, `supplier_approval_state.py`  
+   - **Details**: 
+     - Introduced granular permissions: `"manage_suppliers"` (view), `"manage_supplier_approval"` (approve/revoke), `"delete_supplier"` (delete). 
+     - State methods use `with_for_update()` for race condition handling. 
+     - UI conditionally renders action buttons with `rx.cond` based on permissions, maintaining responsive design (e.g., `max_width=["90vw", "500px"]`) and theme support. 
+     - Optimistic updates (e.g., `is_loading=True`) ensure smooth UX.  
+   - **RBAC Alignment**: All actions permission-gated, flag-based checks eliminated.
+
+5. **User Management Tools**  
+   - **Status**: Completed  
+   - **Files Updated**: `user_mgmt_state.py`, `user_management.py`  
+   - **Details**: 
+     - Implemented permissions: `"manage_users"` (view), `"edit_user"` (role changes), `"delete_user"` (delete). 
+     - State methods use `with_for_update()` for race condition handling. 
+     - UI conditionally renders edit/delete buttons with `rx.cond`, ensuring responsive design and theme support. 
+     - Optimistic updates (e.g., `is_loading=True`) enhance performance.  
+   - **RBAC Alignment**: Fully transitioned to permission-based checks, ensuring granular access control.
+
+6. **Supporting Infrastructure**  
+   - **Status**: Completed  
+   - **Files Reviewed**: `seed_permissions.py`, `seed_roles.py`  
+   - **Details**: 
+     - These files define initial permissions and roles, supporting the RBAC system across the application. 
+     - No updates were needed, as they are already aligned with the permission-based approach.  
+   - **RBAC Alignment**: Provides the foundation for permission checks implemented in other modules.
+
+### Remaining Tasks
+The following tasks must be completed to finalize Step 5 and ensure a robust RBAC implementation before proceeding to Step 6:
+
+1. **Update Navigation Bar and Sidebar**  
+   - **Status**: Pending  
+   - **Details**: 
+     - The navigation bar and sidebar likely contain menu items or links that need conditional rendering based on user permissions (e.g., showing "Admin" only for users with `"manage_users"`). 
+     - Updates should use `rx.cond` for permission checks, ensuring responsive design (mobile/desktop) and theme support (dark/light modes). 
+     - This is critical for a consistent and secure user experience, preventing unauthorized access to restricted areas.  
+   - **Action Required**: Review and update the relevant files (e.g., `navbar.py`, `sidebar.py`) in a separate conversation, as specified by the user.
+
+2. **Final Code Audit**  
+   - **Status**: Pending  
+   - **Details**: 
+     - Although all specified files have been updated, a comprehensive audit is recommended to ensure no residual flag-based checks (e.g., `is_admin`, `is_supplier`) remain in the codebase. 
+     - This involves searching the entire codebase for legacy terms and verifying all authorization logic uses permissions.  
+   - **Action Required**: Conduct a codebase-wide search and review to confirm complete transition to RBAC.
+
+3. **Testing Verification**  
+   - **Status**: Pending  
+   - **Details**: 
+     - Tests, particularly those in `test_permission.py`, need to be run to validate the permission-based authorization. 
+     - This includes testing edge cases like multi-role users, permission denial scenarios, and UI rendering under different permissions. 
+     - Ensures the RBAC system functions correctly across all updated modules.  
+   - **Action Required**: Execute test suite and verify all permission-related tests pass, addressing any failures.
+
+## Summary Table
+
+| **Component**                  | **Status** | **Details**                                                                 |
+|--------------------------------|------------|-----------------------------------------------------------------------------|
+| Authentication & Registration  | Completed  | Uses `set_roles`, permission checks, responsive UI with optimistic updates. |
+| Login & Logout                 | Completed  | Permission-based redirection, reactive UI, theme support.                   |
+| Profile Management             | Completed  | No flag checks, uses `user_roles`, responsive and theme-aware.              |
+| Supplier Approval              | Completed  | Granular permissions, race condition handling, permission-gated UI.         |
+| User Management                | Completed  | Granular permissions, race condition handling, permission-gated UI.         |
+| Supporting Infrastructure       | Completed  | `seed_permissions.py`, `seed_roles.py` support RBAC, no changes needed.     |
+| Navigation Bar & Sidebar       | Pending    | Needs permission-based rendering, to be addressed separately.               |
+| Final Code Audit               | Pending    | Ensure no residual flag-based checks remain.                                |
+| Testing Verification           | Pending    | Run tests, validate permission logic and edge cases.                       |
+
+## Conclusion
+Step 5 is nearly complete, with all specified files (except navigation bar and sidebar) updated to use permission-based authorization. The system now leverages granular permissions, race condition handling, and responsive UI, aligning with Reflex best practices. Completing the remaining tasks—updating the navigation bar and sidebar, conducting a final code audit, and verifying tests—will finalize Step 5, ensuring a secure and robust RBAC implementation. Once these are addressed, the project can confidently proceed to Step 6, likely focusing on role management enhancements.
+
+## Next Steps
+- **Immediate Action**: Address navigation bar and sidebar updates in a separate conversation, as planned.
+- **Follow-Up**: Perform the final code audit and run tests to confirm RBAC integrity.
+- **Transition**: Move to Step 6 after completing all pending tasks, ensuring a smooth progression in the RBAC implementation.
 - **Step 6: Implement Role Management**:
   - Extend `user_mgmt_state.py` and `user_management.py` (if exists) for multi-role assignments.
   - Add UI for role/permission management (e.g., multi-select dropdowns).

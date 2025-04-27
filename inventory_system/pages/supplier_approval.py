@@ -2,6 +2,7 @@ import reflex as rx
 import reflex_local_auth
 
 from inventory_system import routes
+from inventory_system.state.auth import AuthState
 from inventory_system.state.supplier_approval_state import SupplierApprovalState
 from inventory_system.styles import border_radius
 from inventory_system.templates.template import template
@@ -79,12 +80,17 @@ def _supplier_info_display(user: rx.Var) -> rx.Component:
 def _edit_dialog(user: rx.Var) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.trigger(
-            rx.icon_button(
-                rx.icon("square-pen", size=2),
-                color_scheme="blue",
-                size=rx.breakpoints(initial="1", md="2"),
-                variant="soft",
-                on_click=SupplierApprovalState.open_edit_dialog(user["id"]),
+            rx.cond(
+                "manage_supplier_approval"
+                in AuthState.authenticated_user_info.get_permissions(),
+                rx.icon_button(
+                    rx.icon("square-pen", size=2),
+                    color_scheme="blue",
+                    size=rx.breakpoints(initial="1", md="2"),
+                    variant="soft",
+                    on_click=SupplierApprovalState.open_edit_dialog(user["id"]),
+                ),
+                None,
             )
         ),
         rx.dialog.content(
@@ -218,12 +224,17 @@ def _edit_dialog(user: rx.Var) -> rx.Component:
 def _delete_dialog(user: rx.Var) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.trigger(
-            rx.icon_button(
-                rx.icon("trash-2", size=2),
-                color_scheme="tomato",
-                size=rx.breakpoints(initial="1", md="2"),
-                variant="soft",
-                on_click=SupplierApprovalState.open_delete_dialog(user["id"]),
+            rx.cond(
+                "delete_supplier"
+                in AuthState.authenticated_user_info.get_permissions(),
+                rx.icon_button(
+                    rx.icon("trash-2", size=2),
+                    color_scheme="tomato",
+                    size=rx.breakpoints(initial="1", md="2"),
+                    variant="soft",
+                    on_click=SupplierApprovalState.open_delete_dialog(user["id"]),
+                ),
+                None,
             )
         ),
         rx.dialog.content(

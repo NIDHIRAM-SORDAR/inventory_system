@@ -29,7 +29,7 @@ class CustomLoginState(AuthState):
     def route_calc(self):
         """Handle redirects for authenticated users on page load."""
         if self.is_login:
-            if self.is_admin:
+            if "manage_users" in self.user_permissions:
                 return rx.redirect(routes.ADMIN_ROUTE)
             return rx.redirect(routes.OVERVIEW_ROUTE)
 
@@ -123,7 +123,7 @@ class CustomLoginState(AuthState):
                         url=self.router.page.raw_path,
                     )
                     return
-                if user_info and user_info.is_admin:
+                if user_info and "manage_users" in user_info.get_permissions():
                     return rx.redirect(routes.ADMIN_ROUTE)
                 return rx.redirect(routes.OVERVIEW_ROUTE)
 

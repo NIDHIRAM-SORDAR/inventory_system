@@ -2,6 +2,7 @@ import reflex as rx
 import reflex_local_auth
 
 from inventory_system import routes
+from inventory_system.state.auth import AuthState
 from inventory_system.state.user_mgmt_state import UserManagementState
 from inventory_system.templates.template import template
 
@@ -20,15 +21,19 @@ def _header_cell(text: str, icon: str) -> rx.Component:
 def _edit_dialog(user: rx.Var) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.trigger(
-            rx.icon_button(
-                rx.icon("square-pen"),
-                on_click=lambda: UserManagementState.open_edit_dialog(
-                    user["id"], user["role"]
+            rx.cond(
+                "edit_user" in AuthState.authenticated_user_info.get_permissions(),
+                rx.icon_button(
+                    rx.icon("square-pen"),
+                    on_click=lambda: UserManagementState.open_edit_dialog(
+                        user["id"], user["role"]
+                    ),
+                    color_scheme="blue",
+                    size="2",
+                    variant="solid",
+                    disabled=(user["role"] == "supplier"),
                 ),
-                color_scheme="blue",
-                size="2",
-                variant="solid",
-                disabled=(user["role"] == "supplier"),
+                None,
             )
         ),
         rx.dialog.content(
@@ -146,14 +151,19 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
         rx.table.cell(
             rx.hstack(
                 _edit_dialog(user),
-                rx.icon_button(
-                    rx.icon("trash-2"),
-                    on_click=lambda: UserManagementState.confirm_delete_user(
-                        user["id"]
+                rx.cond(
+                    "delete_user"
+                    in AuthState.authenticated_user_info.get_permissions(),
+                    rx.icon_button(
+                        rx.icon("trash-2"),
+                        on_click=lambda: UserManagementState.confirm_delete_user(
+                            user["id"]
+                        ),
+                        color_scheme="red",
+                        size="2",
+                        variant="solid",
                     ),
-                    color_scheme="red",
-                    size="2",
-                    variant="solid",
+                    None,
                 ),
                 spacing="2",
                 align="center",

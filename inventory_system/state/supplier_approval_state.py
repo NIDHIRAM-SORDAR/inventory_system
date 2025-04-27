@@ -60,6 +60,14 @@ class SupplierApprovalState(AuthState):
 
     @rx.event
     async def approve_supplier(self, supplier_id: int):
+        if (
+            "manage_supplier_approval"
+            not in self.authenticated_user_info.get_permissions()
+        ):
+            yield rx.toast.error(
+                "Permission denied: Cannot approve supplier", position="bottom-right"
+            )
+            return
         self.setvar("is_loading", True)
         self.setvar("supplier_error_message", "")
         self.setvar("supplier_success_message", "")
@@ -79,7 +87,6 @@ class SupplierApprovalState(AuthState):
 
         with rx.session() as session:
             try:
-                # Lock Supplier to prevent concurrent updates
                 supplier = session.exec(
                     select(Supplier).where(Supplier.id == supplier_id).with_for_update()
                 ).one_or_none()
@@ -151,7 +158,7 @@ class SupplierApprovalState(AuthState):
                     )
                     self.setvar(
                         "supplier_success_message",
-                        f"Supplier {target_supplier_company_name}"
+                        f"Supplier {target_supplier_company_name} "
                         "approved and user account created.",
                     )
                     yield rx.toast.success(
@@ -176,7 +183,7 @@ class SupplierApprovalState(AuthState):
                     )
                     self.setvar(
                         "supplier_success_message",
-                        f"Supplier {target_supplier_company_name}"
+                        f"Supplier {target_supplier_company_name} "
                         "status set to approved.",
                     )
                     yield rx.toast.success(
@@ -214,6 +221,14 @@ class SupplierApprovalState(AuthState):
 
     @rx.event
     async def revoke_supplier(self, supplier_id: int):
+        if (
+            "manage_supplier_approval"
+            not in self.authenticated_user_info.get_permissions()
+        ):
+            yield rx.toast.error(
+                "Permission denied: Cannot revoke supplier", position="bottom-right"
+            )
+            return
         self.setvar("is_loading", True)
         self.setvar("supplier_error_message", "")
         self.setvar("supplier_success_message", "")
@@ -233,7 +248,6 @@ class SupplierApprovalState(AuthState):
 
         with rx.session() as session:
             try:
-                # Lock Supplier to prevent concurrent updates
                 supplier = session.exec(
                     select(Supplier).where(Supplier.id == supplier_id).with_for_update()
                 ).one_or_none()
@@ -309,7 +323,7 @@ class SupplierApprovalState(AuthState):
                 )
                 self.setvar(
                     "supplier_success_message",
-                    f"Supplier {target_supplier_company_name}"
+                    f"Supplier {target_supplier_company_name} "
                     "status updated to {supplier.status}.",
                 )
                 if associated_user_id:
@@ -351,54 +365,13 @@ class SupplierApprovalState(AuthState):
             self.setvar("show_edit_dialog", False)
             self.setvar("edit_supplier_id", None)
 
-    @rx.var
-    def total_pages(self) -> int:
-        return max(1, (len(self.filtered_users) + self.page_size - 1) // self.page_size)
-
-    @rx.var
-    def filtered_users(self) -> List[Dict[str, Any]]:
-        data = self.users_data
-        if self.search_value:
-            data = [
-                u
-                for u in data
-                if self.search_value.lower() in u["username"].lower()
-                or self.search_value.lower() in u["email"].lower()
-            ]
-        return sorted(data, key=lambda x: x[self.sort_value], reverse=self.sort_reverse)
-
-    @rx.var
-    def current_page(self) -> List[Dict[str, Any]]:
-        start = (self.page_number - 1) * self.page_size
-        end = start + self.page_size
-        return self.filtered_users[start:end]
-
-    async def send_welcome_email(self, email: str, username: str, password: str):
-        self.supplier_error_message = ""
-        self.supplier_success_message = ""
-        try:
-            print(
-                f"Dummy email to {email} with username: {username}, "
-                f"password: {password}"
-            )
-            self.supplier_success_message = (
-                f"Temporary password for {username}: {password} "
-                "(Email not sent - dummy)"
-            )
-            return rx.toast.success(
-                self.supplier_success_message, position="bottom-right", duration=5000
-            )
-        except Exception as e:
-            self.supplier_error_message = f"Failed to send email: {str(e)}"
-            return rx.toast.error(
-                self.supplier_error_message, position="bottom-right", duration=5000
-            )
-        finally:
-            self.supplier_success_message = ""
-            self.supplier_error_message = ""
-
     @rx.event
     async def delete_supplier(self, supplier_id: int):
+        if "delete_supplier" not in self.authenticated_user_info.get_permissions():
+            yield rx.toast.error(
+                "Permission denied: Cannot delete supplier", position="bottom-right"
+            )
+            return
         self.is_loading = True
         self.supplier_error_message = ""
         self.supplier_success_message = ""
@@ -516,6 +489,52 @@ class SupplierApprovalState(AuthState):
             self.show_delete_dialog = False
             self.edit_supplier_id = None
 
+    @rx.var
+    def total_pages(self) -> int:
+        return max(1, (len(self.filtered_users) + self.page_size - 1) // self.page_size)
+
+    @rx.var
+    def filtered_users(self) -> List[Dict[str, Any]]:
+        data = self.users_data
+        if self.search_value:
+            data = [
+                u
+                for u in data
+                if self.search_value.lower() in u["username"].lower()
+                or self.search_value.lower() in u["email"].lower()
+            ]
+        return sorted(data, key=lambda x: x[self.sort_value], reverse=self.sort_reverse)
+
+    @rx.var
+    def current_page(self) -> List[Dict[str, Any]]:
+        start = (self.page_number - 1) * self.page_size
+        end = start + self.page_size
+        return self.filtered_users[start:end]
+
+    async def send_welcome_email(self, email: str, username: str, password: str):
+        self.supplier_error_message = ""
+        self.supplier_success_message = ""
+        try:
+            print(
+                f"Dummy email to {email} with username: {username}, "
+                f"password: {password}"
+            )
+            self.supplier_success_message = (
+                f"Temporary password for {username}: {password} "
+                "(Email not sent - dummy)"
+            )
+            return rx.toast.success(
+                self.supplier_success_message, position="bottom-right", duration=5000
+            )
+        except Exception as e:
+            self.supplier_error_message = f"Failed to send email: {str(e)}"
+            return rx.toast.error(
+                self.supplier_error_message, position="bottom-right", duration=5000
+            )
+        finally:
+            self.supplier_success_message = ""
+            self.supplier_error_message = ""
+
     @rx.event
     def handle_submit(self, form_data: dict):
         supplier_id = int(form_data.get("supplier_id", 0))
@@ -589,6 +608,5 @@ class SupplierApprovalState(AuthState):
         self.page_number = self.total_pages
 
     def clear_search_value(self):
-        """Clear the search value and reset to first page."""
         self.setvar("search_value", "")
         self.setvar("page_number", 1)

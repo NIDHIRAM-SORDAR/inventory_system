@@ -222,7 +222,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         user_id=self.new_user_id,
                         profile_picture=DEFAULT_PROFILE_PICTURE,
                     )
-                    user_info.set_role()
+                    user_info.set_roles(["employee"], session)
                     session.add(user_info)
                     session.flush()  # Ensure user_info.id is available
                     user_info_id = user_info.id
