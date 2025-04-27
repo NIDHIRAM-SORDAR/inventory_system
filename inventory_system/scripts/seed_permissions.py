@@ -11,11 +11,14 @@ def seed_permissions(session: Optional[Session] = None):
     """Seed the Permission table with initial permissions."""
     print("Starting seeding...")
     permissions = [
-        {
-            "name": "manage_users",
-            "description": "Create, read, update, delete user accounts",
-        },
-        {"name": "manage_suppliers", "description": "Manage supplier records"},
+        {"name": "view_supplier", "description": "View supplier records"},
+        {"name": "create_supplier", "description": "Create supplier records"},
+        {"name": "edit_supplier", "description": "Edit supplier records"},
+        {"name": "delete_supplier", "description": "Delete supplier records"},
+        {"name": "view_user", "description": "View user accounts"},
+        {"name": "create_user", "description": "Create user accounts"},
+        {"name": "edit_user", "description": "Edit user accounts"},
+        {"name": "delete_user", "description": "Delete user accounts"},
         {"name": "view_inventory", "description": "View inventory data"},
         {"name": "create_inventory", "description": "Create new inventory items"},
         {
