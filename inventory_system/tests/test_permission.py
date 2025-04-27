@@ -154,9 +154,9 @@ def test_seed_permissions(session: Session):
 
     seed_permissions(session=session)
     permissions = session.exec(select(Permission)).all()
-    assert (
-        len(permissions) >= 16
-    )  # Updated count including manage_users, manage_suppliers, manage_supplier_approval
+    assert len(permissions) >= 16
+    # Updated count including manage_users,
+    # manage_suppliers, manage_supplier_approval
     perm_names = {p.name for p in permissions}
     assert {
         "manage_users",

@@ -253,7 +253,6 @@ def profile() -> rx.Component:
                                 ),
                             ),
                             rx.text("Role: N/A", size="3"),
-                            spacing="2",
                         ),
                     ),
                     width="100%",

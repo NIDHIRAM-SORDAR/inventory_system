@@ -31,6 +31,8 @@ assets/logs/*
 # Ignored directories/files specific to this project
 assets/external/
 .web
+alembic/
+alembic.ini
 
 # --- Specific Files (Review if still needed) ---
 # Is this script intentionally not committed? Contains secrets or local only?
