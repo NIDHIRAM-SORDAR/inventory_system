@@ -126,6 +126,7 @@ class CustomLoginState(AuthState):
                     )
                     return
                 if user_info and "manage_users" in self.user_permissions:
+                    print(self.user_permissions)
                     return rx.redirect(routes.ADMIN_ROUTE)
                 return rx.redirect(routes.OVERVIEW_ROUTE)
 

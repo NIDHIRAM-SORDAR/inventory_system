@@ -6,6 +6,7 @@ import reflex_local_auth
 from email_validator import EmailNotValidError, validate_email
 from sqlmodel import select
 
+from inventory_system.logging.logging import audit_logger
 from inventory_system.models.user import UserInfo
 
 
@@ -95,3 +96,29 @@ class AuthState(reflex_local_auth.LocalAuthState):
             user_info = session.merge(self.authenticated_user_info)
             self.cached_permissions = user_info.get_permissions()
             self.cached_roles = user_info.get_roles()
+
+    async def update_roles(self, role_names: List[str]):
+        """Update the user's roles and refresh cached data."""
+        if not self.authenticated_user_info:
+            yield rx.toast.error("No authenticated user")
+            return
+        try:
+            with rx.session() as session:
+                user_info = session.merge(self.authenticated_user_info)
+                user_info.set_roles(role_names, session)
+                session.commit()
+                self.refresh_user_data()
+                audit_logger.info(
+                    "roles_updated",
+                    user_id=self.authenticated_user.id,
+                    role_names=role_names,
+                )
+                yield rx.toast.success("Roles updated successfully")
+        except ValueError as e:
+            audit_logger.error(
+                "roles_update_failed",
+                user_id=self.authenticated_user.id,
+                role_names=role_names,
+                error=str(e),
+            )
+            yield rx.toast.error(f"Failed to update roles: {str(e)}")

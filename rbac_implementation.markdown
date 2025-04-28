@@ -365,7 +365,10 @@ The following to-do list prioritizes tasks to ensure a successful Step 6 impleme
 - [ ] Add unit tests in `test_permission.py` for role creation, deletion, concurrent updates, and audit logging, using `pytest` fixtures.  
 - [ ] Optimize `set_permissions` in `user.py` for bulk permission assignments, adding indexes to `RolePermission` if needed.  
 - [ ] Deploy to staging and test concurrency with Locust, monitoring audit logs for deadlocks or errors in PostgreSQL.  
-- [ ] Document role management patterns in `DATABASE_OPERATIONS.md`, including concurrency and performance guidelines.  
+- [ ] Document role management patterns in `DATABASE_OPERATIONS.md`, including concurrency and performance guidelines. 
+-[ ] Optimization Option: If get_permissions() is slow with many roles, add eager loading:
+    from sqlalchemy.orm import selectinload
+    user_info = session.merge(self.authenticated_user_info).options(selectinload(UserInfo.roles).selectinload(Role.permissions))
 
 ### Implementation Summary
 Step 6 will introduce dynamic role management by enhancing the `Role` model, state handlers, and UI to support role creation, updating, and deletion. Administrators will manage roles via a responsive interface in `user_management.py`, with multi-select dropdowns for permissions. State handlers in `user_mgmt_state.py` will use `@rx.background` for database operations, ensuring non-blocking UI and concurrency safety via `SELECT FOR UPDATE`. Audit logging will track all changes, and tests will validate functionality and edge cases. The implementation will optimize performance with bulk queries and maintain backward compatibility with predefined roles. Production testing with Locust will ensure scalability, preparing the system for Step 7 (user management enhancements). This approach aligns with Reflex best practices, including `@rx.event`, `setvar`, `yield` for async updates, and responsive design with dark/light theme support.

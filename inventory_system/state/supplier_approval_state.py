@@ -29,33 +29,32 @@ class SupplierApprovalState(AuthState):
     current_status: str = ""
 
     def check_auth_and_load(self):
-        if not self.is_authenticated or not (
-            self.authenticated_user_info and "manage_suppliers" in self.user_permissions
-        ):
+        if not self.is_authenticated or "manage_suppliers" not in self.user_permissions:
             return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
-        self.setvar("is_loading", True)
-        with rx.session() as session:
-            stmt = select(
-                Supplier.id,
-                Supplier.company_name.label("username"),
-                Supplier.contact_email.label("email"),
-                Supplier.status,
-                UserInfo.get_roles(),
-                UserInfo.user_id,
-            ).outerjoin(UserInfo, Supplier.user_info_id == UserInfo.id)
-            results = session.exec(stmt).all()
-            self.users_data = [
-                {
-                    "id": row.id,
-                    "email": row.email,
-                    "status": row.status,
-                    "role": row.role if row.role else "none",
-                    "username": row.username,
-                    "user_id": row.user_id,
-                }
-                for row in results
-            ]
-        self.setvar("is_loading", False)
+        self.set_is_loading(True)
+        try:
+            with rx.session() as session:
+                stmt = select(
+                    Supplier.id,
+                    Supplier.company_name.label("username"),
+                    Supplier.contact_email.label("email"),
+                    Supplier.status,
+                    UserInfo.user_id,
+                ).outerjoin(UserInfo, Supplier.user_info_id == UserInfo.id)
+                results = session.exec(stmt).all()
+                self.users_data = [
+                    {
+                        "id": row.id,
+                        "email": row.email,
+                        "status": row.status,
+                        "role": "none",  # Roles set in approve_supplier
+                        "username": row.username,
+                        "user_id": row.user_id,
+                    }
+                    for row in results
+                ]
+        finally:
+            self.set_is_loading(False)
 
     @rx.event
     async def approve_supplier(self, supplier_id: int):
@@ -64,9 +63,9 @@ class SupplierApprovalState(AuthState):
                 "Permission denied: Cannot approve supplier", position="bottom-right"
             )
             return
-        self.setvar("is_loading", True)
-        self.setvar("supplier_error_message", "")
-        self.setvar("supplier_success_message", "")
+        self.set_is_loading(True)
+        self.set_supplier_error_message("")
+        self.set_supplier_success_message("")
         acting_user_id = self.authenticated_user.id if self.authenticated_user else None
         acting_username = (
             self.authenticated_user.username if self.authenticated_user else "Unknown"
@@ -87,13 +86,13 @@ class SupplierApprovalState(AuthState):
                     select(Supplier).where(Supplier.id == supplier_id).with_for_update()
                 ).one_or_none()
                 if not supplier:
-                    self.setvar("supplier_error_message", "Supplier not found.")
+                    self.set_supplier_error_message("Supplier not found.")
                     yield rx.toast.error(
                         self.supplier_error_message,
                         position="bottom-right",
                         duration=5000,
                     )
-                    self.setvar("is_loading", False)
+                    self.set_is_loading(False)
                     audit_logger.error(
                         "fail_approve_supplier",
                         acting_user_id=acting_user_id,
@@ -102,8 +101,8 @@ class SupplierApprovalState(AuthState):
                         reason="Supplier not found",
                         ip_address=ip_address,
                     )
-                    self.setvar("show_edit_dialog", False)
-                    self.setvar("edit_supplier_id", None)
+                    self.set_show_edit_dialog(False)
+                    self.set_edit_supplier_id(None)
                     return
 
                 target_supplier_company_name = supplier.company_name
@@ -130,14 +129,14 @@ class SupplierApprovalState(AuthState):
                         select(UserInfo)
                         .where(UserInfo.user_id == new_user_id)
                         .with_for_update()
-                    ).one()
-                    session.add(new_user_info)
-                    session.refresh(new_user_info)
-                    new_user_info.set_roles(["supplier"], session)
+                    ).one_or_none()
+                    if not new_user_info:
+                        raise ValueError(
+                            "Failed to create UserInfo for new supplier user"
+                        )
                     supplier.user_info_id = new_user_info.id
                     supplier.status = "approved"
                     session.add(supplier)
-                    session.refresh(supplier)
                     session.commit()
 
                     audit_logger.info(
@@ -154,17 +153,16 @@ class SupplierApprovalState(AuthState):
                         supplier.company_name,
                         default_password,
                     )
-                    self.setvar(
-                        "supplier_success_message",
+                    self.set_supplier_success_message(
                         f"Supplier {target_supplier_company_name} "
-                        "approved and user account created.",
+                        "approved and user account created."
                     )
                     yield rx.toast.success(
                         self.supplier_success_message,
                         position="bottom-right",
                         duration=5000,
                     )
-                    self.setvar("supplier_success_message", "")
+                    self.set_supplier_success_message("")
 
                 else:
                     supplier.status = "approved"
@@ -179,24 +177,20 @@ class SupplierApprovalState(AuthState):
                         associated_user_info_id=supplier.user_info_id,
                         ip_address=ip_address,
                     )
-                    self.setvar(
-                        "supplier_success_message",
+                    self.set_supplier_success_message(
                         f"Supplier {target_supplier_company_name} "
-                        "status set to approved.",
+                        "status set to approved."
                     )
                     yield rx.toast.success(
                         self.supplier_success_message,
                         position="bottom-right",
                         duration=5000,
                     )
-                    self.setvar("supplier_success_message", "")
+                    self.set_supplier_success_message("")
 
             except Exception as e:
                 session.rollback()
-                self.setvar(
-                    "supplier_error_message",
-                    f"Failed to approve supplier: {str(e)}",
-                )
+                self.set_supplier_error_message(f"Failed to approve supplier: {str(e)}")
                 yield rx.toast.error(
                     self.supplier_error_message,
                     position="bottom-right",
@@ -213,9 +207,9 @@ class SupplierApprovalState(AuthState):
                 )
 
             self.check_auth_and_load()
-            self.setvar("is_loading", False)
-            self.setvar("show_edit_dialog", False)
-            self.setvar("edit_supplier_id", None)
+            self.set_is_loading(False)
+            self.set_show_edit_dialog(False)
+            self.set_edit_supplier_id(None)
 
     @rx.event
     async def revoke_supplier(self, supplier_id: int):
@@ -478,11 +472,11 @@ class SupplierApprovalState(AuthState):
                     ip_address=ip_address,
                 )
                 session.rollback()
-
-            self.check_auth_and_load()
-            self.is_loading = False
-            self.show_delete_dialog = False
-            self.edit_supplier_id = None
+            finally:
+                self.check_auth_and_load()
+                self.is_loading = False
+                self.show_delete_dialog = False
+                self.edit_supplier_id = None
 
     @rx.var
     def total_pages(self) -> int:

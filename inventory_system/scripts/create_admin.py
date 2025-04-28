@@ -5,6 +5,7 @@ import reflex_local_auth
 from dotenv import load_dotenv
 from sqlmodel import select
 
+from inventory_system.constants import DEFAULT_PROFILE_PICTURE
 from inventory_system.logging.audit import audit_logger
 from inventory_system.models.user import Role, UserInfo
 
@@ -101,7 +102,7 @@ def create_admin_user():
 
             # Create the corresponding UserInfo entry
             user_info = UserInfo(
-                email=email, user_id=user.id, profile_picture="/default_avatar.png"
+                email=email, user_id=user.id, profile_picture=DEFAULT_PROFILE_PICTURE
             )
             session.add(user_info)
             session.flush()  # Assign user_info.id
