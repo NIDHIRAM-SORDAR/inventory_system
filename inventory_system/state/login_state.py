@@ -94,6 +94,8 @@ class CustomLoginState(AuthState):
                     return
 
                 self._login(user.id, expiration_delta=timedelta(days=7))
+                self.refresh_user_data()  # Cache permissions and roles
+
                 audit_logger.info(
                     "login_success",
                     user_id=user.id,
@@ -123,7 +125,7 @@ class CustomLoginState(AuthState):
                         url=self.router.page.raw_path,
                     )
                     return
-                if user_info and "manage_users" in user_info.get_permissions():
+                if user_info and "manage_users" in self.user_permissions:
                     return rx.redirect(routes.ADMIN_ROUTE)
                 return rx.redirect(routes.OVERVIEW_ROUTE)
 

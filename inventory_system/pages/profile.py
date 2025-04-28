@@ -3,6 +3,7 @@ import reflex as rx
 import reflex_local_auth
 
 from inventory_system import routes
+from inventory_system.state.auth import AuthState
 from inventory_system.state.profile_picture_state import ProfilePictureState
 from inventory_system.state.profile_state import ProfileState
 
@@ -244,10 +245,9 @@ def profile() -> rx.Component:
                     ),
                     rx.hstack(
                         rx.cond(
-                            ProfileState.authenticated_user_info
-                            & ProfileState.user_roles,
+                            ProfileState.authenticated_user_info & AuthState.user_roles,
                             rx.foreach(
-                                ProfileState.user_roles,
+                                AuthState.user_roles,
                                 lambda role: rx.badge(
                                     role, color_scheme="blue", size="2"
                                 ),

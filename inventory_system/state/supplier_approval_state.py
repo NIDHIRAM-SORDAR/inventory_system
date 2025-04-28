@@ -30,8 +30,7 @@ class SupplierApprovalState(AuthState):
 
     def check_auth_and_load(self):
         if not self.is_authenticated or not (
-            self.authenticated_user_info
-            and "manage_suppliers" in self.authenticated_user_info.get_permissions()
+            self.authenticated_user_info and "manage_suppliers" in self.user_permissions
         ):
             return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
         self.setvar("is_loading", True)
@@ -41,7 +40,7 @@ class SupplierApprovalState(AuthState):
                 Supplier.company_name.label("username"),
                 Supplier.contact_email.label("email"),
                 Supplier.status,
-                UserInfo.role,
+                UserInfo.get_roles(),
                 UserInfo.user_id,
             ).outerjoin(UserInfo, Supplier.user_info_id == UserInfo.id)
             results = session.exec(stmt).all()
@@ -60,10 +59,7 @@ class SupplierApprovalState(AuthState):
 
     @rx.event
     async def approve_supplier(self, supplier_id: int):
-        if (
-            "manage_supplier_approval"
-            not in self.authenticated_user_info.get_permissions()
-        ):
+        if "manage_supplier_approval" not in self.user_permissions:
             yield rx.toast.error(
                 "Permission denied: Cannot approve supplier", position="bottom-right"
             )
@@ -223,10 +219,7 @@ class SupplierApprovalState(AuthState):
 
     @rx.event
     async def revoke_supplier(self, supplier_id: int):
-        if (
-            "manage_supplier_approval"
-            not in self.authenticated_user_info.get_permissions()
-        ):
+        if "manage_supplier_approval" not in self.user_permissions:
             yield rx.toast.error(
                 "Permission denied: Cannot revoke supplier", position="bottom-right"
             )
@@ -369,7 +362,7 @@ class SupplierApprovalState(AuthState):
 
     @rx.event
     async def delete_supplier(self, supplier_id: int):
-        if "delete_supplier" not in self.authenticated_user_info.get_permissions():
+        if "delete_supplier" not in self.user_permissions:
             yield rx.toast.error(
                 "Permission denied: Cannot delete supplier", position="bottom-right"
             )

@@ -244,7 +244,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         email=email,
                         user_id=self.new_user_id,
                         user_info_id=user_info_id,
-                        role=user_info.role,
+                        role=user_info.get_roles(),
                         ip_address=ip_address,
                     )
 

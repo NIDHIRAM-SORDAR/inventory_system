@@ -19,8 +19,8 @@ class AdminState(AuthState):
         if not self.is_authenticated or not (
             self.authenticated_user_info
             and (
-                "manage_users" in self.authenticated_user_info.get_permissions()
-                or "manage_suppliers" in self.authenticated_user_info.get_permissions()
+                "manage_users" in self.user_permissions
+                or "manage_suppliers" in self.user_permissions
             )
         ):
             return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
