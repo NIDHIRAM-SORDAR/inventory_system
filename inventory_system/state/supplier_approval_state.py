@@ -135,11 +135,13 @@ class SupplierApprovalState(AuthState):
                         .where(UserInfo.user_id == new_user_id)
                         .with_for_update()
                     ).one()
-                    new_user_info.set_roles(["supplier"], session)
                     session.add(new_user_info)
+                    session.refresh(new_user_info)
+                    new_user_info.set_roles(["supplier"], session)
                     supplier.user_info_id = new_user_info.id
                     supplier.status = "approved"
                     session.add(supplier)
+                    session.refresh(supplier)
                     session.commit()
 
                     audit_logger.info(

@@ -103,11 +103,11 @@ def login_form() -> rx.Component:
                 color_scheme="purple",
                 variant="solid",
                 style={
-                    "background": f"linear-gradient(45deg, {rx.color('purple', 8)}"
-                    ", {rx.color('purple', 10)})",
+                    "background": f"linear-gradient(45deg, {rx.color('purple', 8)}, "
+                    f"{rx.color('purple', 10)})",
                     "_hover": {
-                        "background": f"linear-gradient(45deg, {rx.color('purple', 9)}"
-                        ", {rx.color('purple', 11)})",
+                        "background": f"linear-gradient(45deg, {rx.color('purple', 9)},"
+                        f"{rx.color('purple', 11)})",
                     },
                     "transition": "all 0.3s ease",
                 },

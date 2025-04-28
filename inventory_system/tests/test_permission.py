@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 import pytest
 import reflex as rx
+import reflex_local_auth
 from sqlmodel import Session, create_engine, select
 
 from inventory_system.logging.logging import audit_logger
@@ -316,7 +317,7 @@ def test_userinfo_roles(session: Session):
     roles = user.get_roles()
     assert set(roles) == {"admin", "employee"}
 
-    with pytest.raises(ValueError, match="Role 'invalid' does not exist"):
+    with pytest.raises(ValueError, match="Roles not found: {'invalid'}"):
         user.set_roles(["admin", "invalid"], session)
 
 
@@ -337,7 +338,7 @@ def test_role_permissions(session: Session):
     permissions = role.get_permissions()
     assert set(permissions) == {"manage_users", "view_inventory"}
 
-    with pytest.raises(ValueError, match="Permission 'invalid' does not exist"):
+    with pytest.raises(ValueError, match="Permissions not found: {'invalid'}"):
         role.set_permissions(["manage_users", "invalid"], session)
 
 
@@ -362,6 +363,81 @@ def test_userinfo_permissions(session: Session):
     assert user.has_permission("manage_users") is True
     assert user.has_permission("view_inventory") is True
     assert user.has_permission("delete_inventory") is False
+
+
+def test_user_registration_step5(session: Session):
+    """Test Step 5 of registration: Create UserInfo and assign employee role."""
+    log_capture = []
+    original_info = audit_logger.info
+
+    def capture_log(event, **kwargs):
+        log_capture.append((event, kwargs))
+
+    audit_logger.info = capture_log
+
+    try:
+        # Setup: Create employee role and LocalUser
+        role = Role(name="employee", description="Employee role")
+        session.add(role)
+        session.commit()
+
+        hash_password = reflex_local_auth.LocalUser.hash_password("password")
+        # Step 1: Create LocalUser
+
+        local_user = reflex_local_auth.LocalUser(
+            username="testuser",
+            email="test@example.com",
+            password_hash=hash_password,
+            enabled=True,
+        )
+        session.add(local_user)
+        session.flush()  # Simulate Step 4: Persist LocalUser
+
+        # Step 5: Create and persist UserInfo, assign employee role
+        user_info = UserInfo(
+            email="test@example.com",
+            user_id=local_user.id,
+            profile_picture="/default_avatar.png",
+        )
+        session.add(user_info)
+        session.flush()  # Ensure UserInfo is persisted
+
+        user_info.set_roles(["employee"], session)
+        session.commit()
+
+        # Assertions
+        retrieved_user = session.exec(
+            select(UserInfo).where(UserInfo.user_id == local_user.id)
+        ).first()
+        assert retrieved_user is not None
+        assert retrieved_user.email == "test@example.com"
+        assert retrieved_user.user_id == local_user.id
+        assert set(retrieved_user.get_roles()) == {"employee"}
+
+        # Verify audit logging
+        assert len(log_capture) >= 1
+        set_roles_event = next(
+            (event, kwargs)
+            for event, kwargs in log_capture
+            if event == "set_roles_success"
+        )
+        event, kwargs = set_roles_event
+        assert kwargs["entity"] == "user_role"
+        assert kwargs["user_id"] == user_info.id
+        assert kwargs["role_names"] == ["employee"]
+
+        # Test failure case: Non-existent role
+        user_info = UserInfo(
+            email="fail@example.com",
+            user_id=local_user.id + 1,
+            profile_picture="/default_avatar.png",
+        )
+        session.add(user_info)
+        session.flush()
+        with pytest.raises(ValueError, match="Roles not found: {'invalid_role'}"):
+            user_info.set_roles(["invalid_role"], session)
+    finally:
+        audit_logger.info = original_info
 
 
 def test_audit_logging_roles(session: Session):

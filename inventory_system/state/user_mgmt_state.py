@@ -138,8 +138,9 @@ class UserManagementState(AuthState):
                         duration=5000,
                     )
 
-                user_info.set_roles([selected_role], session)
                 session.add(user_info)
+                session.refresh(user_info)
+                user_info.set_roles([selected_role], session)
                 session.commit()
 
                 audit_logger.info(
