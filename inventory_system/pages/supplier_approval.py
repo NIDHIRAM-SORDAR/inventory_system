@@ -81,8 +81,7 @@ def _edit_dialog(user: rx.Var) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.trigger(
             rx.cond(
-                "manage_supplier_approval"
-                in AuthState.authenticated_user_info.get_permissions(),
+                AuthState.user_permissions.contains("manage_supplier_approval"),
                 rx.icon_button(
                     rx.icon("square-pen", size=2),
                     color_scheme="blue",
@@ -225,8 +224,7 @@ def _delete_dialog(user: rx.Var) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.trigger(
             rx.cond(
-                "delete_supplier"
-                in AuthState.authenticated_user_info.get_permissions(),
+                AuthState.user_permissions.contains("delete_supplier"),
                 rx.icon_button(
                     rx.icon("trash-2", size=2),
                     color_scheme="tomato",

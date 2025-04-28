@@ -22,7 +22,7 @@ def _edit_dialog(user: rx.Var) -> rx.Component:
     return rx.dialog.root(
         rx.dialog.trigger(
             rx.cond(
-                "edit_user" in AuthState.authenticated_user_info.get_permissions(),
+                AuthState.user_permissions.contains("edit_user"),
                 rx.icon_button(
                     rx.icon("square-pen"),
                     on_click=lambda: UserManagementState.open_edit_dialog(
@@ -152,8 +152,7 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
             rx.hstack(
                 _edit_dialog(user),
                 rx.cond(
-                    "delete_user"
-                    in AuthState.authenticated_user_info.get_permissions(),
+                    AuthState.user_permissions.contains("delete_user"),
                     rx.icon_button(
                         rx.icon("trash-2"),
                         on_click=lambda: UserManagementState.confirm_delete_user(

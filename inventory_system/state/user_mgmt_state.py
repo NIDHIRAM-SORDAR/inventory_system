@@ -103,7 +103,7 @@ class UserManagementState(AuthState):
                         ip_address=ip_address,
                     )
                     self.setvar("is_loading", False)
-                    return rx.toast.error(
+                    yield rx.toast.error(
                         self.admin_error_message, position="bottom-right", duration=5000
                     )
 
@@ -123,7 +123,7 @@ class UserManagementState(AuthState):
                         ip_address=ip_address,
                     )
                     self.setvar("is_loading", False)
-                    return rx.toast.error(
+                    yield rx.toast.error(
                         self.admin_error_message, position="bottom-right", duration=5000
                     )
 
@@ -131,7 +131,7 @@ class UserManagementState(AuthState):
                 original_roles = user_info.get_roles()
                 if selected_role in original_roles:
                     self.setvar("is_loading", False)
-                    return rx.toast.info(
+                    yield rx.toast.info(
                         f"No change: User {target_username} "
                         "already has role {selected_role}.",
                         position="bottom-right",
@@ -159,7 +159,7 @@ class UserManagementState(AuthState):
                 self.setvar("is_loading", False)
                 self.setvar("show_edit_dialog", False)
                 self.setvar("target_user_id", None)
-                return rx.toast.success(
+                yield rx.toast.success(
                     self.admin_success_message, position="bottom-right", duration=5000
                 )
 
@@ -175,7 +175,7 @@ class UserManagementState(AuthState):
                     ip_address=ip_address,
                 )
                 self.setvar("is_loading", False)
-                return rx.toast.error(
+                yield rx.toast.error(
                     self.admin_error_message, position="bottom-right", duration=5000
                 )
 
@@ -223,7 +223,7 @@ class UserManagementState(AuthState):
                         ip_address=ip_address,
                     )
                     self.setvar("is_loading", False)
-                    return rx.toast.error(
+                    yield rx.toast.error(
                         self.admin_error_message, position="bottom-right", duration=5000
                     )
 
@@ -243,7 +243,7 @@ class UserManagementState(AuthState):
                         ip_address=ip_address,
                     )
                     self.setvar("is_loading", False)
-                    return rx.toast.error(
+                    yield rx.toast.error(
                         self.admin_error_message, position="bottom-right", duration=5000
                     )
 
@@ -268,7 +268,7 @@ class UserManagementState(AuthState):
                 self.setvar("is_loading", False)
                 self.setvar("show_delete_dialog", False)
                 self.setvar("user_to_delete", None)
-                return rx.toast.success(
+                yield rx.toast.success(
                     self.admin_success_message, position="bottom-right", duration=5000
                 )
 
@@ -284,7 +284,7 @@ class UserManagementState(AuthState):
                     ip_address=ip_address,
                 )
                 self.setvar("is_loading", False)
-                return rx.toast.error(
+                yield rx.toast.error(
                     self.admin_error_message, position="bottom-right", duration=5000
                 )
 
