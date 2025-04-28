@@ -36,7 +36,6 @@ alembic.ini
 
 # --- Specific Files (Review if still needed) ---
 # Is this script intentionally not committed? Contains secrets or local only?
-inventory_system/create_admin.py
 
 # --- Operating System Files ---
 # Ignore OS-generated files (Examples - uncomment/add as needed)
