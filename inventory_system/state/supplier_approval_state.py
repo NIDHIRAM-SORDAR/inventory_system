@@ -119,12 +119,34 @@ class SupplierApprovalState(AuthState):
                         ip_address=ip_address,
                     )
 
-                    new_user_id = register_supplier(
-                        supplier.company_name,
-                        supplier.contact_email,
-                        default_password,
-                        session,
-                    )
+                    try:
+                        new_user_id = register_supplier(
+                            supplier.company_name,
+                            supplier.contact_email,
+                            default_password,
+                            session,
+                        )
+                    except ValueError as e:
+                        self.set_supplier_error_message(str(e))
+                        yield rx.toast.error(
+                            self.supplier_error_message,
+                            position="bottom-right",
+                            duration=5000,
+                        )
+                        audit_logger.error(
+                            "fail_approve_supplier",
+                            acting_user_id=acting_user_id,
+                            acting_username=acting_username,
+                            target_supplier_id=supplier_id,
+                            target_supplier_company_name=target_supplier_company_name,
+                            reason=f"Registration error: {str(e)}",
+                            ip_address=ip_address,
+                        )
+                        self.set_is_loading(False)
+                        self.set_show_edit_dialog(False)
+                        self.set_edit_supplier_id(None)
+                        return
+
                     new_user_info = session.exec(
                         select(UserInfo)
                         .where(UserInfo.user_id == new_user_id)
@@ -205,11 +227,11 @@ class SupplierApprovalState(AuthState):
                     reason=f"Database error: {str(e)}",
                     ip_address=ip_address,
                 )
-
-            self.check_auth_and_load()
-            self.set_is_loading(False)
-            self.set_show_edit_dialog(False)
-            self.set_edit_supplier_id(None)
+            finally:
+                self.check_auth_and_load()
+                self.set_is_loading(False)
+                self.set_show_edit_dialog(False)
+                self.set_edit_supplier_id(None)
 
     @rx.event
     async def revoke_supplier(self, supplier_id: int):
