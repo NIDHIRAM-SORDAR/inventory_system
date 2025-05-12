@@ -9,7 +9,6 @@ from sqlmodel import select
 from inventory_system import routes
 from inventory_system.logging.logging import audit_logger
 from inventory_system.models.user import Role, UserInfo
-from inventory_system.state.auth import AuthState
 
 from ..constants import DEFAULT_PROFILE_PICTURE
 
@@ -103,7 +102,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
 
         return True
 
-    @rx.event(background=True)
+    @rx.event
     async def handle_registration_with_email(self, form_data: dict):
         """Handle registration, create UserInfo, assign roles, and auto-login."""
         self.registration_error = ""
@@ -140,7 +139,6 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                     ip_address=ip_address,
                 )
                 yield rx.toast.error(self.registration_error)
-                return
 
             # Validate fields
             if not self._validate_fields(username, password, confirm_password):
@@ -151,7 +149,6 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                     ip_address=ip_address,
                 )
                 yield rx.toast.error(self.registration_error)
-                return
 
             with rx.session() as session:
                 try:
@@ -169,7 +166,6 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         )
                         yield rx.toast.error(self.registration_error)
                         session.rollback()
-                        return
 
                     audit_logger.info(
                         "registration_localuser_created",
@@ -196,7 +192,6 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         )
                         yield rx.toast.error(self.registration_error)
                         session.rollback()
-                        return
 
                     # Create UserInfo
                     user_info = UserInfo(
@@ -209,9 +204,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
 
                     # Validate and assign employee role
                     employee_role = session.exec(
-                        select(Role).where(
-                            Role.name == "employee", Role.is_active == True
-                        )
+                        select(Role).where(Role.name == "employee", Role.is_active)
                     ).one_or_none()
                     if not employee_role:
                         self.registration_error = (
@@ -227,7 +220,6 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         )
                         yield rx.toast.error(self.registration_error)
                         session.rollback()
-                        return
 
                     try:
                         user_info.set_roles(["employee"], session)
@@ -247,7 +239,6 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         )
                         yield rx.toast.error(self.registration_error)
                         session.rollback()
-                        return
 
                     user_info_id = user_info.id
                     session.commit()
@@ -270,28 +261,6 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         ip_address=ip_address,
                     )
 
-                    # Auto-login using AuthState
-                    auth_state = AuthState.get_state()
-                    user = session.exec(
-                        select(reflex_local_auth.LocalUser).where(
-                            reflex_local_auth.LocalUser.id == self.new_user_id
-                        )
-                    ).one_or_none()
-                    if user:
-                        auth_state.set_authenticated_user(user)
-                        await auth_state.refresh_user_data()
-                    else:
-                        self.registration_error = "Auto-login failed: User not found."
-                        audit_logger.error(
-                            "auto_login_failed",
-                            username=username,
-                            user_id=self.new_user_id,
-                            reason="User not found after registration",
-                            ip_address=ip_address,
-                        )
-                        yield rx.toast.error(self.registration_error)
-                        return
-
                     # Show success toast
                     yield rx.toast.success(
                         "Registration successful! Redirecting...",
@@ -299,14 +268,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         duration=1000,
                     )
 
-                    # Perform redirect based on authentication and permissions
-                    if auth_state.is_authenticated:
-                        if "manage_users" in auth_state.user_permissions:
-                            yield rx.redirect(routes.ADMIN_ROUTE)
-                        else:
-                            yield rx.redirect(routes.OVERVIEW_ROUTE)
-                    else:
-                        yield rx.redirect(routes.LOGIN_ROUTE)
+                    yield rx.redirect(routes.LOGIN_ROUTE)
 
                 except Exception as db_error:
                     self.registration_error = (
@@ -322,7 +284,6 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                     )
                     session.rollback()
                     yield rx.toast.error(self.registration_error)
-                    return
 
         except Exception as e:
             self.registration_error = "An unexpected error occurred. Please try again."

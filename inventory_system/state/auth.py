@@ -166,7 +166,6 @@ class AuthState(reflex_local_auth.LocalAuthState):
         """Update user info (e.g., email) and sync with database."""
         if not self.authenticated_user_info:
             yield rx.toast.error("No authenticated user")
-            return
 
         try:
             with rx.session() as session:
@@ -224,7 +223,7 @@ class AuthState(reflex_local_auth.LocalAuthState):
                 user_info = session.merge(self.authenticated_user_info)
                 user_info.set_roles(role_names, session)
                 session.commit()
-                await self.refresh_user_data()
+                self.refresh_user_data()
                 audit_logger.info(
                     "roles_updated",
                     user_id=self.authenticated_user.id,
@@ -245,4 +244,4 @@ class AuthState(reflex_local_auth.LocalAuthState):
         """Periodically refresh user data for long-lived sessions."""
         while self.is_authenticated:
             await asyncio.sleep(300)  # 5 minutes
-            await self.refresh_user_data()
+            self.refresh_user_data()

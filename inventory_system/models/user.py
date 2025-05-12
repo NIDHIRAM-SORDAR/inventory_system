@@ -148,9 +148,7 @@ class Role(rx.Model, table=True):
     def delete_role(cls, name: str, session: Session) -> None:
         try:
             role = session.exec(
-                select(Role)
-                .where(Role.name == name, Role.is_active == True)
-                .with_for_update()
+                select(Role).where(Role.name == name, Role.is_active).with_for_update()
             ).one_or_none()
             if not role:
                 raise ValueError(f"Active role '{name}' not found")
@@ -209,7 +207,7 @@ class UserInfo(rx.Model, table=True):
                     f"UserInfo with id={self.id} not found or version mismatch"
                 )
             roles = session.exec(
-                select(Role).where(Role.name.in_(role_names), Role.is_active == True)
+                select(Role).where(Role.name.in_(role_names), Role.is_active)
             ).all()
             if len(roles) != len(role_names):
                 missing = set(role_names) - {role.name for role in roles}
