@@ -20,7 +20,7 @@ class CustomLoginState(AuthState):
     @rx.event
     def route_calc(self):
         """Handle redirects for authenticated users on page load."""
-        if self.is_login and not self.is_submitting:
+        if self.is_authenticated and not self.is_submitting:
             if "manage_users" in self.user_permissions:
                 yield rx.redirect(routes.ADMIN_ROUTE)
             yield rx.redirect(routes.OVERVIEW_ROUTE)
@@ -52,6 +52,7 @@ class CustomLoginState(AuthState):
 
         try:
             with rx.session() as session:
+                # Validate username and password
                 try:
                     user = session.exec(
                         select(reflex_local_auth.LocalUser).where(
@@ -69,8 +70,8 @@ class CustomLoginState(AuthState):
                         error="Multiple LocalUser records found",
                         ip_address=ip_address,
                     )
-                    self.set_authenticated_user(None)  # Revert optimistic update
                     yield rx.toast.error(self.error_message)
+                    return
 
                 if not user or not user.verify(password):
                     self.error_message = "Invalid username or password"
@@ -80,25 +81,10 @@ class CustomLoginState(AuthState):
                         error=self.error_message,
                         ip_address=ip_address,
                     )
-                    self.set_authenticated_user(None)  # Revert optimistic update
                     yield rx.toast.error(self.error_message)
+                    return
 
-                # Optimistic update
-                self.set_authenticated_user(user)
-                self.is_submitting = False  # Early feedback
-
-                # Log in and refresh data
-                self._login(user.id, expiration_delta=timedelta(days=7))
-                self.refresh_user_data()
-
-                audit_logger.info(
-                    "login_success",
-                    user_id=user.id,
-                    username=self.get_username,
-                    roles=self.user_roles,
-                    ip_address=ip_address,
-                )
-
+                # Validate UserInfo
                 try:
                     user_info = session.exec(
                         select(UserInfo).where(UserInfo.user_id == user.id)
@@ -113,8 +99,8 @@ class CustomLoginState(AuthState):
                             error="No UserInfo record found",
                             ip_address=ip_address,
                         )
-                        self.set_authenticated_user(None)  # Revert optimistic update
                         yield rx.toast.error(self.error_message)
+                        return
                 except sqlalchemy.exc.MultipleResultsFound:
                     self.error_message = (
                         "Multiple user profiles found. Please contact support."
@@ -125,33 +111,35 @@ class CustomLoginState(AuthState):
                         error="Multiple UserInfo records found",
                         ip_address=ip_address,
                     )
-                    self.set_authenticated_user(None)  # Revert optimistic update
                     yield rx.toast.error(self.error_message)
+                    return
+
+                # Perform login and state updates only after validations pass
+                self._login(user.id, expiration_delta=timedelta(days=7))
+                yield type(
+                    self
+                ).refresh_user_data()  # Yield events to ensure state updates
+
+                # Log login success with updated roles and permissions
+                audit_logger.info(
+                    "login_success",
+                    user_id=user.id,
+                    username=username,
+                    roles=self.user_roles,
+                    ip_address=ip_address,
+                )
 
                 # Redirect based on permissions
-                if self.is_login:
-                    yield rx.toast.success(
-                        "Login successful! Redirecting...",
-                        position="top-center",
-                        duration=1000,
-                    )
-                    self.refresh_user_data()  # Ensure user data is up-to-date
-                    print("User permissions:", self.user_permissions)
-                    if "manage_users" in self.user_permissions:
-                        yield rx.redirect(routes.ADMIN_ROUTE)
-                    else:
-                        yield rx.redirect(routes.OVERVIEW_ROUTE)
+                yield rx.toast.success(
+                    "Login successful! Redirecting...",
+                    position="top-center",
+                    duration=1000,
+                )
+                print("User permissions:", self.user_permissions)
+                if "manage_users" in self.user_permissions:
+                    yield rx.redirect(routes.ADMIN_ROUTE)
                 else:
-                    self.error_message = "Authentication failed unexpectedly."
-                    audit_logger.error(
-                        "login_failed_auth_state",
-                        username=username,
-                        user_id=user.id,
-                        reason=self.error_message,
-                        ip_address=ip_address,
-                    )
-                    self.set_authenticated_user(None)  # Revert optimistic update
-                    yield rx.toast.error(self.error_message)
+                    yield rx.redirect(routes.OVERVIEW_ROUTE)
 
         except Exception as e:
             self.error_message = "An unexpected error occurred. Please try again."
@@ -162,7 +150,6 @@ class CustomLoginState(AuthState):
                 ip_address=ip_address,
                 exception_type=type(e).__name__,
             )
-            self.set_authenticated_user(None)  # Revert optimistic update
             yield rx.toast.error(self.error_message)
 
         finally:
@@ -171,8 +158,10 @@ class CustomLoginState(AuthState):
                 "http_response",
                 method="POST",
                 url=self.router.page.raw_path,
-                user_id=user.id if user and self.is_login else None,
-                username=self.get_username or username,
+                user_id=user.id
+                if "user" in locals() and self.is_authenticated
+                else None,
+                username=username,
                 ip_address=ip_address,
-                status_code=200 if self.is_login else 401,
+                status_code=200 if self.is_authenticated else 401,
             )

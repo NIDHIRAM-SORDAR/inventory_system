@@ -62,7 +62,7 @@ class AuthState(reflex_local_auth.LocalAuthState):
             return self.authenticated_user_info.get_roles()
         return []
 
-    @rx.event(background=True)
+    @rx.event
     async def refresh_user_data(self):
         """Refresh user data from the database."""
         if not self.is_authenticated or not self.authenticated_user:
@@ -161,7 +161,7 @@ class AuthState(reflex_local_auth.LocalAuthState):
             self.authenticated_user_info = None
             yield rx.toast.error(f"Failed to refresh user data: {str(e)}")
 
-    @rx.event(background=True)
+    @rx.event
     async def update_user_info(self, email: Optional[str] = None):
         """Update user info (e.g., email) and sync with database."""
         if not self.authenticated_user_info:
@@ -212,7 +212,7 @@ class AuthState(reflex_local_auth.LocalAuthState):
             )
             yield rx.toast.error(f"Failed to update user info: {str(e)}")
 
-    @rx.event(background=True)
+    @rx.event
     async def update_roles(self, role_names: List[str]):
         """Update the user's roles and refresh user data."""
         if not self.authenticated_user_info:
@@ -240,7 +240,7 @@ class AuthState(reflex_local_auth.LocalAuthState):
             )
             yield rx.toast.error(f"Failed to update roles: {str(e)}")
 
-    @rx.event(background=True)
+    @rx.event
     async def periodic_refresh(self):
         """Periodically refresh user data for long-lived sessions."""
         while self.is_authenticated:
