@@ -8,7 +8,7 @@ from ..templates import template
 
 
 def register_error() -> rx.Component:
-    """Render the registration error message."""
+    """Render the registration error message with accessibility."""
     return rx.cond(
         CustomRegisterState.registration_error != "",
         rx.callout(
@@ -18,24 +18,24 @@ def register_error() -> rx.Component:
             role="alert",
             width="100%",
             transition="all 0.3s ease-in-out",
+            aria_live="assertive",
         ),
     )
 
 
 def register_form() -> rx.Component:
-    """Render the registration form with styling similar to supplier registration."""
+    """Render the registration form with validation and accessibility."""
     return rx.form(
         rx.vstack(
-            # Enhanced heading with icon and gradient text
             rx.hstack(
                 rx.icon("user_plus", size=32, color=rx.color("purple", 10)),
                 rx.heading(
                     "Create an Account",
-                    size="8",  # Using string number as per Reflex convention
+                    size="8",
                     color=rx.color("purple", 10),
                     style={
-                        "background": f"linear-gradient(45deg, {rx.color('purple', 10)}"
-                        ", {rx.color('purple', 8)})",
+                        "background": f"linear-gradient(45deg, "
+                        f"{rx.color('purple', 10)}, {rx.color('purple', 8)})",
                         "-webkit-background-clip": "text",
                         "-webkit-text-fill-color": "transparent",
                     },
@@ -43,13 +43,11 @@ def register_form() -> rx.Component:
                 align="center",
                 spacing="3",
             ),
-            # Error message with animation
             register_error(),
-            # ID Input with Icon
             rx.vstack(
                 rx.hstack(
                     rx.text("ID", weight="bold", color=rx.color("gray", 12)),
-                    rx.text("*", color="red"),  # Add asterisk
+                    rx.text("*", color="red"),
                     spacing="1",
                 ),
                 rx.input(
@@ -61,6 +59,7 @@ def register_form() -> rx.Component:
                     required=True,
                     variant="soft",
                     color_scheme="purple",
+                    aria_label="ID",
                     style={
                         "border": f"1px solid {rx.color('purple', 4)}",
                         "_focus": {
@@ -72,11 +71,10 @@ def register_form() -> rx.Component:
                 spacing="1",
                 width="100%",
             ),
-            # Username Input with Icon
             rx.vstack(
-                rx.hstack(  # Use hstack for label and asterisk
+                rx.hstack(
                     rx.text("Username", weight="bold", color=rx.color("gray", 12)),
-                    rx.text("*", color="red"),  # Add asterisk
+                    rx.text("*", color="red"),
                     spacing="1",
                 ),
                 rx.input(
@@ -87,8 +85,14 @@ def register_form() -> rx.Component:
                     placeholder="Enter your username",
                     width="100%",
                     required=True,
+                    pattern="[a-zA-Z0-9_]{4,20}",
+                    title=(
+                        "Username must be 4-20 characters, "
+                        "alphanumeric with underscores"
+                    ),
                     variant="soft",
                     color_scheme="purple",
+                    aria_label="Username",
                     style={
                         "border": f"1px solid {rx.color('purple', 4)}",
                         "_focus": {
@@ -100,11 +104,10 @@ def register_form() -> rx.Component:
                 spacing="1",
                 width="100%",
             ),
-            # Email Input with Icon
             rx.vstack(
                 rx.hstack(
                     rx.text("Email", weight="bold", color=rx.color("gray", 12)),
-                    rx.text("*", color="red"),  # Add asterisk
+                    rx.text("*", color="red"),
                     spacing="1",
                 ),
                 rx.input(
@@ -116,6 +119,7 @@ def register_form() -> rx.Component:
                     required=True,
                     variant="soft",
                     color_scheme="purple",
+                    aria_label="Email",
                     style={
                         "border": f"1px solid {rx.color('purple', 4)}",
                         "_focus": {
@@ -127,11 +131,10 @@ def register_form() -> rx.Component:
                 spacing="1",
                 width="100%",
             ),
-            # Password Input with Icon
             rx.vstack(
                 rx.hstack(
                     rx.text("Password", weight="bold", color=rx.color("gray", 12)),
-                    rx.text("*", color="red"),  # Add asterisk
+                    rx.text("*", color="red"),
                     spacing="1",
                 ),
                 rx.input(
@@ -141,8 +144,15 @@ def register_form() -> rx.Component:
                     placeholder="Enter your password",
                     width="100%",
                     required=True,
+                    min_length=8,
+                    pattern='(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}',
+                    title=(
+                        "Password must be at least 8 characters, with uppercase, "
+                        "lowercase, number, and special character"
+                    ),
                     variant="soft",
                     color_scheme="purple",
+                    aria_label="Password",
                     style={
                         "border": f"1px solid {rx.color('purple', 4)}",
                         "_focus": {
@@ -154,13 +164,12 @@ def register_form() -> rx.Component:
                 spacing="1",
                 width="100%",
             ),
-            # Confirm Password Input with Icon
             rx.vstack(
                 rx.hstack(
                     rx.text(
                         "Confirm Password", weight="bold", color=rx.color("gray", 12)
                     ),
-                    rx.text("*", color="red"),  # Add asterisk
+                    rx.text("*", color="red"),
                     spacing="1",
                 ),
                 rx.input(
@@ -170,8 +179,10 @@ def register_form() -> rx.Component:
                     placeholder="Confirm your password",
                     width="100%",
                     required=True,
+                    min_length=8,
                     variant="soft",
                     color_scheme="purple",
+                    aria_label="Confirm Password",
                     style={
                         "border": f"1px solid {rx.color('purple', 4)}",
                         "_focus": {
@@ -183,7 +194,6 @@ def register_form() -> rx.Component:
                 spacing="1",
                 width="100%",
             ),
-            # Sign Up Button with Loading State
             rx.button(
                 rx.cond(
                     CustomRegisterState.is_submitting,
@@ -195,17 +205,19 @@ def register_form() -> rx.Component:
                 size="3",
                 color_scheme="purple",
                 variant="solid",
+                disabled=CustomRegisterState.is_submitting,
+                aria_busy=CustomRegisterState.is_submitting,
                 style={
                     "background": f"linear-gradient(45deg, {rx.color('purple', 8)}, "
                     f"{rx.color('purple', 10)})",
                     "_hover": {
-                        "background": f"linear-gradient(45deg, {rx.color('purple', 9)},"
+                        "background": f"linear-gradient(45deg, "
+                        f"{rx.color('purple', 9)}, "
                         f"{rx.color('purple', 11)})",
                     },
                     "transition": "all 0.3s ease",
                 },
             ),
-            # Links for Login and Supplier Registration
             rx.center(
                 rx.vstack(
                     rx.link(
@@ -239,7 +251,7 @@ def register_form() -> rx.Component:
             ),
             spacing="5",
             width="100%",
-            min_width=["90%", "80%", "400px"],
+            min_width=["95%", "80%", "400px"],
         ),
         on_submit=CustomRegisterState.handle_registration_with_email,
         width="100%",
@@ -255,21 +267,13 @@ def register_form() -> rx.Component:
     ],
 )
 def register_page() -> rx.Component:
-    """Render the registration page with a fade-in transition."""
+    """Render the registration page with responsive styling."""
     return rx.center(
         rx.card(
             register_form(),
-            width="100%",  # Ensure the card takes full width of its container
-            max_width=[
-                "90%",
-                "80%",
-                "500px",
-            ],  # Responsive max_width: 90% on small, 80% on medium, 500px on large
-            padding=[
-                "1em",
-                "1.5em",
-                "2em",
-            ],  # Responsive padding: smaller on small screens
+            width="100%",
+            max_width=["95%", "80%", "500px"],
+            padding=["1em", "1.5em", "2em"],
             box_shadow="0 8px 32px rgba(0, 0, 0, 0.1)",
             border_radius="lg",
             background=rx.color("gray", 1),
@@ -280,15 +284,15 @@ def register_page() -> rx.Component:
                 "transform": "translateY(-4px)",
             },
         ),
-        padding=["1em", "1.5em", "2em"],  # Responsive padding for the container
-        width="100%",  # Ensure the container takes full viewport width
-        max_width="100%",  # Prevent overflow by capping at 100%
-        min_height="85vh",  # Use min_height to ensure the background fills the viewport
+        padding=["1em", "1.5em", "2em"],
+        width="100%",
+        max_width="100%",
+        min_height="85vh",
         align="center",
         justify="center",
         background=rx.color("gray", 2),
         _dark={"background": rx.color("gray", 11)},
         transition="opacity 0.5s ease-in-out",
-        overflow="auto",  # Prevent content from stretching outside
-        box_sizing="border-box",  # Ensure padding is included in width calculations
+        overflow="auto",
+        box_sizing="border-box",
     )

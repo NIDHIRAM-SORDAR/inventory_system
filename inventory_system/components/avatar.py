@@ -2,7 +2,6 @@ import reflex as rx
 
 from inventory_system import routes, styles
 from inventory_system.state.auth import AuthState
-from inventory_system.state.login_state import CustomLoginState
 from inventory_system.state.logout_state import LogoutState
 from inventory_system.state.profile_picture_state import ProfilePictureState
 
@@ -34,7 +33,7 @@ def user_avatar() -> rx.Component:
 
     return rx.fragment(
         rx.cond(
-            CustomLoginState.is_login,
+            AuthState.authenticated_user,
             rx.menu.root(
                 rx.menu.trigger(
                     rx.avatar(

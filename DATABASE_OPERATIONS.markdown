@@ -285,7 +285,8 @@ This document outlines best practices for performing database operations in the 
 - **RBAC Context**: Document RBAC-specific patterns (e.g., `set_roles`, `set_permissions`) to ensure secure permission management.
 
 ## Additional Notes
-- **Responsive Design**: Ensure database operations are wrapped in `@rx.background` to keep the UI responsive, supporting mobile and desktop breakpoints (see [Reflex Breakpoints](https://reflex.dev/docs/styling/responsive/)).
+- **Responsive Design**: Ensure database operations are wrapped in `@rx.background` but remeber to pros and cons of https://reflex.dev/docs/events/background-events/ and also to keep the UI responsive, supporting mobile and desktop breakpoints (see [Reflex Breakpoints](https://reflex.dev/docs/styling/responsive/)).
+--**Read How Reflex works**:https://reflex.dev/docs/advanced-onboarding/how-reflex-works/#event-processing
 - **Dark/Light Theme**: Use `rx.color_mode_cond` for UI components affected by database operations to maintain theme consistency.
 - **Audit Compliance**: All RBAC operations must log to `audit.log` with sufficient detail (e.g., user ID, role names, timestamps) to meet audit requirements.
 - **Testing**: Use `pytest` with `sqlmodel` fixtures to test all database operations, ensuring coverage for RBAC scenarios (e.g., `test_permission.py`).

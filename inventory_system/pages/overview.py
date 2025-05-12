@@ -6,7 +6,7 @@ import reflex as rx
 import reflex_local_auth
 
 from inventory_system import routes
-from inventory_system.state.login_state import CustomLoginState
+from inventory_system.state.auth import AuthState
 
 from .. import styles
 from ..components.card import card
@@ -29,7 +29,10 @@ def _time_data() -> rx.Component:
     return rx.hstack(
         rx.tooltip(
             rx.icon("info", size=20),
-            content=f"{(datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%b %d, %Y')} - {datetime.datetime.now().strftime('%b %d, %Y')}",
+            content=(
+                f"{(datetime.datetime.now() - datetime.timedelta(days=30)).strftime('%b %d, %Y')} - "  # noqa: E501
+                f"{datetime.datetime.now().strftime('%b %d, %Y')}"
+            ),
         ),
         rx.text("Last 30 days", size="4", weight="medium"),
         align="center",
@@ -60,7 +63,7 @@ def overview() -> rx.Component:
 
     """
     return rx.vstack(
-        rx.heading(f"Welcome {CustomLoginState.get_username}", size="5"),
+        rx.heading(f"Welcome {AuthState.authenticated_user.username}", size="5"),
         rx.flex(
             rx.input(
                 rx.input.slot(rx.icon("search"), padding_left="0"),

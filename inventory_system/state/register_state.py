@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 import re
@@ -9,7 +8,8 @@ from sqlmodel import select
 
 from inventory_system import routes
 from inventory_system.logging.logging import audit_logger
-from inventory_system.models.user import UserInfo
+from inventory_system.models.user import Role, UserInfo
+from inventory_system.state.auth import AuthState
 
 from ..constants import DEFAULT_PROFILE_PICTURE
 
@@ -29,7 +29,7 @@ def load_user_data():
 
 class CustomRegisterState(reflex_local_auth.RegistrationState):
     registration_error: str = ""
-    is_submitting: bool = False  # Added for loading
+    is_submitting: bool = False
 
     def reset_form_state(self):
         """Reset form state on page load."""
@@ -41,7 +41,6 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
         user_data = load_user_data()
         user_id = form_data.get("id")
         email = form_data.get("email")
-
         for user in user_data:
             if (
                 str(user["ID"]) == str(user_id)
@@ -51,43 +50,33 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
         return False
 
     def _validate_fields(
-        self, username, password, confirm_password
-    ) -> bool:  # Returns True if valid, False otherwise
-        """Override base validation to add specific constraints
-        and only set error messages, not return DOM events."""
+        self, username: str, password: str, confirm_password: str
+    ) -> bool:
+        """Validate username, password, and confirm password."""
+        self.registration_error = ""
 
-        self.registration_error = ""  # Use our custom error state var
-
-        # --- Username Constraints ---
+        # Username validation
         if not username:
             self.registration_error = "Username cannot be empty"
             return False
-        if len(username) < 4:
-            self.registration_error = "Username must be at least 4 characters long"
+        if len(username) < 4 or len(username) > 20:
+            self.registration_error = "Username must be 4-20 characters long"
             return False
-        if len(username) > 20:
-            self.registration_error = "Username cannot exceed 20 characters"
-            return False
-        # Example: Alphanumeric + underscore only
         if not re.match(r"^[a-zA-Z0-9_]+$", username):
             self.registration_error = (
-                "Username can only contain letters, numbers, and underscores (_)"
+                "Username can only contain letters, numbers, and underscores"
             )
             return False
-        # Uniqueness Check
         with rx.session() as session:
-            existing_user = session.exec(
-                select(reflex_local_auth.user.LocalUser).where(
-                    reflex_local_auth.user.LocalUser.username == username
+            if session.exec(
+                select(reflex_local_auth.LocalUser).where(
+                    reflex_local_auth.LocalUser.username == username
                 )
-            ).one_or_none()
-        if existing_user is not None:
-            self.registration_error = (
-                f"Username {username} is already registered. Try a different name"
-            )
-            return False
+            ).one_or_none():
+                self.registration_error = f"Username {username} is already taken"
+                return False
 
-        # --- Password Constraints ---
+        # Password validation
         if not password:
             self.registration_error = "Password cannot be empty"
             return False
@@ -103,25 +92,23 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
         if not re.search(r"[0-9]", password):
             self.registration_error = "Password must contain a number"
             return False
-        # Example: Check for at least one special character
         if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
             self.registration_error = "Password must contain a special character"
             return False
 
-        # --- Confirm Password Check ---
+        # Confirm password
         if password != confirm_password:
             self.registration_error = "Passwords do not match"
             return False
 
-        # If all custom checks pass
-        return True  # Indicate validation success
+        return True
 
-    async def handle_registration_with_email(self, form_data):
-        """Handle registration and create UserInfo entry with toast and delay."""
-        self.registration_error = ""  # Clear custom error message
-        self.error_message = ""  # Clear parent error message
+    @rx.event(background=True)
+    async def handle_registration_with_email(self, form_data: dict):
+        """Handle registration, create UserInfo, assign roles, and auto-login."""
+        self.registration_error = ""
         self.is_submitting = True
-        self.new_user_id = -1  # Ensure reset
+        self.new_user_id = -1
 
         username = form_data.get("username", "N/A")
         password = form_data.get("password", "N/A")
@@ -130,7 +117,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
         submitted_id = form_data.get("id", "N/A")
         ip_address = self.router.session.client_ip
 
-        audit_logger.info(  # Log attempt
+        audit_logger.info(
             "attempt_registration",
             username=username,
             email=email,
@@ -139,7 +126,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
         )
 
         try:
-            # 1. Custom ID/Email Pre-Validation (from external source)
+            # Validate ID/email against user_data.json
             if not self.validate_user(form_data):
                 self.registration_error = (
                     "Invalid ID or email. Please check your details."
@@ -152,10 +139,10 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                     submitted_id=submitted_id,
                     ip_address=ip_address,
                 )
-                self.is_submitting = False
+                yield rx.toast.error(self.registration_error)
                 return
 
-            # 2. Custom Field Validation (Username, Password)
+            # Validate fields
             if not self._validate_fields(username, password, confirm_password):
                 audit_logger.warning(
                     "registration_validation_failed",
@@ -163,15 +150,13 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                     username=username,
                     ip_address=ip_address,
                 )
-                self.is_submitting = False
+                yield rx.toast.error(self.registration_error)
                 return
 
             with rx.session() as session:
                 try:
-                    # 3. Register the user using the base _register_user
+                    # Register user
                     self._register_user(username, password)
-
-                    # 4. Check if LocalUser was created successfully
                     if self.new_user_id < 0:
                         self.registration_error = (
                             "Registration failed: Could not create user account."
@@ -182,7 +167,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                             username=username,
                             ip_address=ip_address,
                         )
-                        self.is_submitting = False
+                        yield rx.toast.error(self.registration_error)
                         session.rollback()
                         return
 
@@ -193,16 +178,13 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         ip_address=ip_address,
                     )
 
-                    # 5. Check for existing UserInfo
+                    # Check for existing UserInfo
                     existing_info = session.exec(
                         select(UserInfo).where(UserInfo.user_id == self.new_user_id)
                     ).one_or_none()
                     if existing_info:
-                        # If UserInfo exists, this is an error
-                        # (should not happen with unique constraint)
                         self.registration_error = (
-                            "Registration failed: User profile already "
-                            "exists for this account."
+                            "Registration failed: User profile already exists."
                         )
                         audit_logger.error(
                             "registration_failed_userinfo_exists",
@@ -212,21 +194,63 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                             existing_user_info_id=existing_info.id,
                             ip_address=ip_address,
                         )
-                        self.is_submitting = False
-                        session.rollback()  # Roll back LocalUser creation
+                        yield rx.toast.error(self.registration_error)
+                        session.rollback()
                         return
 
-                    # 6. Create new UserInfo
+                    # Create UserInfo
                     user_info = UserInfo(
-                        email=form_data["email"],
+                        email=email,
                         user_id=self.new_user_id,
                         profile_picture=DEFAULT_PROFILE_PICTURE,
                     )
-
                     session.add(user_info)
-                    session.flush()  # Ensure user_info.id is available
-                    user_info.set_roles(["employee"], session)
+                    session.flush()
+
+                    # Validate and assign employee role
+                    employee_role = session.exec(
+                        select(Role).where(
+                            Role.name == "employee", Role.is_active == True
+                        )
+                    ).one_or_none()
+                    if not employee_role:
+                        self.registration_error = (
+                            "Registration failed: Employee role not found."
+                        )
+                        audit_logger.error(
+                            "registration_failed_role_missing",
+                            reason=self.registration_error,
+                            username=username,
+                            user_id=self.new_user_id,
+                            role="employee",
+                            ip_address=ip_address,
+                        )
+                        yield rx.toast.error(self.registration_error)
+                        session.rollback()
+                        return
+
+                    try:
+                        user_info.set_roles(["employee"], session)
+                    except ValueError as role_error:
+                        self.registration_error = (
+                            f"Registration failed: Could not assign employee role: "
+                            f"{str(role_error)}"
+                        )
+                        audit_logger.error(
+                            "registration_failed_role_assignment",
+                            reason=self.registration_error,
+                            username=username,
+                            user_id=self.new_user_id,
+                            role="employee",
+                            error=str(role_error),
+                            ip_address=ip_address,
+                        )
+                        yield rx.toast.error(self.registration_error)
+                        session.rollback()
+                        return
+
                     user_info_id = user_info.id
+                    session.commit()
 
                     audit_logger.info(
                         "userinfo_created",
@@ -235,8 +259,6 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         user_info_id=user_info_id,
                         ip_address=ip_address,
                     )
-
-                    session.commit()
 
                     audit_logger.info(
                         "success_registration",
@@ -248,13 +270,43 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         ip_address=ip_address,
                     )
 
-                    # 7. Show success toast and trigger delayed redirect
+                    # Auto-login using AuthState
+                    auth_state = AuthState.get_state()
+                    user = session.exec(
+                        select(reflex_local_auth.LocalUser).where(
+                            reflex_local_auth.LocalUser.id == self.new_user_id
+                        )
+                    ).one_or_none()
+                    if user:
+                        auth_state.set_authenticated_user(user)
+                        await auth_state.refresh_user_data()
+                    else:
+                        self.registration_error = "Auto-login failed: User not found."
+                        audit_logger.error(
+                            "auto_login_failed",
+                            username=username,
+                            user_id=self.new_user_id,
+                            reason="User not found after registration",
+                            ip_address=ip_address,
+                        )
+                        yield rx.toast.error(self.registration_error)
+                        return
+
+                    # Show success toast
                     yield rx.toast.success(
-                        "Registration successful! Redirecting to login...",
+                        "Registration successful! Redirecting...",
                         position="top-center",
-                        duration=1000,  # Toast visible for 1 second
+                        duration=1000,
                     )
-                    yield CustomRegisterState.schedule_redirect
+
+                    # Perform redirect based on authentication and permissions
+                    if auth_state.is_authenticated:
+                        if "manage_users" in auth_state.user_permissions:
+                            yield rx.redirect(routes.ADMIN_ROUTE)
+                        else:
+                            yield rx.redirect(routes.OVERVIEW_ROUTE)
+                    else:
+                        yield rx.redirect(routes.LOGIN_ROUTE)
 
                 except Exception as db_error:
                     self.registration_error = (
@@ -262,14 +314,14 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                     )
                     audit_logger.error(
                         "registration_failed_userinfo",
-                        reason="Error creating UserInfo",
+                        reason=str(db_error),
                         username=username,
                         user_id=self.new_user_id,
                         error=str(db_error),
                         ip_address=ip_address,
                     )
                     session.rollback()
-                    self.is_submitting = False
+                    yield rx.toast.error(self.registration_error)
                     return
 
         except Exception as e:
@@ -283,11 +335,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                 ip_address=ip_address,
                 exception_type=type(e).__name__,
             )
-            self.is_submitting = False
+            yield rx.toast.error(self.registration_error)
 
-    @rx.event
-    async def schedule_redirect(self):
-        """Helper method to handle delayed redirect."""
-        await asyncio.sleep(2)  # Wait for 2 seconds
-        self.is_submitting = False  # Reset submitting state
-        return rx.redirect(routes.LOGIN_ROUTE)
+        finally:
+            self.is_submitting = False

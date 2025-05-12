@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 import reflex as rx
+from sqlalchemy import Column, Integer
+from sqlalchemy.orm import selectinload
 from sqlmodel import Field, Relationship, Session, select
 
 from inventory_system.logging.audit import enable_audit_logging_for_models
@@ -59,6 +61,10 @@ class Role(rx.Model, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True, index=True)
     description: Optional[str] = Field(default=None)
+    is_active: bool = Field(default=True)  # For soft deletion
+    version: int = Field(
+        default=0, sa_column=Column(Integer, nullable=False)
+    )  # Optimistic locking
     created_at: datetime = Field(default_factory=get_utc_now)
     updated_at: datetime = Field(default_factory=get_utc_now)
     permissions: List[Permission] = Relationship(
@@ -75,62 +81,41 @@ class Role(rx.Model, table=True):
         return [perm.name for perm in self.permissions]
 
     def set_permissions(self, permission_names: List[str], session: Session) -> None:
-        """Set the permissions for this role atomically, replacing existing ones.
-
-        Args:
-            permission_names: List of permission names to assign.
-            session: Database session for atomic operations.
-
-        Raises:
-            ValueError: If Role is not persisted, permissions don't exist,
-            or operation fails.
-        """
+        """Set the permissions for this role atomically, replacing existing ones."""
         try:
-            # Validate Role is persisted
             if self.id is None:
-                raise ValueError(
-                    "Role must be persisted to the session before setting permissions"
-                )
-
-            # Lock the role to prevent concurrent updates
+                raise ValueError("Role must be persisted to the session")
             role = session.exec(
-                select(Role).where(Role.id == self.id).with_for_update()
+                select(Role)
+                .where(Role.id == self.id, Role.version == self.version)
+                .with_for_update()
             ).one_or_none()
             if not role:
-                raise ValueError(f"Role with id={self.id} not found in database")
-
-            # Validate all permissions exist
+                raise ValueError(
+                    f"Role with id={self.id} not found or version mismatch"
+                )
             permissions = session.exec(
                 select(Permission).where(Permission.name.in_(permission_names))
             ).all()
             if len(permissions) != len(permission_names):
-                missing_permissions = set(permission_names) - {
-                    perm.name for perm in permissions
-                }
-                raise ValueError(f"Permissions not found: {missing_permissions}")
-
-            # Atomically replace permissions
+                missing = set(permission_names) - {perm.name for perm in permissions}
+                raise ValueError(f"Permissions not found: {missing}")
             session.exec(
                 RolePermission.__table__.delete().where(
                     RolePermission.role_id == self.id
                 )
             )
             for perm in permissions:
-                role_perm = RolePermission(role_id=self.id, permission_id=perm.id)
-                session.add(role_perm)
-
-            # Update timestamp and stage Role
+                session.add(RolePermission(role_id=self.id, permission_id=perm.id))
+            self.version += 1  # Increment version for optimistic locking
             self.update_timestamp()
             session.add(self)
-
-            # Log the operation for auditing
             audit_logger.info(
                 "set_permissions_success",
                 entity="role_permission",
                 role_id=self.id,
                 permission_names=permission_names,
             )
-
         except Exception as e:
             session.rollback()
             audit_logger.error(
@@ -142,6 +127,43 @@ class Role(rx.Model, table=True):
             )
             raise ValueError(f"Failed to set permissions: {str(e)}")
 
+    @classmethod
+    def create_role(
+        cls, name: str, description: Optional[str], session: Session
+    ) -> "Role":
+        try:
+            if session.exec(select(Role).where(Role.name == name)).one_or_none():
+                raise ValueError(f"Role '{name}' already exists")
+            role = Role(name=name, description=description)
+            session.add(role)
+            session.flush()
+            audit_logger.info("create_role_success", role_name=name)
+            return role
+        except Exception as e:
+            session.rollback()
+            audit_logger.error("create_role_failed", role_name=name, error=str(e))
+            raise ValueError(f"Failed to create role: {str(e)}")
+
+    @classmethod
+    def delete_role(cls, name: str, session: Session) -> None:
+        try:
+            role = session.exec(
+                select(Role)
+                .where(Role.name == name, Role.is_active == True)
+                .with_for_update()
+            ).one_or_none()
+            if not role:
+                raise ValueError(f"Active role '{name}' not found")
+            role.is_active = False  # Soft deletion
+            role.version += 1
+            role.update_timestamp()
+            session.add(role)
+            audit_logger.info("delete_role_success", role_name=name)
+        except Exception as e:
+            session.rollback()
+            audit_logger.error("delete_role_failed", role_name=name, error=str(e))
+            raise ValueError(f"Failed to delete role: {str(e)}")
+
 
 class UserInfo(rx.Model, table=True):
     """User information model linked to LocalUser in a one-to-one relationship."""
@@ -152,10 +174,15 @@ class UserInfo(rx.Model, table=True):
         foreign_key="localuser.id", unique=True, index=True, ondelete="CASCADE"
     )
     profile_picture: Optional[str] = Field(default=None)
+    version: int = Field(
+        default=0, sa_column=Column(Integer, nullable=False)
+    )  # Optimistic locking
     supplier: Optional["Supplier"] = Relationship(
         back_populates="user_info", cascade_delete=True
     )
-    roles: List[Role] = Relationship(back_populates="users", link_model=UserRole)
+    roles: List[Role] = Relationship(
+        back_populates="users", link_model=UserRole
+    )  # Fixed back_populates
     created_at: datetime = Field(default_factory=get_utc_now)
     updated_at: datetime = Field(default_factory=get_utc_now)
 
@@ -165,57 +192,40 @@ class UserInfo(rx.Model, table=True):
 
     def get_roles(self) -> List[str]:
         """Get the list of role names assigned to this user."""
-        return [role.name for role in self.roles]
+        return [role.name for role in self.roles if role.is_active]
 
     def set_roles(self, role_names: List[str], session: Session) -> None:
-        """Set the roles for this user atomically, replacing existing ones.
-
-        Args:
-            role_names: List of role names to assign.
-            session: Database session for atomic operations.
-
-        Raises:
-            ValueError: If UserInfo is not persisted, roles don't exist,
-            or operation fails.
-        """
+        """Set the roles for this user atomically, replacing existing ones."""
         try:
-            # Validate UserInfo is persisted
             if self.id is None:
-                raise ValueError(
-                    "UserInfo must be persisted to the session before setting roles"
-                )
-
-            # Lock the user to prevent concurrent updates
+                raise ValueError("UserInfo must be persisted to the session")
             user_info = session.exec(
-                select(UserInfo).where(UserInfo.id == self.id).with_for_update()
+                select(UserInfo)
+                .where(UserInfo.id == self.id, UserInfo.version == self.version)
+                .with_for_update()
             ).one_or_none()
             if not user_info:
-                raise ValueError(f"UserInfo with id={self.id} not found in database")
-
-            # Validate all roles exist
-            roles = session.exec(select(Role).where(Role.name.in_(role_names))).all()
+                raise ValueError(
+                    f"UserInfo with id={self.id} not found or version mismatch"
+                )
+            roles = session.exec(
+                select(Role).where(Role.name.in_(role_names), Role.is_active == True)
+            ).all()
             if len(roles) != len(role_names):
-                missing_roles = set(role_names) - {role.name for role in roles}
-                raise ValueError(f"Roles not found: {missing_roles}")
-
-            # Atomically replace roles
+                missing = set(role_names) - {role.name for role in roles}
+                raise ValueError(f"Roles not found or inactive: {missing}")
             session.exec(UserRole.__table__.delete().where(UserRole.user_id == self.id))
             for role in roles:
-                user_role = UserRole(user_id=self.id, role_id=role.id)
-                session.add(user_role)
-
-            # Update timestamp and stage UserInfo
+                session.add(UserRole(user_id=self.id, role_id=role.id))
+            self.version += 1  # Increment version for optimistic locking
             self.update_timestamp()
             session.add(self)
-
-            # Log the operation for auditing
             audit_logger.info(
                 "set_roles_success",
                 entity="user_role",
                 user_id=self.id,
                 role_names=role_names,
             )
-
         except Exception as e:
             session.rollback()
             audit_logger.error(
@@ -227,16 +237,36 @@ class UserInfo(rx.Model, table=True):
             )
             raise ValueError(f"Failed to set roles: {str(e)}")
 
-    def get_permissions(self) -> list[str]:
-        """Get all permissions from the user's roles."""
+    def get_permissions(self, session: Session = None) -> List[str]:
+        """Get the user's permissions, using eager loading if session provided."""
+        if session:
+            user_info = session.exec(
+                select(UserInfo)
+                .where(UserInfo.id == self.id)
+                .options(selectinload(UserInfo.roles).selectinload(Role.permissions))
+            ).one_or_none()
+            if not user_info:
+                audit_logger.warning(
+                    "get_permissions_failed",
+                    user_id=self.id,
+                    error="UserInfo not found during eager loading",
+                )
+                return []
+            self.roles = user_info.roles
+            audit_logger.info(
+                "get_permissions_eager_load",
+                user_id=self.id,
+                roles=[role.name for role in self.roles if role.is_active],
+            )
         permissions = set()
         for role in self.roles:
-            permissions.update(role.get_permissions())
+            if role.is_active:
+                permissions.update(role.get_permissions())
         return list(permissions)
 
-    def has_permission(self, permission_name: str) -> bool:
+    def has_permission(self, permission_name: str, session: Session = None) -> bool:
         """Check if the user has a specific permission."""
-        return permission_name in self.get_permissions()
+        return permission_name in self.get_permissions(session)
 
 
 class Supplier(rx.Model, table=True):
@@ -265,7 +295,6 @@ class Supplier(rx.Model, table=True):
         self.updated_at = get_utc_now()
 
 
-# Enable audit logging for all models
 enable_audit_logging_for_models(
     UserInfo, Supplier, Permission, Role, UserRole, RolePermission
 )

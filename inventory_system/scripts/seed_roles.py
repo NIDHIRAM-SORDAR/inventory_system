@@ -1,15 +1,15 @@
-# inventory_system/scripts/seed_roles.py
 from typing import Optional
 
 import reflex as rx
 from sqlmodel import Session, select
 
-from inventory_system.models.user import Role
+from inventory_system.logging.logging import audit_logger
+from inventory_system.models.user import Permission, Role
 
 
 def seed_roles(session: Optional[Session] = None):
-    """Seed the Role table with initial roles and assign permissions."""
-    print("Starting role seeding...")
+    """Seed the Role table with initial roles and assign permissions,
+    considering is_active flag."""
     roles = [
         {
             "name": "admin",
@@ -100,59 +100,112 @@ def seed_roles(session: Optional[Session] = None):
 
     try:
         # Use provided session or create a new one
-        if session is None:
-            print("Using rx.session()")
-            session_context = rx.session()
-        else:
-            print("Using provided session")
-            session_context = session
+        session_context = session if session else rx.session()
+        session_is_external = session is not None
 
         # Handle session context
-        if session is None:
+        if not session_is_external:
             with session_context as sess:
                 for role_data in roles:
-                    existing = sess.exec(
-                        select(Role).where(Role.name == role_data["name"])
-                    ).first()
-                    if not existing:
-                        role = Role(
-                            name=role_data["name"], description=role_data["description"]
-                        )
-                        sess.add(role)
-                        sess.commit()  # Commit to get role.id
-                        role.set_permissions(role_data["permissions"], sess)
-                        sess.commit()
-                        print(
-                            f"Added role: {role_data['name']} with "
-                            " {len(role_data['permissions'])} permissions"
-                        )
-                    else:
-                        print(f"Role already exists: {role_data['name']}")
-                print("Role seeding completed")
+                    _seed_single_role(sess, role_data)
+                audit_logger.info("seed_roles_completed", role_count=len(roles))
         else:
             for role_data in roles:
-                existing = session.exec(
-                    select(Role).where(Role.name == role_data["name"])
-                ).first()
-                if not existing:
-                    role = Role(
-                        name=role_data["name"], description=role_data["description"]
-                    )
-                    session.add(role)
-                    session.commit()  # Commit to get role.id
-                    role.set_permissions(role_data["permissions"], session)
-                    session.commit()
-                    print(
-                        f"Added role: {role_data['name']} with "
-                        " {len(role_data['permissions'])} permissions"
-                    )
-                else:
-                    print(f"Role already exists: {role_data['name']}")
-            print("Role seeding completed")
+                _seed_single_role(session_context, role_data)
+            audit_logger.info("seed_roles_completed", role_count=len(roles))
+
     except Exception as e:
-        print(f"Role seeding error: {e}")
+        audit_logger.error("seed_roles_failed", error=str(e))
         raise
 
 
-if __name__ == "__main__":
-    seed_roles()
+def _seed_single_role(session: Session, role_data: dict):
+    """Seed a single role with permissions, handling is_active flag."""
+    role_name = role_data["name"]
+    try:
+        # Check for existing active role
+        existing = session.exec(
+            select(Role).where(Role.name == role_name, Role.is_active == True)
+        ).first()
+
+        if existing:
+            audit_logger.info(
+                "seed_role_skipped",
+                role_name=role_name,
+                reason="Active role already exists",
+            )
+            return
+
+        # Check for inactive role
+        inactive_role = session.exec(
+            select(Role).where(Role.name == role_name, Role.is_active == False)
+        ).first()
+
+        if inactive_role:
+            # Reactivate and update
+            inactive_role.is_active = True
+            inactive_role.description = role_data["description"]
+            session.add(inactive_role)
+            audit_logger.info(
+                "seed_role_reactivated",
+                role_name=role_name,
+                role_id=inactive_role.id,
+            )
+            role = inactive_role
+        else:
+            # Create new role
+            role = Role(
+                name=role_name,
+                description=role_data["description"],
+                is_active=True,
+            )
+            session.add(role)
+            audit_logger.info(
+                "seed_role_created",
+                role_name=role_name,
+            )
+
+        session.flush()  # Ensure role.id is available
+
+        # Validate permissions
+        permissions = []
+        for perm_name in role_data["permissions"]:
+            perm = session.exec(
+                select(Permission).where(Permission.name == perm_name)
+            ).first()
+            if not perm:
+                audit_logger.warning(
+                    "seed_role_permission_missing",
+                    role_name=role_name,
+                    permission_name=perm_name,
+                )
+                continue
+            permissions.append(perm_name)
+
+        # Assign permissions
+        try:
+            role.set_permissions(permissions, session)
+        except ValueError as perm_error:
+            audit_logger.error(
+                "seed_role_permission_assignment_failed",
+                role_name=role_name,
+                error=str(perm_error),
+            )
+            session.rollback()
+            raise
+
+        session.commit()
+        audit_logger.info(
+            "seed_role_permissions_assigned",
+            role_name=role_name,
+            permission_count=len(permissions),
+        )
+
+    except Exception as e:
+        session.rollback()
+        audit_logger.error(
+            "seed_role_failed",
+            role_name=role_name,
+            error=str(e),
+        )
+        raise

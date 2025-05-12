@@ -7,7 +7,7 @@ from inventory_system.templates import template
 
 
 def login_error() -> rx.Component:
-    """Render the login error message."""
+    """Render the login error message with accessibility."""
     return rx.cond(
         CustomLoginState.error_message != "",
         rx.callout(
@@ -17,12 +17,13 @@ def login_error() -> rx.Component:
             role="alert",
             width="100%",
             transition="all 0.3s ease-in-out",
+            aria_live="assertive",
         ),
     )
 
 
 def login_form() -> rx.Component:
-    """Render the login form with styling similar to supplier registration."""
+    """Render the login form with validation and accessibility."""
     return rx.form(
         rx.vstack(
             rx.hstack(
@@ -32,8 +33,9 @@ def login_form() -> rx.Component:
                     size="8",
                     color=rx.color("purple", 10),
                     style={
-                        "background": f"linear-gradient(45deg, {rx.color('purple', 10)}"
-                        ", {rx.color('purple', 8)})",
+                        "background": f"linear-gradient(45deg, "
+                        f"{rx.color('purple', 10)}, "
+                        f"{rx.color('purple', 8)})",
                         "-webkit-background-clip": "text",
                         "-webkit-text-fill-color": "transparent",
                     },
@@ -45,7 +47,7 @@ def login_form() -> rx.Component:
             rx.vstack(
                 rx.hstack(
                     rx.text("Username", weight="bold", color=rx.color("gray", 12)),
-                    rx.text("*", color="red"),  # Add asterisk
+                    rx.text("*", color="red"),
                     spacing="1",
                 ),
                 rx.input(
@@ -55,8 +57,11 @@ def login_form() -> rx.Component:
                     placeholder="Enter your username",
                     width="100%",
                     required=True,
+                    pattern="[a-zA-Z0-9_]+",  # No spaces, alphanumeric
+                    title="Username must be alphanumeric with underscores",
                     variant="soft",
                     color_scheme="purple",
+                    aria_label="Username",
                     style={
                         "border": f"1px solid {rx.color('purple', 4)}",
                         "_focus": {
@@ -71,7 +76,7 @@ def login_form() -> rx.Component:
             rx.vstack(
                 rx.hstack(
                     rx.text("Password", weight="bold", color=rx.color("gray", 12)),
-                    rx.text("*", color="red"),  # Add asterisk
+                    rx.text("*", color="red"),
                     spacing="1",
                 ),
                 rx.input(
@@ -81,8 +86,10 @@ def login_form() -> rx.Component:
                     placeholder="Enter your password",
                     width="100%",
                     required=True,
+                    min_length=8,  # Minimum password length
                     variant="soft",
                     color_scheme="purple",
+                    aria_label="Password",
                     style={
                         "border": f"1px solid {rx.color('purple', 4)}",
                         "_focus": {
@@ -95,18 +102,25 @@ def login_form() -> rx.Component:
                 width="100%",
             ),
             rx.button(
-                rx.spinner(loading=CustomLoginState.is_submitting),
-                "Login",
+                rx.cond(
+                    CustomLoginState.is_submitting,
+                    rx.spinner(),
+                    rx.text("Login"),
+                ),
                 type="submit",
                 width="100%",
                 size="3",
                 color_scheme="purple",
                 variant="solid",
+                disabled=CustomLoginState.is_submitting,
+                aria_busy=CustomLoginState.is_submitting,
                 style={
-                    "background": f"linear-gradient(45deg, {rx.color('purple', 8)}, "
+                    "background": f"linear-gradient(45deg, "
+                    f"{rx.color('purple', 8)}, "
                     f"{rx.color('purple', 10)})",
                     "_hover": {
-                        "background": f"linear-gradient(45deg, {rx.color('purple', 9)},"
+                        "background": f"linear-gradient(45deg, "
+                        f"{rx.color('purple', 9)}, "
                         f"{rx.color('purple', 11)})",
                     },
                     "transition": "all 0.3s ease",
@@ -129,7 +143,7 @@ def login_form() -> rx.Component:
             ),
             spacing="5",
             width="100%",
-            min_width=["90%", "80%", "400px"],
+            min_width=["100%", "80%", "400px"],  # Responsive breakpoints
         ),
         on_submit=CustomLoginState.on_submit,
         width="100%",
@@ -146,30 +160,29 @@ def login_form() -> rx.Component:
     ],
 )
 def login_page() -> rx.Component:
-    """Render the login page with a fade-in transition."""
-    return (
-        rx.center(
-            rx.card(
-                login_form(),
-                width=["90%", "80%", "500px"],
-                padding="2em",
-                box_shadow="0 8px 32px rgba(0, 0, 0, 0.1)",
-                border_radius="lg",
-                background=rx.color("gray", 1),
-                _dark={"background": rx.color("gray", 12)},
-                transition="all 0.3s ease",
-                _hover={
-                    "box_shadow": "0 12px 48px rgba(0, 0, 0, 0.15)",
-                    "transform": "translateY(-4px)",
-                },
-            ),
-            padding_top="2em",
-            width="100%",
-            height="85vh",
-            align="center",
-            justify="center",
-            background=rx.color("gray", 2),
-            _dark={"background": rx.color("gray", 11)},
-            transition="opacity 0.5s ease-in-out",
+    """Render the login page with responsive styling."""
+    return rx.center(
+        rx.card(
+            login_form(),
+            width=["95%", "80%", "500px"],
+            max_width="90vw",
+            padding="2em",
+            box_shadow="0 8px 32px rgba(0, 0, 0, 0.1)",
+            border_radius="lg",
+            background=rx.color("gray", 1),
+            _dark={"background": rx.color("gray", 12)},
+            transition="all 0.3s ease",
+            _hover={
+                "box_shadow": "0 12px 48px rgba(0, 0, 0, 0.15)",
+                "transform": "translateY(-4px)",
+            },
         ),
+        padding_top="2em",
+        width="100%",
+        height="85vh",
+        align="center",
+        justify="center",
+        background=rx.color("gray", 2),
+        _dark={"background": rx.color("gray", 11)},
+        transition="opacity 0.5s ease-in-out",
     )
