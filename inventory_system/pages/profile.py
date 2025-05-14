@@ -180,7 +180,7 @@ def profile() -> rx.Component:
                                 "user@reflex.dev",
                                 "email",
                                 "mail",
-                                ProfileState.user_email,
+                                AuthState.user_email,
                                 on_blur=ProfileState.validate_email_input,
                             ),
                             rx.cond(

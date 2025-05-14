@@ -21,15 +21,44 @@ class CustomLoginState(AuthState):
     def route_calc(self):
         """Handle redirects for authenticated users on page load."""
         if self.is_authenticated and not self.is_submitting:
-            if "manage_users" in self.user_permissions:
-                yield rx.redirect(routes.ADMIN_ROUTE)
-            yield rx.redirect(routes.OVERVIEW_ROUTE)
+            # Step 1: Trigger refresh_user_data and wait for it to complete
+            yield type(self).refresh_user_data()
+            # Step 2: Trigger a follow-up event to check permissions
+            yield type(self).check_permissions_and_redirect()
+
+    @rx.event
+    def check_permissions_and_redirect(self):
+        """Check permissions and redirect after state is updated."""
+        if "manage_users" in self.user_permissions:
+            return rx.redirect(routes.ADMIN_ROUTE)
+        else:
+            return rx.redirect(routes.OVERVIEW_ROUTE)
 
     @rx.event
     def reset_form_state(self):
         """Reset form state on page load."""
         self.error_message = ""
         self.is_submitting = False
+
+    @rx.event
+    def post_login(self, user):
+        """Handle post-login logging and redirection."""
+        audit_logger.info(
+            "login_success",
+            user_id=user["id"],  # Use dictionary key instead of user.id
+            username=user["username"],
+            roles=self.user_roles,
+            ip_address=self.router.session.client_ip,
+        )
+        yield rx.toast.success(
+            "Login successful! Redirecting...",
+            position="top-center",
+            duration=1000,
+        )
+        if "manage_users" in self.user_permissions:
+            yield rx.redirect(routes.ADMIN_ROUTE)
+        else:
+            yield rx.redirect(routes.OVERVIEW_ROUTE)
 
     @rx.event
     async def on_submit(self, form_data: dict):
@@ -119,6 +148,8 @@ class CustomLoginState(AuthState):
                 yield type(
                     self
                 ).refresh_user_data()  # Yield events to ensure state updates
+                print(user)
+                yield type(self).post_login(user)
 
                 # Log login success with updated roles and permissions
                 audit_logger.info(

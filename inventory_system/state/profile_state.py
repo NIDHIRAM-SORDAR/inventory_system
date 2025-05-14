@@ -1,4 +1,3 @@
-# inventory_system/state/profile_state.py
 import re
 
 import reflex as rx
@@ -15,17 +14,15 @@ class ProfileState(AuthState):
     notifications: bool = True
     password_error: str = ""
     email_error: str = ""
-    is_updating_email: bool = False  # New loading state
-    is_updating_password: bool = False  # New loading state
+    is_updating_email: bool = False  # Loading state for email update
+    is_updating_password: bool = False  # Loading state for password update
 
-    def _handle_error(
-        self, error_type: str, error_message: str, previous_email: str = None
-    ):
+    def _handle_error(self, error_type: str, error_message: str):
         """Handle errors with logging and UI feedback."""
-        self.email_error = error_message if error_type == "email" else ""
-        self.password_error = error_message if error_type == "password" else ""
-        if previous_email is not None:
-            self.email = previous_email
+        if error_type == "email":
+            self.email_error = error_message
+        elif error_type == "password":
+            self.password_error = error_message
         audit_logger.error(
             f"{error_type}_update_failed",
             user_id=self.authenticated_user.id,
@@ -59,9 +56,11 @@ class ProfileState(AuthState):
             return False
         return True
 
-    def handle_password_change(self, form_data: dict):
+    @rx.event
+    async def handle_password_change(self, form_data: dict):
         if not self.is_authenticated:
-            return rx.redirect(routes.LOGIN_ROUTE)
+            yield rx.redirect(routes.LOGIN_ROUTE)
+            return
 
         self.is_updating_password = True
         try:
@@ -79,7 +78,8 @@ class ProfileState(AuthState):
             confirm_password = form_data["confirm_password"]
 
             if not self._validate_password(new_password, confirm_password):
-                return self._handle_error("password", self.password_error)
+                yield self._handle_error("password", self.password_error)
+                return
 
             with rx.session() as session:
                 user = session.exec(
@@ -89,9 +89,10 @@ class ProfileState(AuthState):
                 ).one()
 
                 if not user.verify(current_password):
-                    return self._handle_error(
+                    yield self._handle_error(
                         "password", "Current password is incorrect"
                     )
+                    return
 
                 user.password_hash = reflex_local_auth.LocalUser.hash_password(
                     new_password
@@ -109,14 +110,14 @@ class ProfileState(AuthState):
                 method="POST",
                 url=self.router.page.raw_path,
             )
-            return rx.toast.success(
+            yield rx.toast.success(
                 "Password updated successfully", position="top-center"
             )
         finally:
             self.is_updating_password = False
 
     def toggle_notifications(self):
-        self.set_notifications(not self.notifications)
+        self.notifications = not self.notifications
         audit_logger.info(
             "notification_settings_updated",
             user_id=self.authenticated_user.id,
@@ -128,7 +129,7 @@ class ProfileState(AuthState):
         )
 
     def validate_email_input(self, email: str):
-        self.user_email = email  # Update shared state
+        """Validate email input without updating state prematurely."""
         if not email:
             self.email_error = "Email is required"
             return
@@ -138,9 +139,13 @@ class ProfileState(AuthState):
         except EmailNotValidError as e:
             self.email_error = str(e)
 
-    def handle_submit(self, form_data: dict):
+    @rx.event
+    async def handle_submit(self, form_data: dict):
+        """Handle email update using AuthState.update_user_info."""
         if not self.is_authenticated:
-            return rx.redirect(routes.LOGIN_ROUTE)
+            yield rx.redirect(routes.LOGIN_ROUTE)
+            return
+
         self.is_updating_email = True
         try:
             audit_logger.info(
@@ -153,24 +158,19 @@ class ProfileState(AuthState):
                 data=form_data,
             )
             email = form_data["email"]
-            previous_email = self.user_email
+
+            # Validate email before attempting update
+            if not email:
+                yield self._handle_error("email", "Email is required")
+                return
             try:
-                self.set_user_email(email)
-            except ValueError as e:
-                self.user_email = previous_email
-                return self._handle_error("email", str(e), previous_email)
-            audit_logger.info(
-                "profile_update_success",
-                user_id=self.authenticated_user.id,
-                username=self.authenticated_user.username,
-                ip_address=self.router.session.client_ip,
-                method="POST",
-                url=self.router.page.raw_path,
-                old_email=previous_email,
-                new_email=email,
-            )
-            return rx.toast.success(
-                "Profile email updated successfully", position="top-center"
-            )
+                validate_email(email, check_deliverability=False)
+            except EmailNotValidError as e:
+                yield self._handle_error("email", str(e))
+                return
+
+            # Call update_user_info and yield its events
+            yield self.update_user_info(email=email)
+
         finally:
             self.is_updating_email = False

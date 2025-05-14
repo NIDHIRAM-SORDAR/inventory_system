@@ -48,14 +48,14 @@ class AuthState(reflex_local_auth.LocalAuthState):
             self.authenticated_user_info.email if self.authenticated_user_info else ""
         )
 
-    @rx.var(cache=True)
+    @rx.var
     def user_permissions(self) -> List[str]:
         """Return permissions for the authenticated user."""
         if self.authenticated_user_info:
             return self.authenticated_user_info.get_permissions()
         return []
 
-    @rx.var(cache=True)
+    @rx.var
     def user_roles(self) -> List[str]:
         """Return roles for the authenticated user."""
         if self.authenticated_user_info:
@@ -223,7 +223,7 @@ class AuthState(reflex_local_auth.LocalAuthState):
                 user_info = session.merge(self.authenticated_user_info)
                 user_info.set_roles(role_names, session)
                 session.commit()
-                self.refresh_user_data()
+                type(self).refresh_user_data()
                 audit_logger.info(
                     "roles_updated",
                     user_id=self.authenticated_user.id,
@@ -244,4 +244,4 @@ class AuthState(reflex_local_auth.LocalAuthState):
         """Periodically refresh user data for long-lived sessions."""
         while self.is_authenticated:
             await asyncio.sleep(300)  # 5 minutes
-            self.refresh_user_data()
+            type(self).refresh_user_data()

@@ -251,6 +251,15 @@ The inventory system built with Reflex has encountered several issues related to
       # Existing logic
   ```
 - **Improvement**: Batch queries where possible (e.g., fetch all roles in one query using `GROUP_CONCAT`).
+- **Background Task Limitations**
+
+    Background tasks mostly work like normal EventHandler methods, with certain exceptions:
+
+      Background tasks must be async functions.
+      Background tasks cannot modify the state outside of an async with self context block.
+      Background tasks may read the state outside of an async with self context block, but the value may be stale.
+      Background tasks may not be directly called from other event handlers or background tasks. Instead use yield or return to trigger the background task.
+      https://reflex.dev/docs/events/background-events/
 
 ### 2. Caching Overhead
 - **Bottleneck**: Over-frequent calls to `refresh_user_data` can overload the database and slow down UI rendering.

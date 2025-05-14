@@ -156,7 +156,7 @@ def login_form() -> rx.Component:
     show_nav=False,
     on_load=[
         CustomLoginState.reset_form_state,
-        # CustomLoginState.route_calc,
+        CustomLoginState.route_calc,
     ],
 )
 def login_page() -> rx.Component:
