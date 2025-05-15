@@ -165,13 +165,23 @@ class AuthState(reflex_local_auth.LocalAuthState):
     async def update_user_info(self, email: Optional[str] = None):
         """Update user info (e.g., email) and sync with database."""
         if not self.authenticated_user_info:
+            audit_logger.error(
+                "update_user_info_failed",
+                user_id=self.authenticated_user.id if self.authenticated_user else None,
+                email=email,
+                error="No authenticated user",
+            )
             yield rx.toast.error("No authenticated user")
+            return
 
         try:
             with rx.session() as session:
                 user_info = session.exec(
                     select(UserInfo)
-                    .where(UserInfo.user_id == self.authenticated_user.id)
+                    .where(
+                        UserInfo.user_id == self.authenticated_user.id,
+                        UserInfo.version == self.authenticated_user_info.version,
+                    )
                     .with_for_update()
                 ).one_or_none()
                 if not user_info:
@@ -189,12 +199,46 @@ class AuthState(reflex_local_auth.LocalAuthState):
                         raise ValueError("This email is already in use by another user")
                     user_info.email = email
 
+                    # Update the email in the LocalUser table as well
+                    local_user = session.exec(
+                        select(reflex_local_auth.LocalUser).where(
+                            reflex_local_auth.LocalUser.id == self.authenticated_user.id
+                        )
+                    ).one_or_none()
+                    if local_user:
+                        local_user.email = email
+                        session.add(local_user)
+
                 user_info.update_timestamp()
+                user_info.version += 1
+
+                # Prepare new state object before committing
+                new_user_info = UserInfo(
+                    id=user_info.id,
+                    user_id=user_info.user_id,
+                    email=user_info.email,
+                    profile_picture=user_info.profile_picture,
+                    # Include all scalar fields
+                    version=user_info.version,
+                    created_at=user_info.created_at,
+                    updated_at=user_info.updated_at,
+                )
+
+                # Validate state update (dry-run serialization)
+                try:
+                    new_user_info.dict()  # Ensure no serialization issues
+                except Exception as e:
+                    raise ValueError(f"State update validation failed: {str(e)}")
+
+                # Optimistic state update
+                self.set_authenticated_user_info(new_user_info)
+
+                # Commit database changes
                 session.add(user_info)
                 session.commit()
+                session.refresh(user_info)
 
-                # Refresh user data to sync state
-                self.authenticated_user_info = user_info
+                # Log success
                 audit_logger.info(
                     "update_user_info_success",
                     user_id=self.authenticated_user.id,
@@ -203,9 +247,11 @@ class AuthState(reflex_local_auth.LocalAuthState):
                 yield rx.toast.success("User info updated successfully")
 
         except Exception as e:
+            # Roll back session on any error
+            session.rollback()
             audit_logger.error(
                 "update_user_info_failed",
-                user_id=self.authenticated_user.id,
+                user_id=self.authenticated_user.id if self.authenticated_user else None,
                 email=email,
                 error=str(e),
             )

@@ -170,7 +170,7 @@ class ProfileState(AuthState):
                 return
 
             # Call update_user_info and yield its events
-            yield self.update_user_info(email=email)
+            yield type(self).update_user_info(email=email)
 
         finally:
             self.is_updating_email = False
