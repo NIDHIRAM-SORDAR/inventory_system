@@ -46,10 +46,7 @@ class CustomLoginState(AuthState):
             yield type(self).validate_session()
             if self.is_authenticated:  # Proceed only if session remains valid
                 yield type(self).load_user_data()
-                if "manage_users" in self.permissions:
-                    yield rx.redirect(routes.ADMIN_ROUTE)
-                else:
-                    yield rx.redirect(routes.OVERVIEW_ROUTE)
+                yield type(self).post_login(self.authenticated_user)
 
     @rx.event
     def reset_form_state(self):

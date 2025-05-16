@@ -152,10 +152,7 @@ def password_change_section() -> rx.Component:
     )
 
 
-@template(
-    route=routes.PROFILE_ROUTE,
-    title="Profile",
-)
+@template(route=routes.PROFILE_ROUTE, title="Profile", on_load=AuthState.load_user_data)
 @reflex_local_auth.require_login
 def profile() -> rx.Component:
     return rx.vstack(
