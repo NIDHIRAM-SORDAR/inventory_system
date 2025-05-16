@@ -29,7 +29,7 @@ class SupplierApprovalState(AuthState):
     current_status: str = ""
 
     def check_auth_and_load(self):
-        if not self.is_authenticated or "manage_suppliers" not in self.user_permissions:
+        if not self.is_authenticated or "manage_suppliers" not in self.permissions:
             return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
         self.set_is_loading(True)
         try:
@@ -58,7 +58,7 @@ class SupplierApprovalState(AuthState):
 
     @rx.event
     async def approve_supplier(self, supplier_id: int):
-        if "manage_supplier_approval" not in self.user_permissions:
+        if "manage_supplier_approval" not in self.permissions:
             yield rx.toast.error(
                 "Permission denied: Cannot approve supplier", position="bottom-right"
             )
@@ -235,7 +235,7 @@ class SupplierApprovalState(AuthState):
 
     @rx.event
     async def revoke_supplier(self, supplier_id: int):
-        if "manage_supplier_approval" not in self.user_permissions:
+        if "manage_supplier_approval" not in self.permissions:
             yield rx.toast.error(
                 "Permission denied: Cannot revoke supplier", position="bottom-right"
             )
@@ -378,7 +378,7 @@ class SupplierApprovalState(AuthState):
 
     @rx.event
     async def delete_supplier(self, supplier_id: int):
-        if "delete_supplier" not in self.user_permissions:
+        if "delete_supplier" not in self.permissions:
             yield rx.toast.error(
                 "Permission denied: Cannot delete supplier", position="bottom-right"
             )

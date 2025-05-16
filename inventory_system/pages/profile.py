@@ -246,9 +246,9 @@ def profile() -> rx.Component:
                     ),
                     rx.hstack(
                         rx.cond(
-                            ProfileState.authenticated_user_info & AuthState.user_roles,
+                            ProfileState.is_authenticated_and_ready & AuthState.roles,
                             rx.foreach(
-                                AuthState.user_roles,
+                                AuthState.roles,
                                 lambda role: rx.badge(
                                     role, color_scheme="blue", size="2"
                                 ),

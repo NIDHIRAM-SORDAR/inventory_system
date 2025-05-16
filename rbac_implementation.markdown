@@ -100,7 +100,7 @@ Audit logging, implemented in `inventory_system/logging/audit.py`, tracks all ro
 **Status**: Completed  
 **Details**:  
 - Added `get_permissions()` and `has_permission()` to `UserInfo`.  
-- Added `user_permissions` to `AuthState` with eager loading.  
+- Added `permissions` to `AuthState` with eager loading.  
 - Enhanced `seed_permissions.py` with action-specific permissions (e.g., `view_supplier`, `delete_user`) and legacy permissions (`manage_users`, `manage_suppliers`).  
 - Created `seed_roles.py` for `admin`, `employee`, `supplier`, `inventory_manager`, `supplier_manager`, `auditor` roles.  
 - Updated `test_permission.py` with tests for new permissions and roles.  
@@ -143,7 +143,7 @@ The following components have been successfully updated to use permission-based 
    - **Files Updated**: `profile_input.py`, `profile.py`, `profile_picture_state.py`, `profile_state.py`  
    - **Details**: 
      - Profile management inherently RBAC-compatible, with no flag-based checks. 
-     - Uses `user_roles` from `get_roles()`, rendered as badges with `rx.foreach`. 
+     - Uses `roles` from `get_roles()`, rendered as badges with `rx.foreach`. 
      - UI is responsive (e.g., `flex_direction=["column", "column", "row"]`) and theme-aware. 
      - Optimistic updates (e.g., loading states) implemented.  
    - **RBAC Alignment**: No changes needed, fully aligned with permission-based system.
@@ -208,7 +208,7 @@ The following tasks must be completed to finalize Step 5 and ensure a robust RBA
 |--------------------------------|------------|-----------------------------------------------------------------------------|
 | Authentication & Registration  | Completed  | Uses `set_roles`, permission checks, responsive UI with optimistic updates. |
 | Login & Logout                 | Completed  | Permission-based redirection, reactive UI, theme support.                   |
-| Profile Management             | Completed  | No flag checks, uses `user_roles`, responsive and theme-aware.              |
+| Profile Management             | Completed  | No flag checks, uses `roles`, responsive and theme-aware.              |
 | Supplier Approval              | Completed  | Granular permissions, race condition handling, permission-gated UI.         |
 | User Management                | Completed  | Granular permissions, race condition handling, permission-gated UI.         |
 | Supporting Infrastructure       | Completed  | `seed_permissions.py`, `seed_roles.py` support RBAC, no changes needed.     |
@@ -246,7 +246,7 @@ The following components have been successfully updated to use permission-based 
 3. **Profile Management Interfaces**  
    - **Status**: Completed  
    - **Files Updated**: `profile_input.py`, `profile.py`, `profile_picture_state.py`, `profile_state.py`  
-   - **Details**: Inherently RBAC-compatible, with no flag-based checks. Uses `user_roles` from `get_roles()`, rendered as badges with `rx.foreach`. UI is responsive (e.g., `flex_direction=["column", "column", "row"]`) and theme-aware via `rx.color_mode_cond`. Optimistic updates (e.g., loading states) implemented.  
+   - **Details**: Inherently RBAC-compatible, with no flag-based checks. Uses `roles` from `get_roles()`, rendered as badges with `rx.foreach`. UI is responsive (e.g., `flex_direction=["column", "column", "row"]`) and theme-aware via `rx.color_mode_cond`. Optimistic updates (e.g., loading states) implemented.  
    - **RBAC Alignment**: No changes needed, fully aligned with permission-based system.
 
 4. **Supplier Approval Processes**  
@@ -289,7 +289,7 @@ The following components have been successfully updated to use permission-based 
 |--------------------------------|------------|-----------------------------------------------------------------------------|
 | Authentication & Registration  | Completed  | Uses `set_roles`, permission checks, responsive UI with optimistic updates. |
 | Login & Logout                 | Completed  | Permission-based redirection, reactive UI, theme support.                   |
-| Profile Management             | Completed  | No flag checks, uses `user_roles`, responsive and theme-aware.              |
+| Profile Management             | Completed  | No flag checks, uses `roles`, responsive and theme-aware.              |
 | Supplier Approval              | Completed  | Granular permissions, race condition handling, permission-gated UI.         |
 | User Management                | Completed  | Granular permissions, race condition handling, permission-gated UI.         |
 | Supporting Infrastructure       | Completed  | `seed_permissions.py`, `seed_roles.py` support RBAC, no changes needed.     |
@@ -368,7 +368,7 @@ The following to-do list prioritizes tasks to ensure a successful Step 6 impleme
 - [ ] Document role management patterns in `DATABASE_OPERATIONS.md`, including concurrency and performance guidelines. 
 -[ ] Optimization Option: If get_permissions() is slow with many roles, add eager loading:
     from sqlalchemy.orm import selectinload
-    user_info = session.merge(self.authenticated_user_info).options(selectinload(UserInfo.roles).selectinload(Role.permissions))
+    user_info = session.merge(self.is_authenticated_and_ready).options(selectinload(UserInfo.roles).selectinload(Role.permissions))
 
 ### Implementation Summary
 Step 6 will introduce dynamic role management by enhancing the `Role` model, state handlers, and UI to support role creation, updating, and deletion. Administrators will manage roles via a responsive interface in `user_management.py`, with multi-select dropdowns for permissions. State handlers in `user_mgmt_state.py` will use `@rx.background` for database operations, ensuring non-blocking UI and concurrency safety via `SELECT FOR UPDATE`. Audit logging will track all changes, and tests will validate functionality and edge cases. The implementation will optimize performance with bulk queries and maintain backward compatibility with predefined roles. Production testing with Locust will ensure scalability, preparing the system for Step 7 (user management enhancements). This approach aligns with Reflex best practices, including `@rx.event`, `setvar`, `yield` for async updates, and responsive design with dark/light theme support.

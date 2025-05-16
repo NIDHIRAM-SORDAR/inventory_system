@@ -107,6 +107,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
         """Handle registration, create UserInfo, assign roles, and auto-login."""
         self.registration_error = ""
         self.is_submitting = True
+        yield
         self.new_user_id = -1
 
         username = form_data.get("username", "N/A")
@@ -242,6 +243,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
 
                     user_info_id = user_info.id
                     session.commit()
+                    session.refresh(user_info)
 
                     audit_logger.info(
                         "userinfo_created",

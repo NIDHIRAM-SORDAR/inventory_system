@@ -134,7 +134,7 @@ def menu_button() -> rx.Component:
                     *[
                         rx.cond(
                             (
-                                AuthState.user_permissions.contains("manage_users")
+                                AuthState.permissions.contains("manage_users")
                                 & (page["route"] == routes.ADMIN_ROUTE)
                             ),
                             menu_item(

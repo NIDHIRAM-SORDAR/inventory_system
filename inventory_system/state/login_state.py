@@ -12,42 +12,80 @@ from inventory_system.state.auth import AuthState
 
 
 class CustomLoginState(AuthState):
-    """Custom login state to redirect based on user role."""
+    """Custom login state to manage authentication and redirect based on user permissions.
+
+    Extends AuthState to leverage session validation, user data loading, and permission-based
+    routing. Handles login form submission and page-load redirects, ensuring only valid
+    sessions access protected routes. Provides UI feedback and audit logging for all actions.
+
+    Attributes:
+        error_message (str): Stores error messages for UI display (e.g., login failures).
+        is_submitting (bool): Indicates if a login submission is in progress, used for UI feedback.
+    """  # noqa: E501
 
     error_message: str = ""
     is_submitting: bool = False
 
     @rx.event
     def route_calc(self):
-        """Handle redirects for authenticated users on page load."""
-        if self.is_authenticated and not self.is_submitting:
-            # Step 1: Trigger refresh_user_data and wait for it to complete
-            yield type(self).refresh_user_data()
-            # Step 2: Trigger a follow-up event to check permissions
-            yield type(self).check_permissions_and_redirect()
+        """Handle redirects for authenticated users on page load by validating session.
 
-    @rx.event
-    def check_permissions_and_redirect(self):
-        """Check permissions and redirect after state is updated."""
-        if "manage_users" in self.user_permissions:
-            return rx.redirect(routes.ADMIN_ROUTE)
-        else:
-            return rx.redirect(routes.OVERVIEW_ROUTE)
+        Validates the user's session using validate_session. If valid, loads user data and
+        redirects based on permissions (admin or overview page). If invalid, validate_session
+        redirects to login, halting further processing.
+
+        Yields:
+            rx.EventSpec: Events for session validation, data loading, and redirection.
+
+        Notes:
+            - Uses type(self).validate_session() to ensure session validity before proceeding.
+            - Checks is_authenticated post-validation for robustness.
+            - Redirects to ADMIN_ROUTE if 'manage_users' permission exists, else OVERVIEW_ROUTE.
+        """  # noqa: E501
+        if self.is_authenticated:
+            yield type(self).validate_session()
+            if self.is_authenticated:  # Proceed only if session remains valid
+                yield type(self).load_user_data()
+                if "manage_users" in self.permissions:
+                    yield rx.redirect(routes.ADMIN_ROUTE)
+                else:
+                    yield rx.redirect(routes.OVERVIEW_ROUTE)
 
     @rx.event
     def reset_form_state(self):
-        """Reset form state on page load."""
+        """Reset form state variables on page load.
+
+        Clears error messages and submission status to ensure a clean UI state when the login
+        page is accessed.
+
+        Notes:
+            - Called on page load to prevent stale data display.
+        """  # noqa: E501
         self.error_message = ""
         self.is_submitting = False
 
     @rx.event
     def post_login(self, user):
-        """Handle post-login logging and redirection."""
+        """Handle post-login actions including logging and redirection.
+
+        Logs successful login to audit_logger and redirects the user based on permissions.
+        Provides UI feedback via a success toast.
+
+        Args:
+            user: The LocalUser object of the authenticated user.
+
+        Yields:
+            rx.EventSpec: Toast notification and redirect events.
+
+        Notes:
+            - Uses self.roles and self.permissions from AuthState for consistency.
+            - Redirects to ADMIN_ROUTE if 'manage_users' permission exists, else OVERVIEW_ROUTE.
+        """  # noqa: E501
         audit_logger.info(
             "login_success",
-            user_id=user["id"],  # Use dictionary key instead of user.id
+            user_id=user["id"],
             username=user["username"],
-            roles=self.user_roles,
+            roles=self.roles,
             ip_address=self.router.session.client_ip,
         )
         yield rx.toast.success(
@@ -55,16 +93,32 @@ class CustomLoginState(AuthState):
             position="top-center",
             duration=1000,
         )
-        if "manage_users" in self.user_permissions:
+        if "manage_users" in self.permissions:
             yield rx.redirect(routes.ADMIN_ROUTE)
         else:
             yield rx.redirect(routes.OVERVIEW_ROUTE)
 
     @rx.event
     async def on_submit(self, form_data: dict):
-        """Handle login form submission and redirect based on role."""
+        """Handle login form submission, authenticate user, and trigger post-login actions.
+
+        Validates username/password, logs in the user, loads user data, and triggers post_login
+        for redirection. Provides UI feedback via toasts and logs all actions to audit_logger.
+
+        Args:
+            form_data (dict): Form data containing 'username' and 'password'.
+
+        Yields:
+            rx.EventSpec: Events for UI updates, toasts, and post-login actions.
+
+        Notes:
+            - Sets is_submitting for UI feedback during processing.
+            - Handles exceptions with detailed logging and user feedback.
+            - Uses type(self).load_user_data() to align with AuthState.
+        """  # noqa: E501
         self.error_message = ""
         self.is_submitting = True
+        yield
         username = form_data.get("username", "N/A")
         password = form_data.get("password", "N/A")
         ip_address = self.router.session.client_ip
@@ -143,34 +197,10 @@ class CustomLoginState(AuthState):
                     yield rx.toast.error(self.error_message)
                     return
 
-                # Perform login and state updates only after validations pass
+                # Perform login and load user data
                 self._login(user.id, expiration_delta=timedelta(days=7))
-                yield type(
-                    self
-                ).refresh_user_data()  # Yield events to ensure state updates
-                print(user)
+                yield type(self).load_user_data()
                 yield type(self).post_login(user)
-
-                # Log login success with updated roles and permissions
-                audit_logger.info(
-                    "login_success",
-                    user_id=user.id,
-                    username=username,
-                    roles=self.user_roles,
-                    ip_address=ip_address,
-                )
-
-                # Redirect based on permissions
-                yield rx.toast.success(
-                    "Login successful! Redirecting...",
-                    position="top-center",
-                    duration=1000,
-                )
-                print("User permissions:", self.user_permissions)
-                if "manage_users" in self.user_permissions:
-                    yield rx.redirect(routes.ADMIN_ROUTE)
-                else:
-                    yield rx.redirect(routes.OVERVIEW_ROUTE)
 
         except Exception as e:
             self.error_message = "An unexpected error occurred. Please try again."

@@ -28,7 +28,7 @@ def admin() -> rx.Component:
             AuthState.is_authenticated,
             rx.heading(
                 rx.cond(
-                    AuthState.authenticated_user_info,
+                    AuthState.username,
                     f"Welcome, {AuthState.authenticated_user.username}",
                     "Welcome, Admin",
                 ),

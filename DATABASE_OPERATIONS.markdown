@@ -257,7 +257,7 @@ This document outlines best practices for performing database operations in the 
           session.add(UserRole(user_id=self.id, role_id=role.id))
   ```
 - **Why**: Efficient queries reduce latency, supporting Reflex’s responsive UI requirements and dark/light theme transitions.
-- **RBAC Context**: Optimize RBAC queries (e.g., `user_permissions`) to ensure fast permission checks for UI rendering.
+- **RBAC Context**: Optimize RBAC queries (e.g., `permissions`) to ensure fast permission checks for UI rendering.
 
 ## 10. Document and Enforce Guidelines
 - **Purpose**: Ensure all developers follow consistent database operation patterns to maintain code quality and prevent errors.

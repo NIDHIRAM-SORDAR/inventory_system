@@ -22,11 +22,8 @@ class ProfilePictureState(AuthState):
     @rx.var
     def profile_picture(self) -> str:
         """Public computed var for the current profile picture."""
-        if (
-            self.authenticated_user_info
-            and self.authenticated_user_info.profile_picture
-        ):
-            return self.authenticated_user_info.profile_picture
+        if self.is_authenticated_and_ready and self.auth_profile_picture:
+            return self.auth_profile_picture
         return (
             self._profile_picture or DEFAULT_PROFILE_PICTURE
         )  # Default profile picture
@@ -34,7 +31,7 @@ class ProfilePictureState(AuthState):
     def set_profile_picture(self, url: str | None):
         """Set the profile picture manually and update the backend."""
         self._profile_picture = url
-        if self.is_authenticated and self.authenticated_user_info:
+        if self.is_authenticated and self.is_authenticated_and_ready:
             with rx.session() as session:
                 user_info = session.exec(
                     select(UserInfo).where(
@@ -46,7 +43,7 @@ class ProfilePictureState(AuthState):
                     session.add(user_info)
                     session.commit()
                     session.refresh(user_info)
-                    self.authenticated_user_info.profile_picture = url
+                    self.auth_profile_picture = url
 
     async def handle_profile_picture_upload(self, files: list[rx.UploadFile]):
         """Handle the upload of a single profile picture."""
@@ -87,12 +84,12 @@ class ProfilePictureState(AuthState):
             self.set_profile_picture(upload_url)
             self.preview_img = upload_url
             yield rx.toast.success("Profile picture uploaded!", position="top-center")
+            yield rx.clear_selected_files("profile_upload")
         except Exception as e:
             self.upload_error = f"Upload failed: {str(e)}"
             yield rx.toast.error(f"Upload failed: {str(e)}", position="bottom-right")
         finally:
             self.is_uploading = False
-            yield
 
     def clear_upload(self):
         """Clear the upload state."""

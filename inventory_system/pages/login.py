@@ -104,7 +104,7 @@ def login_form() -> rx.Component:
             rx.button(
                 rx.cond(
                     CustomLoginState.is_submitting,
-                    rx.spinner(),
+                    rx.spinner(size="2"),
                     rx.text("Login"),
                 ),
                 type="submit",

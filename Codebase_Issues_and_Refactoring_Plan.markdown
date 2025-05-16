@@ -19,10 +19,10 @@ The inventory system built with Reflex has encountered several issues related to
 ### 3. Non-Reactive Profile Data
 - **Description**: The UI shows `Welcome nidhiram_sordar`, but the profile section displays `sandip.kumar@teletalk.com.bd`, and updates to profile data (e.g., username, email) are not reflected reactively.
 - **Impact**: Users see inconsistent or outdated profile information, leading to confusion.
-- **Likely Cause**: The `AuthState` caching mechanism (e.g., `authenticated_user`, `authenticated_user_info`) is not updating reactively, or the UI components are not using `rx.var` to subscribe to state changes.
+- **Likely Cause**: The `AuthState` caching mechanism (e.g., `authenticated_user`, `is_authenticated_and_ready`) is not updating reactively, or the UI components are not using `rx.var` to subscribe to state changes.
 
 ### 4. Caching Mechanism Issues
-- **Description**: The screenshot and issues suggest that `AuthState`’s caching (e.g., `user_permissions`, `authenticated_user_info`) is not refreshing correctly after login or registration.
+- **Description**: The screenshot and issues suggest that `AuthState`’s caching (e.g., `permissions`, `is_authenticated_and_ready`) is not refreshing correctly after login or registration.
 - **Impact**: Permissions and profile data are stale, causing incorrect redirects, permission checks, and UI rendering.
 - **Likely Cause**: `AuthState` may not be refreshing its cached properties (`@rx.var(Cached=True)`) after login/registration, or the refresh logic (e.g., `refresh_user_data`) is not triggered properly.
 
@@ -62,7 +62,7 @@ The inventory system built with Reflex has encountered several issues related to
 - **Checks**:
   - Inspect the login handler (`on_submit` or `handle_login`) to ensure it refreshes `AuthState` (e.g., calls `refresh_user_data`).
   - Verify redirect logic post-login: redirect to `/admin` if user has `admin` role or `manage_suppliers` permission.
-  - Ensure `AuthState.authenticated_user` and `authenticated_user_info` are updated after login.
+  - Ensure `AuthState.authenticated_user` and `is_authenticated_and_ready` are updated after login.
 - **Tests**:
   - Test login redirect for admin user:
     ```python
@@ -87,8 +87,8 @@ The inventory system built with Reflex has encountered several issues related to
 ### 3. Profile Data Reactivity
 - **Files**: `AuthState`, `overview.py` (or wherever profile data is rendered), `template.py` (for `Welcome` header).
 - **Checks**:
-  - Ensure `AuthState.authenticated_user` and `authenticated_user_info` are defined as `@rx.var(Cached=True)` and updated via setters (`set_authenticated_user`, `set_authenticated_user_info`).
-  - Verify that UI components (e.g., `Welcome` header, profile section) use `AuthState.authenticated_user.username` or `authenticated_user_info.email` as `rx.var` for reactivity.
+  - Ensure `AuthState.authenticated_user` and `is_authenticated_and_ready` are defined as `@rx.var(Cached=True)` and updated via setters (`set_authenticated_user`, `set_is_authenticated_and_ready`).
+  - Verify that UI components (e.g., `Welcome` header, profile section) use `AuthState.authenticated_user.username` or `is_authenticated_and_ready.email` as `rx.var` for reactivity.
   - Check if `refresh_user_data` reloads user data from the database and updates cached vars.
 - **Tests**:
   - Test profile data reactivity:
@@ -115,7 +115,7 @@ The inventory system built with Reflex has encountered several issues related to
 ### 4. Caching Mechanism
 - **Files**: `AuthState`.
 - **Checks**:
-  - Verify that `user_permissions`, `authenticated_user`, and `authenticated_user_info` are cached vars (`@rx.var(Cached=True)`).
+  - Verify that `permissions`, `authenticated_user`, and `is_authenticated_and_ready` are cached vars (`@rx.var(Cached=True)`).
   - Ensure `refresh_user_data` updates these vars using setters (e.g., `self.set_authenticated_user`) to trigger reactivity.
   - Check if login/registration handlers call `refresh_user_data` or equivalent.
 - **Tests**:
@@ -130,14 +130,14 @@ The inventory system built with Reflex has encountered several issues related to
         state = AuthState()
         state._login(user.id)
         state.refresh_user_data()
-        assert state.user_permissions == ["admin"]  # Assuming admin role
+        assert state.permissions == ["admin"]  # Assuming admin role
         # Update roles
         user_info = session.exec(select(UserInfo).where(UserInfo.user_id == user.id)).one()
         user_info.set_roles(["supplier"], session)
         session.commit()
         state.refresh_user_data()
-        assert "admin" not in state.user_permissions
-        assert "manage_inventory" in state.user_permissions  # Assuming supplier role
+        assert "admin" not in state.permissions
+        assert "manage_inventory" in state.permissions  # Assuming supplier role
     ```
 
 ### 5. Supplier Approval Flow
@@ -171,7 +171,7 @@ The inventory system built with Reflex has encountered several issues related to
   ```python
   def handle_login(self) -> rx.EventSpec:
       self.refresh_user_data()
-      if "admin" in self.user_permissions or "manage_suppliers" in self.user_permissions:
+      if "admin" in self.permissions or "manage_suppliers" in self.permissions:
           return rx.redirect(routes.ADMIN_ROUTE)
       return rx.redirect("/overview")
   ```
@@ -182,11 +182,11 @@ The inventory system built with Reflex has encountered several issues related to
   ```python
   class AuthState(BaseState):
       authenticated_user: Optional[LocalUser] = None
-      authenticated_user_info: Optional[UserInfo] = None
+      is_authenticated_and_ready: Optional[UserInfo] = None
 
       @rx.var(Cached=True)
-      def user_permissions(self) -> List[str]:
-          return self.authenticated_user_info.get_permissions() if self.authenticated_user_info else []
+      def permissions(self) -> List[str]:
+          return self.is_authenticated_and_ready.get_permissions() if self.is_authenticated_and_ready else []
 
       def refresh_user_data(self):
           with rx.session() as session:
@@ -194,12 +194,12 @@ The inventory system built with Reflex has encountered several issues related to
                   user = session.exec(select(LocalUser).where(LocalUser.id == self.authenticated_user.id)).one_or_none()
                   user_info = session.exec(select(UserInfo).where(UserInfo.user_id == self.authenticated_user.id)).one_or_none()
                   self.set_authenticated_user(user)
-                  self.set_authenticated_user_info(user_info)
+                  self.set_is_authenticated_and_ready(user_info)
   ```
 - **UI Fix**: Update `overview.py` and `template.py` to use `AuthState` vars reactively:
   ```python
   rx.heading(f"Welcome {AuthState.authenticated_user.username}", size="3")
-  rx.text(f"{AuthState.authenticated_user_info.email}")
+  rx.text(f"{AuthState.is_authenticated_and_ready.email}")
   ```
 - **Improvement**: Add a `profile_updated` event to trigger UI refresh after profile changes.
 
@@ -274,7 +274,7 @@ The inventory system built with Reflex has encountered several issues related to
       # Refresh logic
       self.last_refresh = time.time()
   ```
-- **Improvement**: Use Redis or an in-memory cache for `user_permissions` and `authenticated_user_info` if scaling to multiple users.
+- **Improvement**: Use Redis or an in-memory cache for `permissions` and `is_authenticated_and_ready` if scaling to multiple users.
 
 ### 3. UI Rendering
 - **Bottleneck**: `rx.foreach` in `supplier_approval.py` can be slow for large datasets (e.g., 1000+ suppliers).

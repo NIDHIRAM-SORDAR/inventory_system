@@ -28,15 +28,13 @@ class UserManagementState(AuthState):
 
     def check_auth_and_load(self):
         if not self.is_authenticated or not (
-            self.authenticated_user_info and "manage_users" in self.user_permissions
+            self.is_authenticated_and_ready and "manage_users" in self.permissions
         ):
             return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
         self.is_loading = True
         with rx.session() as session:
             current_user_id = (
-                self.authenticated_user_info.user_id
-                if self.authenticated_user_info
-                else None
+                self.user_info.user_id if self.is_authenticated_and_ready else None
             )
             stmt = (
                 select(UserInfo, reflex_local_auth.LocalUser.username)
@@ -62,7 +60,7 @@ class UserManagementState(AuthState):
 
     @rx.event
     async def change_user_role(self, user_id: int, selected_role: str):
-        if "edit_user" not in self.user_permissions:
+        if "edit_user" not in self.permissions:
             yield rx.toast.error(
                 "Permission denied: Cannot change user role", position="bottom-right"
             )
@@ -181,7 +179,7 @@ class UserManagementState(AuthState):
 
     @rx.event
     async def delete_user(self):
-        if "delete_user" not in self.user_permissions:
+        if "delete_user" not in self.permissions:
             yield rx.toast.error(
                 "Permission denied: Cannot delete user", position="bottom-right"
             )
