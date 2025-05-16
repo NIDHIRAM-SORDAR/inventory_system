@@ -33,9 +33,7 @@ class UserManagementState(AuthState):
             return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
         self.is_loading = True
         with rx.session() as session:
-            current_user_id = (
-                self.user_info.user_id if self.is_authenticated_and_ready else None
-            )
+            current_user_id = self.user_id if self.is_authenticated_and_ready else None
             stmt = (
                 select(UserInfo, reflex_local_auth.LocalUser.username)
                 .join(
