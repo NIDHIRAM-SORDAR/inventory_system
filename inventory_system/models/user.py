@@ -54,6 +54,97 @@ class Permission(rx.Model, table=True):
         """Update the updated_at timestamp to current UTC time."""
         self.updated_at = get_utc_now()
 
+    def update_permission(
+        self,
+        session: Session,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> None:
+        """
+        Update the permission's name and/or description atomically
+        with optimistic locking.
+
+        Args:
+            name: Optional new name for the permission. Must be unique if provided.
+            description: Optional new description. Can be None to clear the description.
+            session: SQLModel session for database operations.
+
+        Raises:
+            ValueError: If the permission is not persisted, not found, version mismatch,
+            or new name already exists.
+        """
+        try:
+            if self.id is None:
+                raise ValueError("Permission must be persisted to the session")
+            permission = session.exec(
+                select(Permission).where(Permission.id == self.id).with_for_update()
+            ).one_or_none()
+            if not permission:
+                raise ValueError(f"Permission with id={self.id} not found")
+            if name and name != self.name:
+                if session.exec(
+                    select(Permission).where(Permission.name == name)
+                ).one_or_none():
+                    raise ValueError(f"Permission name '{name}' already exists")
+                self.name = name
+            if description is not None:
+                self.description = description
+            self.update_timestamp()
+            session.add(self)
+            audit_logger.info(
+                "update_permission_success",
+                permission_id=self.id,
+                name=name,
+                description=description,
+            )
+        except Exception as e:
+            session.rollback()
+            audit_logger.error(
+                "update_permission_failed",
+                permission_id=self.id if self.id else "unknown",
+                error=str(e),
+            )
+            raise ValueError(f"Failed to update permission: {str(e)}")
+
+    @classmethod
+    def create_permission(
+        cls, name: str, description: Optional[str], session: Session
+    ) -> "Permission":
+        try:
+            if session.exec(
+                select(Permission).where(Permission.name == name)
+            ).one_or_none():
+                raise ValueError(f"Permission '{name}' already exists")
+            permission = Permission(name=name, description=description)
+            session.add(permission)
+            session.flush()
+            audit_logger.info("create_permission_success", permission_name=name)
+            return permission
+        except Exception as e:
+            session.rollback()
+            audit_logger.error(
+                "create_permission_failed", permission_name=name, error=str(e)
+            )
+            raise ValueError(f"Failed to create permission: {str(e)}")
+
+    @classmethod
+    def delete_permission(cls, name: str, session: Session) -> None:
+        try:
+            permission = session.exec(
+                select(Permission).where(Permission.name == name).with_for_update()
+            ).one_or_none()
+            if not permission:
+                raise ValueError(f"Permission '{name}' not found")
+            session.delete(permission)
+            session.flush()
+            audit_logger.info("delete_permission_success", permission_name=name)
+        except Exception as e:
+            session.rollback()
+            audit_logger.error(
+                "delete_permission_failed", permission_name=name, error=str(e)
+            )
+            raise ValueError(f"Failed to delete permission: {str(e)}")
+
 
 class Role(rx.Model, table=True):
     """Role model for RBAC, grouping permissions."""
@@ -126,6 +217,44 @@ class Role(rx.Model, table=True):
                 error=str(e),
             )
             raise ValueError(f"Failed to set permissions: {str(e)}")
+
+    def update_role(
+        self,
+        session: Session,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> None:
+        try:
+            if self.id is None:
+                raise ValueError("Role must be persisted to the session")
+            role = session.exec(
+                select(Role)
+                .where(Role.id == self.id, Role.version == self.version)
+                .with_for_update()
+            ).one_or_none()
+            if not role:
+                raise ValueError(
+                    f"Role with id={self.id} not found or version mismatch"
+                )
+            if name and name != self.name:
+                if session.exec(select(Role).where(Role.name == name)).one_or_none():
+                    raise ValueError(f"Role name '{name}' already exists")
+                self.name = name
+            if description is not None:
+                self.description = description
+            self.version += 1
+            self.update_timestamp()
+            session.add(self)
+            audit_logger.info(
+                "update_role_success",
+                role_id=self.id,
+                name=name,
+                description=description,
+            )
+        except Exception as e:
+            session.rollback()
+            audit_logger.error("update_role_failed", role_id=self.id, error=str(e))
+            raise ValueError(f"Failed to update role: {str(e)}")
 
     @classmethod
     def create_role(
