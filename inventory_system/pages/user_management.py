@@ -123,6 +123,7 @@ def _edit_dialog(user: rx.Var) -> rx.Component:
                             color_scheme="gray",
                             size="2",
                             width=rx.breakpoints(initial="100%", md="120px"),
+                            on_click=UserManagementState.cancel_edit_dialog,
                         )
                     ),
                     justify=rx.breakpoints(initial="center", md="end"),
