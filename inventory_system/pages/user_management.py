@@ -138,6 +138,8 @@ def _edit_dialog(user: rx.Var) -> rx.Component:
                 "width": "100%",
             },
         ),
+        open=UserManagementState.show_edit_dialog
+        & (UserManagementState.target_user_id == user["id"]),
     )
 
 

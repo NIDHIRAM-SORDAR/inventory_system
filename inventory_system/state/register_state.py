@@ -140,6 +140,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                     ip_address=ip_address,
                 )
                 yield rx.toast.error(self.registration_error)
+                return
 
             # Validate fields
             if not self._validate_fields(username, password, confirm_password):
@@ -150,6 +151,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                     ip_address=ip_address,
                 )
                 yield rx.toast.error(self.registration_error)
+                return
 
             with rx.session() as session:
                 try:
@@ -167,6 +169,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         )
                         yield rx.toast.error(self.registration_error)
                         session.rollback()
+                        return
 
                     audit_logger.info(
                         "registration_localuser_created",
@@ -193,6 +196,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         )
                         yield rx.toast.error(self.registration_error)
                         session.rollback()
+                        return
 
                     # Create UserInfo
                     user_info = UserInfo(
@@ -221,6 +225,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         )
                         yield rx.toast.error(self.registration_error)
                         session.rollback()
+                        return
 
                     try:
                         user_info.set_roles(["employee"], session)
@@ -240,6 +245,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         )
                         yield rx.toast.error(self.registration_error)
                         session.rollback()
+                        return
 
                     user_info_id = user_info.id
                     session.commit()
@@ -284,8 +290,10 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                         error=str(db_error),
                         ip_address=ip_address,
                     )
-                    session.rollback()
+
                     yield rx.toast.error(self.registration_error)
+                    session.rollback()
+                    return
 
         except Exception as e:
             self.registration_error = "An unexpected error occurred. Please try again."
