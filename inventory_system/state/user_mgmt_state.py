@@ -25,6 +25,7 @@ class UserManagementState(AuthState):
     target_user_id: Optional[int] = None
     selected_role: str = ""
     current_user_role: str = ""
+    active_tab: str = "profiles"
 
     def check_auth_and_load(self):
         if not self.is_authenticated or not (
