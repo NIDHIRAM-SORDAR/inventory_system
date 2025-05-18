@@ -44,6 +44,7 @@ class Permission(rx.Model, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True, index=True)
     description: Optional[str] = Field(default=None)
+    category: Optional[str] = Field(default=None)  # New field for categorization
     created_at: datetime = Field(default_factory=get_utc_now)
     updated_at: datetime = Field(default_factory=get_utc_now)
     roles: List["Role"] = Relationship(
@@ -59,14 +60,16 @@ class Permission(rx.Model, table=True):
         session: Session,
         name: Optional[str] = None,
         description: Optional[str] = None,
+        category: Optional[str] = None,
     ) -> None:
         """
-        Update the permission's name and/or description atomically
+        Update the permission's name, description, and/or category atomically
         with optimistic locking.
 
         Args:
             name: Optional new name for the permission. Must be unique if provided.
             description: Optional new description. Can be None to clear the description.
+            category: Optional new category. Can be None to clear the category.
             session: SQLModel session for database operations.
 
         Raises:
@@ -89,6 +92,8 @@ class Permission(rx.Model, table=True):
                 self.name = name
             if description is not None:
                 self.description = description
+            if category is not None:
+                self.category = category
             self.update_timestamp()
             session.add(self)
             audit_logger.info(
@@ -96,6 +101,7 @@ class Permission(rx.Model, table=True):
                 permission_id=self.id,
                 name=name,
                 description=description,
+                category=category,
             )
         except Exception as e:
             session.rollback()
@@ -108,17 +114,25 @@ class Permission(rx.Model, table=True):
 
     @classmethod
     def create_permission(
-        cls, name: str, description: Optional[str], session: Session
+        cls,
+        name: str,
+        description: Optional[str],
+        category: Optional[str],
+        session: Session,
     ) -> "Permission":
         try:
             if session.exec(
                 select(Permission).where(Permission.name == name)
             ).one_or_none():
                 raise ValueError(f"Permission '{name}' already exists")
-            permission = Permission(name=name, description=description)
+            permission = Permission(
+                name=name, description=description, category=category
+            )
             session.add(permission)
             session.flush()
-            audit_logger.info("create_permission_success", permission_name=name)
+            audit_logger.info(
+                "create_permission_success", permission_name=name, category=category
+            )
             return permission
         except Exception as e:
             session.rollback()

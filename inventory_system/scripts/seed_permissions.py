@@ -11,38 +11,89 @@ def seed_permissions(session: Optional[Session] = None):
     """Seed the Permission table with initial permissions."""
     print("Starting seeding...")
     permissions = [
-        {"name": "view_supplier", "description": "View supplier records"},
-        {"name": "create_supplier", "description": "Create supplier records"},
-        {"name": "edit_supplier", "description": "Edit supplier records"},
-        {"name": "delete_supplier", "description": "Delete supplier records"},
-        {"name": "view_user", "description": "View user accounts"},
-        {"name": "create_user", "description": "Create user accounts"},
-        {"name": "edit_user", "description": "Edit user accounts"},
-        {"name": "delete_user", "description": "Delete user accounts"},
-        {"name": "view_inventory", "description": "View inventory data"},
-        {"name": "create_inventory", "description": "Create new inventory items"},
+        {
+            "name": "view_supplier",
+            "description": "View supplier records",
+            "category": "Suppliers",
+        },
+        {
+            "name": "create_supplier",
+            "description": "Create supplier records",
+            "category": "Suppliers",
+        },
+        {
+            "name": "edit_supplier",
+            "description": "Edit supplier records",
+            "category": "Suppliers",
+        },
+        {
+            "name": "delete_supplier",
+            "description": "Delete supplier records",
+            "category": "Suppliers",
+        },
+        {"name": "view_user", "description": "View user accounts", "category": "Users"},
+        {
+            "name": "create_user",
+            "description": "Create user accounts",
+            "category": "Users",
+        },
+        {"name": "edit_user", "description": "Edit user accounts", "category": "Users"},
+        {
+            "name": "delete_user",
+            "description": "Delete user accounts",
+            "category": "Users",
+        },
+        {
+            "name": "view_inventory",
+            "description": "View inventory data",
+            "category": "Inventory",
+        },
+        {
+            "name": "create_inventory",
+            "description": "Create new inventory items",
+            "category": "Inventory",
+        },
         {
             "name": "update_inventory",
             "description": "Update existing inventory item details",
+            "category": "Inventory",
         },
-        {"name": "delete_inventory", "description": "Delete inventory items"},
-        {"name": "view_profile", "description": "View own user profile"},
+        {
+            "name": "delete_inventory",
+            "description": "Delete inventory items",
+            "category": "Inventory",
+        },
+        {
+            "name": "view_profile",
+            "description": "View own user profile",
+            "category": "Users",
+        },
         {
             "name": "edit_profile",
             "description": "Edit own user profile (email, password, etc.)",
+            "category": "Users",
         },
-        {"name": "manage_roles", "description": "Create, read, update, delete roles"},
-        {"name": "manage_users", "description": "Manage all user-related actions"},
+        {
+            "name": "manage_roles",
+            "description": "Create, read, update, delete roles",
+            "category": "Administration",
+        },
+        {
+            "name": "manage_users",
+            "description": "Manage all user-related actions",
+            "category": "Administration",
+        },
         {
             "name": "manage_suppliers",
             "description": "Manage all supplier-related actions",
+            "category": "Suppliers",
         },
         {
             "name": "manage_supplier_approval",
             "description": "Approve or reject supplier registrations",
+            "category": "Suppliers",
         },
     ]
-
     try:
         # Use provided session or create a new one
         if session is None:
@@ -61,7 +112,9 @@ def seed_permissions(session: Optional[Session] = None):
                     ).first()
                     if not existing:
                         permission = Permission(
-                            name=perm["name"], description=perm["description"]
+                            name=perm["name"],
+                            description=perm["description"],
+                            category=perm["category"],
                         )
                         sess.add(permission)
                         print(f"Added permission: {perm['name']}")
@@ -76,7 +129,9 @@ def seed_permissions(session: Optional[Session] = None):
                 ).first()
                 if not existing:
                     permission = Permission(
-                        name=perm["name"], description=perm["description"]
+                        name=perm["name"],
+                        description=perm["description"],
+                        category=perm["category"],
                     )
                     session.add(permission)
                     print(f"Added permission: {perm['name']}")
