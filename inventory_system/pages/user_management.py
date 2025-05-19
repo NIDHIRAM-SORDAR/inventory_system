@@ -5,6 +5,7 @@ from inventory_system import routes
 from inventory_system.state.auth import AuthState
 from inventory_system.state.user_mgmt_state import UserManagementState
 from inventory_system.templates.template import template
+from inventory_system.views.permission_view import permissions_tab
 
 
 def _header_cell(text: str, icon: str) -> rx.Component:
@@ -446,7 +447,7 @@ def user_management() -> rx.Component:
                 value="roles",
             ),
             rx.tabs.content(
-                rx.text("Permissions content to be implemented."),
+                permissions_tab(),
                 value="permissions",
             ),
             value=UserManagementState.active_tab,
