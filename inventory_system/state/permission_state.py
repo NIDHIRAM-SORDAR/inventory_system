@@ -79,9 +79,9 @@ class PermissionsManagementState(rx.State):
         )
 
     @rx.var
-    def filtered_permissions_by_category(self) -> dict:
+    def filtered_permissions_by_category(self) -> Dict[str, List[Dict[str, Any]]]:
         """Group filtered permissions by category, sorted by category name."""
-        grouped = {}
+        grouped: Dict[str, List[Dict[str, Any]]] = {}
         for p in self.filtered_permissions:
             cat = p["category"] if p["category"] else "Uncategorized"
             grouped.setdefault(cat, []).append(p)
@@ -104,12 +104,6 @@ class PermissionsManagementState(rx.State):
                 }
                 for p in perms
             ]
-            for perm in self.permissions:
-                perm["permission_code"] = self.get_permission_code(perm["name"])
-
-    def get_permission_code(self, name: str) -> str:
-        """Generate a 6-character code from the permission name."""
-        return name.upper().replace("_", "").zfill(6)[-6:]
 
     # Event handlers
     @rx.event
