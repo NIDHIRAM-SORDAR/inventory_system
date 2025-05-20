@@ -7,60 +7,70 @@ from inventory_system.state.permission_state import PermissionsManagementState
 COLOR = [color for color in LiteralAccentColor.__args__ if color != "gray"]
 
 
-async def get_category_color(category_name: str) -> str:
-    """Get a consistent color based on the category.
+class CategoryBadgeState(rx.State):
+    """State for handling category badge colors."""
 
-    Args:
-        category_name: The category name
+    async def get_category_color(self, category_name: str) -> str:
+        """Get a consistent color based on the category.
 
-    Returns:
-        A color from the COLOR list or gray for 'Uncategorized'
-    """
-    # Special case for Uncategorized
-    if category_name == "Uncategorized":
-        return "gray"
+        Args:
+            category_name: The category name
 
-    # Get all categories from the state
-    categories = await PermissionsManagementState.get_var_value("perm_categories", [])
+        Returns:
+            A color from the COLOR list or gray for 'Uncategorized'
+        """
+        # Special case for Uncategorized
+        if category_name == "Uncategorized":
+            return "gray"
 
-    # If "All" is in categories (as it usually is), remove it
-    if "All" in categories:
-        categories = [c for c in categories if c != "All"]
+        # Get all categories from the PermissionsManagementState using get_var_value
+        categories = await self.get_var_value(
+            PermissionsManagementState.perm_categories, []
+        )
 
-    # Remove "Uncategorized" if present since it has a special color
-    categories = [c for c in categories if c != "Uncategorized"]
-    print(categories)
+        # Filter categories
+        filtered_categories = [
+            c for c in categories if c != "All" and c != "Uncategorized"
+        ]
 
-    # Find the index of the category in the sorted list
-    try:
-        index = sorted(categories).index(category_name)
-        # Map the index to a color from the COLOR list
-        color_index = index % len(COLOR)
-        return COLOR[color_index]
-    except (ValueError, IndexError):
-        # Default color if category not found
-        return "blue"
+        # Find the index of the category in the sorted list
+        try:
+            index = sorted(filtered_categories).index(category_name)
+            # Map the index to a color from the COLOR list
+            color_index = index % len(COLOR)
+            return COLOR[color_index]
+        except (ValueError, IndexError):
+            # Default color if category not found
+            return "blue"
 
 
-def category_badge(category: rx.Var[str]) -> rx.Component:
+def category_badge(category: str) -> rx.Component:
     """Create a badge for category with consistent coloring.
 
     Args:
-        category: The category name (string, not rx.Var)
+        category: The category name as a string
 
     Returns:
-        A badge component with color based on the category
+        A badge component with appropriate styling
     """
-    # Get color for the category
-    color_scheme = get_category_color(category)
+    # For the "Uncategorized" case, we can directly return a badge with gray color
+    if category == "Uncategorized":
+        return rx.badge(
+            rx.icon("folder", size=16),
+            "Uncategorized",
+            color_scheme="gray",
+            radius="large",
+            variant="surface",
+            size="2",
+        )
 
-    # Choose appropriate icon
-    icon = "folder"
-
+    # For other categories, we need a component
+    # that can compute its color based on state
     return rx.badge(
-        rx.icon(icon, size=16),
+        rx.icon("folder", size=16),
         category,
-        color_scheme=color_scheme,
+        # Use an async_var to get the color
+        color_scheme=CategoryBadgeState.get_category_color(category),
         radius="large",
         variant="surface",
         size="2",
