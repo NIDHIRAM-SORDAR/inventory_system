@@ -10,7 +10,14 @@ COLOR = [color for color in LiteralAccentColor.__args__ if color != "gray"]
 class CategoryBadgeState(rx.State):
     """State for handling category badge colors."""
 
-    async def get_category_color(self, category_name: str) -> str:
+    catagories: list[str] = []
+
+    async def on_mount(self):
+        self.categories = await self.get_var_value(
+            PermissionsManagementState.perm_categories, []
+        )
+
+    def get_category_color(self, category_name: str) -> str:
         """Get a consistent color based on the category.
 
         Args:
@@ -22,15 +29,9 @@ class CategoryBadgeState(rx.State):
         # Special case for Uncategorized
         if category_name == "Uncategorized":
             return "gray"
-
-        # Get all categories from the PermissionsManagementState using get_var_value
-        categories = await self.get_var_value(
-            PermissionsManagementState.perm_categories, []
-        )
-
         # Filter categories
         filtered_categories = [
-            c for c in categories if c != "All" and c != "Uncategorized"
+            c for c in self.categories if c != "All" and c != "Uncategorized"
         ]
 
         # Find the index of the category in the sorted list
@@ -74,4 +75,5 @@ def category_badge(category: str) -> rx.Component:
         radius="large",
         variant="surface",
         size="2",
+        on_mount=CategoryBadgeState.on_mount,
     )
