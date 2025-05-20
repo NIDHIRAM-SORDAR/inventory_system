@@ -2,123 +2,60 @@ from typing import Any, Dict, List
 
 import reflex as rx
 
+from inventory_system.components.permission_category_badge import category_badge
 from inventory_system.state.permission_state import PermissionsManagementState
 
 
-def get_category_color(category: str) -> str:
-    """Get color scheme for category badge."""
-    color_map = {
-        "Suppliers": "blue",
-        "Users": "green",
-        "Inventory": "orange",
-        "Administration": "purple",
-    }
-    return color_map.get(category, "gray")
-
-
 def permission_card(permission: Dict[str, Any]) -> rx.Component:
-    """Modern permission card with responsive content layout that stretches to content."""
-    # Define shared components to avoid duplication
-    badge = rx.badge(
-        permission["category"],
-        color_scheme=get_category_color(permission["category"]),
-        variant="soft",
-        size="2",
-    )
-
-    heading = rx.heading(
-        permission["name"].to_string().replace("_", " ").title(),
-        size="4",
-        weight="medium",
-        margin_top="1",
-        margin_bottom="1",
-        width="100%",
-        no_wrap=True,
-    )
-
-    description = rx.text(
-        permission["description"],
-        color="gray.500",
-        line_height="1.5",
-        size="2",
-        width="100%",
-        style={
-            "overflow": "hidden",
-            "text_overflow": "ellipsis",
-            "white_space": "pre-line",
-        },
-    )
-
-    edit_button = rx.button(
-        rx.icon("pencil", size=14),
-        "Edit",
-        variant="soft",
-        size="1",
-        on_click=lambda: PermissionsManagementState.open_perm_edit_modal(
-            permission["id"]
-        ),
-    )
-
-    delete_button = rx.button(
-        rx.icon("trash", size=14),
-        "Delete",
-        variant="soft",
-        size="1",
-        on_click=lambda: PermissionsManagementState.open_perm_delete_modal(
-            permission["id"]
-        ),
-    )
-
+    """Permission card with dynamic category color and unified layout."""
     return rx.card(
-        # Desktop layout (horizontal)
-        rx.desktop_only(
-            rx.hstack(
-                badge,
-                rx.vstack(
-                    heading,
-                    description,
-                    spacing="2",
-                    width="100%",
-                ),
-                rx.spacer(),
-                rx.vstack(
-                    rx.hstack(
-                        edit_button,
-                        delete_button,
-                        spacing="2",
-                    ),
-                    spacing="2",
-                    align="end",
-                    width="auto",
-                ),
-                align="center",
-                justify="between",
-                spacing="3",
-                width="100%",
-            ),
-        ),
-        # Mobile and tablet layout (vertical)
-        rx.mobile_and_tablet(
+        rx.hstack(
+            category_badge(permission["category"]),
             rx.vstack(
-                rx.hstack(
-                    badge,
-                    rx.spacer(),
-                    delete_button,
-                    justify="between",
-                    align="center",
-                    width="100%",
+                rx.heading(
+                    permission["name"].replace("_", " ").title(),
+                    size="4",
+                    weight="medium",
+                    no_wrap=True,
                 ),
-                heading,
-                description,
-                edit_button,
-                align="stretch",
-                spacing="2",
+                rx.text(
+                    permission["description"],
+                    color="gray.500",
+                    size="2",
+                    style={"white_space": "pre-line"},
+                ),
+                spacing="1",
                 width="100%",
             ),
+            rx.spacer(),
+            rx.hstack(
+                rx.button(
+                    rx.icon("pencil", size=14),
+                    "Edit",
+                    variant="soft",
+                    size="1",
+                    on_click=lambda: PermissionsManagementState.open_perm_edit_modal(
+                        permission["id"]
+                    ),
+                ),
+                rx.button(
+                    rx.icon("trash", size=14),
+                    "Delete",
+                    variant="soft",
+                    size="1",
+                    on_click=lambda: PermissionsManagementState.open_perm_delete_modal(
+                        permission["id"]
+                    ),
+                ),
+                spacing="2",
+            ),
+            align="center",
+            justify="between",
+            width="100%",
         ),
         padding="3",
         width="100%",
-        min_width="300px",
+        min_width="250px",
         style={
             "transition": "all 0.2s ease",
             "cursor": "pointer",
@@ -210,10 +147,12 @@ def search_and_filter() -> rx.Component:
                     rx.cond(
                         PermissionsManagementState.perm_search_query != "",
                         (
-                            f"Showing {PermissionsManagementState.filtered_permissions.length()} "
-                            f"of {PermissionsManagementState.permissions.length()} permissions"
+                            f"Showing {PermissionsManagementState.filtered_permissions.length()} "  # noqa: E501
+                            f"of {PermissionsManagementState.permissions.length()} "
+                            "permissions"
                         ),
-                        f"{PermissionsManagementState.permissions.length()} total permissions",
+                        f"{PermissionsManagementState.permissions.length()} "
+                        "total permissions",
                     ),
                     color="var(--gray-9)",
                     size="2",
@@ -300,7 +239,7 @@ def pagination_controls() -> rx.Component:
 
 
 def permission_form_modal(is_edit: bool = False) -> rx.Component:
-    """Add/Edit permission modal form."""
+    """Responsive Add/Edit permission modal form."""
     title = "Edit Permission" if is_edit else "Add New Permission"
     submit_handler = (
         PermissionsManagementState.update_permission
@@ -312,56 +251,40 @@ def permission_form_modal(is_edit: bool = False) -> rx.Component:
         rx.dialog.content(
             rx.dialog.title(title),
             rx.dialog.description(
-                "Fill in the permission details below.",
-                margin_bottom="4",
+                "Fill in the permission details below.", margin_bottom="4"
             ),
             rx.vstack(
-                rx.vstack(
-                    rx.text("Permission Name", font_weight="medium", size="2"),
-                    rx.input(
-                        placeholder="e.g., manage_inventory",
-                        value=PermissionsManagementState.perm_form_name,
-                        on_change=PermissionsManagementState.set_perm_form_name,
-                        width="100%",
-                    ),
-                    spacing="2",
+                rx.input(
+                    placeholder="Permission Name",
+                    value=PermissionsManagementState.perm_form_name,
+                    on_change=PermissionsManagementState.set_perm_form_name,
+                    width="100%",
                 ),
-                rx.vstack(
-                    rx.text("Category", font_weight="medium", size="2"),
-                    rx.select.root(
-                        rx.select.trigger(
-                            placeholder="Select category",
-                            width="100%",
+                rx.select.root(
+                    rx.select.trigger(placeholder="Select category", width="100%"),
+                    rx.select.content(
+                        rx.foreach(
+                            PermissionsManagementState.perm_categories,
+                            lambda category: rx.select.item(category, value=category),
                         ),
-                        rx.select.content(
-                            rx.select.item("Suppliers", value="Suppliers"),
-                            rx.select.item("Users", value="Users"),
-                            rx.select.item("Inventory", value="Inventory"),
-                            rx.select.item("Administration", value="Administration"),
-                        ),
-                        value=PermissionsManagementState.perm_form_category,
-                        on_change=PermissionsManagementState.set_perm_form_category,
-                        width="100%",
                     ),
-                    spacing="2",
+                    value=PermissionsManagementState.perm_form_category,
+                    on_change=PermissionsManagementState.set_perm_form_category,
+                    width="100%",
                 ),
-                rx.vstack(
-                    rx.text("Description", font_weight="medium", size="2"),
-                    rx.text_area(
-                        placeholder="Describe what this permission allows...",
-                        value=PermissionsManagementState.perm_form_description,
-                        on_change=PermissionsManagementState.set_perm_form_description,
-                        width="100%",
-                        height="100px",
-                    ),
-                    spacing="2",
+                rx.text_area(
+                    placeholder="Describe what this permission allows...",
+                    value=PermissionsManagementState.perm_form_description,
+                    on_change=PermissionsManagementState.set_perm_form_description,
+                    width="100%",
+                    height="100px",
                 ),
-                spacing="4",
+                spacing="3",
                 width="100%",
             ),
             rx.hstack(
                 rx.dialog.close(
-                    rx.button("Cancel", variant="soft", color_scheme="gray"),
+                    rx.button("Cancel", variant="soft", color_scheme="gray")
                 ),
                 rx.dialog.close(
                     rx.button(
@@ -370,13 +293,12 @@ def permission_form_modal(is_edit: bool = False) -> rx.Component:
                         loading=PermissionsManagementState.perm_is_loading,
                     ),
                 ),
-                spacing="3",
-                margin_top="6",
+                spacing="2",
                 justify="end",
-                flex_wrap="wrap",
             ),
-            max_width=["90vw", "450px"],
-            padding=["4", "6"],
+            max_width="95vw",
+            width=["95vw", "400px"],
+            padding=["3", "4"],
         ),
         open=PermissionsManagementState.perm_show_edit_modal
         if is_edit
@@ -428,23 +350,25 @@ def delete_confirmation_modal() -> rx.Component:
 
 
 def permissions_tab() -> rx.Component:
-    """Permissions management tab content with category-based layout."""
+    """Permissions management tab content with improved layout."""
 
     # Helper function to render permissions for a category
-    def render_category_permissions(
+    def render_category(
         category: str, permissions: List[Dict[str, Any]]
     ) -> rx.Component:
         return rx.vstack(
             rx.heading(category, size="5", margin_bottom="2"),
-            rx.vstack(
-                rx.foreach(
-                    permissions,
-                    permission_card,
+            rx.box(
+                rx.vstack(
+                    rx.foreach(permissions, permission_card),
+                    spacing="2",
+                    width="100%",
                 ),
-                spacing="4",
+                max_height="400px",
+                overflow_y="auto" if len(permissions) > 6 else "visible",
                 width="100%",
             ),
-            spacing="4",
+            spacing="2",
         )
 
     # Main layout
@@ -457,7 +381,7 @@ def permissions_tab() -> rx.Component:
                 rx.vstack(
                     rx.foreach(
                         PermissionsManagementState.filtered_permissions_by_category.keys(),
-                        lambda category: render_category_permissions(
+                        lambda category: render_category(
                             category,
                             PermissionsManagementState.filtered_permissions_by_category[
                                 category
@@ -467,7 +391,7 @@ def permissions_tab() -> rx.Component:
                     spacing="4",
                     width="100%",
                 ),
-                render_category_permissions(
+                render_category(
                     PermissionsManagementState.perm_selected_category,
                     PermissionsManagementState.filtered_permissions,
                 ),

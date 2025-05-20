@@ -254,3 +254,7 @@ class PermissionsManagementState(rx.State):
             yield rx.toast.error(f"Failed to delete permission: {str(e)}")
         finally:
             self.perm_is_loading = False
+
+    def get_category_color(self, category: str) -> str:
+        """Get color for a category from the dynamic color map."""
+        return self.category_colors.get(category, "gray")
