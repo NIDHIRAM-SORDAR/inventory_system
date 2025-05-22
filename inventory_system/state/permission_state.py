@@ -140,7 +140,7 @@ class PermissionsManagementState(rx.State):
     def open_perm_add_modal(self) -> None:
         """Open add permission modal."""
         self.perm_form_name = ""
-        self.perm_form_category = "Suppliers"
+        self.perm_form_category = ""
         self.perm_form_description = ""
         self.perm_show_add_modal = True
 

@@ -34,10 +34,11 @@ def permission_card(permission: Dict[str, str]) -> rx.Component:
                     size="4",
                     weight="medium",
                     no_wrap=True,
+                    color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
                 ),
                 rx.text(
                     permission["description"],
-                    color="gray.500",
+                    color=rx.color_mode_cond(light="gray.500", dark="gray.400"),
                     size="2",
                     style={"white_space": "pre-line"},
                 ),
@@ -68,10 +69,10 @@ def permission_card(permission: Dict[str, str]) -> rx.Component:
             ),
             align="center",
             justify="between",
-            width="100%",
+            width="100%",  # Ensure full width to prevent overflow
         ),
         padding="3",
-        width="100%",
+        width=["100%", "100%", "48%"],  # Responsive width to fit screen
         min_width="250px",
         style={
             "transition": "all 0.2s ease",
@@ -90,25 +91,33 @@ def search_and_filter() -> rx.Component:
         rx.vstack(
             rx.hstack(
                 rx.hstack(
-                    rx.icon("search", size=18, color="var(--gray-9)"),
+                    rx.icon(
+                        "search",
+                        size=18,
+                        color=rx.color_mode_cond(light="gray.700", dark="gray.300"),
+                    ),
                     rx.input(
                         placeholder="Search permissions...",
                         value=PermissionsManagementState.perm_search_query,
                         on_change=PermissionsManagementState.set_perm_search_query,
                         variant="soft",
                         width=["100%", "250px", "300px", "350px"],
-                        color="var(--gray-11)",
+                        color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
                         style={
                             "border": "none",
                             "box_shadow": "none",
                             "background": "transparent",
-                            "_placeholder": {"color": "var(--gray-8)"},
+                            "_placeholder": {
+                                "color": rx.color_mode_cond(
+                                    light="gray.500", dark="gray.600"
+                                )
+                            },
                         },
                     ),
                     align="center",
                     padding="2",
                     border_radius="var(--radius-2)",
-                    background="var(--gray-3)",
+                    background=rx.color_mode_cond(light="gray.100", dark="gray.800"),
                     border="1px solid var(--gray-5)",
                     style={
                         "transition": "all 0.2s ease",
@@ -134,14 +143,23 @@ def search_and_filter() -> rx.Component:
             ),
             rx.hstack(
                 rx.hstack(
-                    rx.text("Filter by category:", size="2", color="var(--gray-10)"),
+                    rx.text(
+                        "Filter by category:",
+                        size="2",
+                        color=rx.color_mode_cond(light="gray.700", dark="gray.300"),
+                        weight="medium",
+                    ),
                     rx.select.root(
                         rx.select.trigger(
                             placeholder="All categories",
                             variant="soft",
                             size="2",
-                            color="var(--gray-11)",
-                            style={"background": "var(--gray-2)"},
+                            color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
+                            style={
+                                "background": rx.color_mode_cond(
+                                    light="gray.100", dark="gray.800"
+                                )
+                            },
                         ),
                         rx.select.content(
                             rx.foreach(
@@ -164,15 +182,16 @@ def search_and_filter() -> rx.Component:
                     rx.cond(
                         PermissionsManagementState.perm_search_query != "",
                         (
-                            f"Showing {PermissionsManagementState.filtered_permissions.length()} "  # noqa: E501
+                            f"Showing {PermissionsManagementState.filtered_permissions.length()} "
                             f"of {PermissionsManagementState.permissions.length()} "
                             "permissions"
                         ),
                         f"{PermissionsManagementState.permissions.length()} "
                         "total permissions",
                     ),
-                    color="var(--gray-9)",
+                    color=rx.color_mode_cond(light="gray.600", dark="gray.400"),
                     size="2",
+                    weight="medium",
                 ),
                 justify="between",
                 align="center",
@@ -181,14 +200,15 @@ def search_and_filter() -> rx.Component:
                 spacing="3",
             ),
             spacing="4",
-            width="100%",
+            width="100%",  # Ensure full width
         ),
         padding=["3", "4"],
         margin_bottom="6",
         border_radius="var(--radius-3)",
-        background="var(--gray-1)",
+        background=rx.color_mode_cond(light="gray.50", dark="gray.900"),
         border="1px solid var(--gray-4)",
         box_shadow="0 1px 4px rgba(0, 0, 0, 0.03)",
+        width="100%",  # Ensure full width
     )
 
 
@@ -202,8 +222,9 @@ def pagination_controls() -> rx.Component:
                     f"Page {PermissionsManagementState.perm_current_page} "
                     f"of {PermissionsManagementState.perm_total_pages}"
                 ),
-                color="gray.600",
+                color=rx.color_mode_cond(light="gray.600", dark="gray.400"),
                 size="2",
+                weight="medium",
             ),
             rx.spacer(),
             rx.hstack(
@@ -225,6 +246,7 @@ def pagination_controls() -> rx.Component:
                     f"{PermissionsManagementState.perm_current_page}",
                     size="2",
                     weight="medium",
+                    color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
                 ),
                 rx.icon_button(
                     rx.icon("chevron-right", size=16),
@@ -257,7 +279,7 @@ def pagination_controls() -> rx.Component:
 
 def permission_form_modal(is_edit: bool = False) -> rx.Component:
     """Responsive Add/Edit permission modal form."""
-    title = "Edit Permission" if is_edit else "Add New Permission"
+    title = (rx.cond(is_edit, "Edit Permission", "Add New Permission"),)
     submit_handler = (
         PermissionsManagementState.update_permission
         if is_edit
@@ -268,7 +290,8 @@ def permission_form_modal(is_edit: bool = False) -> rx.Component:
         rx.dialog.content(
             rx.dialog.title(title),
             rx.dialog.description(
-                "Fill in the permission details below.", margin_bottom="4"
+                "Fill in the permission details below.",
+                margin_bottom="4",
             ),
             rx.vstack(
                 rx.input(
@@ -276,18 +299,47 @@ def permission_form_modal(is_edit: bool = False) -> rx.Component:
                     value=PermissionsManagementState.perm_form_name,
                     on_change=PermissionsManagementState.set_perm_form_name,
                     width="100%",
+                    color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
+                    background=rx.color_mode_cond(light="gray.100", dark="gray.800"),
                 ),
-                rx.select.root(
-                    rx.select.trigger(placeholder="Select category", width="100%"),
-                    rx.select.content(
-                        rx.foreach(
-                            PermissionsManagementState.perm_categories,
-                            lambda category: rx.select.item(category, value=category),
+                rx.cond(
+                    is_edit,
+                    rx.select.root(
+                        rx.select.trigger(
+                            placeholder="Select category",
+                            width="100%",  # Ensure it fits within modal
+                            variant="soft",
+                            size="2",
+                            color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
+                            style={
+                                "background": rx.color_mode_cond(
+                                    light="gray.100", dark="gray.800"
+                                )
+                            },
+                        ),
+                        rx.select.content(
+                            rx.foreach(
+                                PermissionsManagementState.perm_categories,
+                                lambda category: rx.select.item(
+                                    category, value=category
+                                ),
+                            ),
+                            width="100%",  # Ensure content fits
+                        ),
+                        value=PermissionsManagementState.perm_form_category,
+                        on_change=PermissionsManagementState.set_perm_form_category,
+                        width="100%",
+                    ),
+                    rx.input(
+                        placeholder="Permission Category",
+                        value=PermissionsManagementState.perm_form_category,
+                        on_change=PermissionsManagementState.set_perm_form_category,
+                        width="100%",
+                        color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
+                        background=rx.color_mode_cond(
+                            light="gray.100", dark="gray.800"
                         ),
                     ),
-                    value=PermissionsManagementState.perm_form_category,
-                    on_change=PermissionsManagementState.set_perm_form_category,
-                    width="100%",
                 ),
                 rx.text_area(
                     placeholder="Describe what this permission allows...",
@@ -295,6 +347,8 @@ def permission_form_modal(is_edit: bool = False) -> rx.Component:
                     on_change=PermissionsManagementState.set_perm_form_description,
                     width="100%",
                     height="100px",
+                    color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
+                    background=rx.color_mode_cond(light="gray.100", dark="gray.800"),
                 ),
                 spacing="3",
                 width="100%",
@@ -316,6 +370,7 @@ def permission_form_modal(is_edit: bool = False) -> rx.Component:
             max_width="95vw",
             width=["95vw", "400px"],
             padding=["3", "4"],
+            background=rx.color_mode_cond(light="white", dark="gray.900"),
         ),
         open=PermissionsManagementState.perm_show_edit_modal
         if is_edit
@@ -358,6 +413,7 @@ def delete_confirmation_modal() -> rx.Component:
             ),
             max_width=["90vw", "400px"],
             padding=["4", "6"],
+            background=rx.color_mode_cond(light="white", dark="gray.900"),
         ),
         open=PermissionsManagementState.perm_show_delete_modal,
         on_open_change=lambda x: rx.cond(
@@ -378,14 +434,15 @@ def permissions_tab() -> rx.Component:
             rx.box(
                 rx.vstack(
                     rx.foreach(permissions, permission_card),
-                    spacing="2",
+                    spacing="3",  # Increased spacing to prevent overlap
                     width="100%",
                 ),
                 overflow_y=rx.cond(permissions.length() > 6, "auto", "visible"),
-                max_height="400px",
+                max_height="450px",  # Increased to accommodate more cards
                 width="100%",
             ),
-            spacing="2",
+            spacing="4",  # Increased spacing between sections
+            width="100%",
         )
 
     # Main layout
@@ -405,7 +462,7 @@ def permissions_tab() -> rx.Component:
                             ],
                         ),
                     ),
-                    spacing="4",
+                    spacing="6",  # Increased spacing between categories
                     width="100%",
                 ),
                 render_category(
