@@ -2,18 +2,35 @@ from typing import Any, Dict, List
 
 import reflex as rx
 
-from inventory_system.components.permission_category_badge import category_badge
 from inventory_system.state.permission_state import PermissionsManagementState
 
 
-def permission_card(permission: Dict[str, Any]) -> rx.Component:
+def permission_card(permission: Dict[str, str]) -> rx.Component:
     """Permission card with dynamic category color and unified layout."""
     return rx.card(
         rx.hstack(
-            category_badge(permission["category"]),
+            rx.cond(
+                permission["category"] == "Uncategorized",
+                rx.badge(
+                    rx.icon("book-x", size=16),
+                    rx.text(permission["category"]),
+                    color_scheme="gray",
+                    radius="large",
+                    variant="surface",
+                    size="2",
+                ),
+                rx.badge(
+                    rx.icon("layers-2", size=16),
+                    rx.text(permission["category"]),
+                    color_scheme="tomato",
+                    radius="large",
+                    variant="surface",
+                    size="2",
+                ),
+            ),
             rx.vstack(
                 rx.heading(
-                    permission["name"].replace("_", " ").title(),
+                    permission["name"].to_string().replace("_", " ").title(),
                     size="4",
                     weight="medium",
                     no_wrap=True,
@@ -364,8 +381,8 @@ def permissions_tab() -> rx.Component:
                     spacing="2",
                     width="100%",
                 ),
+                overflow_y=rx.cond(permissions.length() > 6, "auto", "visible"),
                 max_height="400px",
-                overflow_y="auto" if len(permissions) > 6 else "visible",
                 width="100%",
             ),
             spacing="2",
