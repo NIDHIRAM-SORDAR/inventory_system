@@ -28,22 +28,25 @@ def permission_card(permission: Dict[str, str]) -> rx.Component:
                     size="2",
                 ),
             ),
-            rx.vstack(
-                rx.heading(
-                    permission["name"].to_string().replace("_", " ").title(),
-                    size="4",
-                    weight="medium",
-                    no_wrap=True,
-                    color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
+            rx.flex(
+                rx.box(
+                    rx.heading(
+                        permission["name"].to_string().replace("_", " ").title(),
+                        margin_bottom="4px",
+                        size="3",
+                        trim="start",
+                    ),
+                    rx.text(
+                        permission["description"],
+                    ),
+                    style={
+                        "background": "var(--gray-a2)",
+                        "border": "1px dashed var(--gray-a7)",
+                    },
+                    padding="16px",
                 ),
-                rx.text(
-                    permission["description"],
-                    color=rx.color_mode_cond(light="gray.500", dark="gray.400"),
-                    size="2",
-                    style={"white_space": "pre-line"},
-                ),
-                spacing="1",
-                width="100%",
+                direction="column",
+                spacing="3",
             ),
             rx.spacer(),
             rx.hstack(
@@ -72,7 +75,7 @@ def permission_card(permission: Dict[str, str]) -> rx.Component:
             width="100%",  # Ensure full width to prevent overflow
         ),
         padding="3",
-        width=["100%", "100%", "48%"],  # Responsive width to fit screen
+        width=["100%", "100%", "68%"],  # Responsive width to fit screen
         min_width="250px",
         style={
             "transition": "all 0.2s ease",
@@ -212,71 +215,6 @@ def search_and_filter() -> rx.Component:
     )
 
 
-def pagination_controls() -> rx.Component:
-    """Enhanced pagination controls."""
-    return rx.cond(
-        PermissionsManagementState.perm_total_pages > 1,
-        rx.hstack(
-            rx.text(
-                (
-                    f"Page {PermissionsManagementState.perm_current_page} "
-                    f"of {PermissionsManagementState.perm_total_pages}"
-                ),
-                color=rx.color_mode_cond(light="gray.600", dark="gray.400"),
-                size="2",
-                weight="medium",
-            ),
-            rx.spacer(),
-            rx.hstack(
-                rx.icon_button(
-                    rx.icon("chevrons-left", size=16),
-                    variant="soft",
-                    size="2",
-                    on_click=lambda: PermissionsManagementState.set_perm_page(1),
-                    disabled=PermissionsManagementState.perm_current_page == 1,
-                ),
-                rx.icon_button(
-                    rx.icon("chevron-left", size=16),
-                    variant="soft",
-                    size="2",
-                    on_click=PermissionsManagementState.prev_perm_page,
-                    disabled=PermissionsManagementState.perm_current_page == 1,
-                ),
-                rx.text(
-                    f"{PermissionsManagementState.perm_current_page}",
-                    size="2",
-                    weight="medium",
-                    color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
-                ),
-                rx.icon_button(
-                    rx.icon("chevron-right", size=16),
-                    variant="soft",
-                    size="2",
-                    on_click=PermissionsManagementState.next_perm_page,
-                    disabled=PermissionsManagementState.perm_current_page
-                    == PermissionsManagementState.perm_total_pages,
-                ),
-                rx.icon_button(
-                    rx.icon("chevrons-right", size=16),
-                    variant="soft",
-                    size="2",
-                    on_click=lambda: PermissionsManagementState.set_perm_page(
-                        PermissionsManagementState.perm_total_pages
-                    ),
-                    disabled=PermissionsManagementState.perm_current_page
-                    == PermissionsManagementState.perm_total_pages,
-                ),
-                spacing="1",
-            ),
-            justify="between",
-            align="center",
-            width="100%",
-            padding_top="6",
-            flex_wrap="wrap",
-        ),
-    )
-
-
 def permission_form_modal(is_edit: bool = False) -> rx.Component:
     """Responsive Add/Edit permission modal form."""
     title = (rx.cond(is_edit, "Edit Permission", "Add New Permission"),)
@@ -286,139 +224,157 @@ def permission_form_modal(is_edit: bool = False) -> rx.Component:
         else PermissionsManagementState.add_permission
     )
 
-    return rx.dialog.root(
-        rx.dialog.content(
-            rx.dialog.title(title),
-            rx.dialog.description(
-                "Fill in the permission details below.",
-                margin_bottom="4",
-            ),
-            rx.vstack(
-                rx.input(
-                    placeholder="Permission Name",
-                    value=PermissionsManagementState.perm_form_name,
-                    on_change=PermissionsManagementState.set_perm_form_name,
-                    width="100%",
-                    color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
-                    background=rx.color_mode_cond(light="gray.100", dark="gray.800"),
-                ),
-                rx.cond(
-                    is_edit,
-                    rx.select.root(
-                        rx.select.trigger(
-                            placeholder="Select category",
-                            width="100%",  # Ensure it fits within modal
-                            variant="soft",
-                            size="2",
+    return rx.box(
+        rx.flex(
+            rx.dialog.root(
+                rx.dialog.content(
+                    rx.dialog.title(title),
+                    rx.dialog.description(
+                        "Fill in the permission details below.",
+                        margin_bottom="4",
+                    ),
+                    rx.vstack(
+                        rx.input(
+                            placeholder="Permission Name",
+                            value=PermissionsManagementState.perm_form_name,
+                            on_change=PermissionsManagementState.set_perm_form_name,
+                            width="100%",
                             color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
-                            style={
-                                "background": rx.color_mode_cond(
-                                    light="gray.100", dark="gray.800"
-                                )
-                            },
+                            background=rx.color_mode_cond(
+                                light="gray.100", dark="gray.800"
+                            ),
                         ),
-                        rx.select.content(
-                            rx.foreach(
-                                PermissionsManagementState.perm_categories,
-                                lambda category: rx.select.item(
-                                    category, value=category
+                        rx.cond(
+                            is_edit,
+                            rx.select.root(
+                                rx.select.trigger(
+                                    placeholder="Select category",
+                                    width="100%",  # Ensure it fits within modal
+                                    variant="soft",
+                                    size="2",
+                                    color=rx.color_mode_cond(
+                                        light="gray.800", dark="gray.200"
+                                    ),
+                                    style={
+                                        "background": rx.color_mode_cond(
+                                            light="gray.100", dark="gray.800"
+                                        )
+                                    },
+                                ),
+                                rx.select.content(
+                                    rx.foreach(
+                                        PermissionsManagementState.perm_categories,
+                                        lambda category: rx.select.item(
+                                            category, value=category
+                                        ),
+                                    ),
+                                    width="100%",  # Ensure content fits
+                                ),
+                                value=PermissionsManagementState.perm_form_category,
+                                on_change=PermissionsManagementState.set_perm_form_category,
+                                width="100%",
+                            ),
+                            rx.input(
+                                placeholder="Permission Category",
+                                value=PermissionsManagementState.perm_form_category,
+                                on_change=PermissionsManagementState.set_perm_form_category,
+                                width="100%",
+                                color=rx.color_mode_cond(
+                                    light="gray.800", dark="gray.200"
+                                ),
+                                background=rx.color_mode_cond(
+                                    light="gray.100", dark="gray.800"
                                 ),
                             ),
-                            width="100%",  # Ensure content fits
                         ),
-                        value=PermissionsManagementState.perm_form_category,
-                        on_change=PermissionsManagementState.set_perm_form_category,
-                        width="100%",
-                    ),
-                    rx.input(
-                        placeholder="Permission Category",
-                        value=PermissionsManagementState.perm_form_category,
-                        on_change=PermissionsManagementState.set_perm_form_category,
-                        width="100%",
-                        color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
-                        background=rx.color_mode_cond(
-                            light="gray.100", dark="gray.800"
+                        rx.text_area(
+                            placeholder="Describe what this permission allows...",
+                            value=PermissionsManagementState.perm_form_description,
+                            on_change=PermissionsManagementState.set_perm_form_description,
+                            width="100%",
+                            height="100px",
+                            color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
+                            background=rx.color_mode_cond(
+                                light="gray.100", dark="gray.800"
+                            ),
                         ),
+                        spacing="3",
+                        padding="3",
+                        width="100%",
+                        margin_bottom="4",
                     ),
-                ),
-                rx.text_area(
-                    placeholder="Describe what this permission allows...",
-                    value=PermissionsManagementState.perm_form_description,
-                    on_change=PermissionsManagementState.set_perm_form_description,
-                    width="100%",
-                    height="100px",
-                    color=rx.color_mode_cond(light="gray.800", dark="gray.200"),
-                    background=rx.color_mode_cond(light="gray.100", dark="gray.800"),
-                ),
-                spacing="3",
-                width="100%",
-            ),
-            rx.hstack(
-                rx.dialog.close(
-                    rx.button("Cancel", variant="soft", color_scheme="gray")
-                ),
-                rx.dialog.close(
-                    rx.button(
-                        "Update" if is_edit else "Add",
-                        on_click=submit_handler,
-                        loading=PermissionsManagementState.perm_is_loading,
+                    rx.hstack(
+                        rx.dialog.close(
+                            rx.button("Cancel", variant="soft", color_scheme="gray")
+                        ),
+                        rx.dialog.close(
+                            rx.button(
+                                "Update" if is_edit else "Add",
+                                on_click=submit_handler,
+                                loading=PermissionsManagementState.perm_is_loading,
+                            ),
+                        ),
+                        spacing="2",
+                        justify="end",
                     ),
+                    max_width="95vw",
+                    width=["95vw", "400px"],
+                    padding=["3", "4"],
+                    background=rx.color_mode_cond(light="white", dark="gray.900"),
                 ),
-                spacing="2",
-                justify="end",
-            ),
-            max_width="95vw",
-            width=["95vw", "400px"],
-            padding=["3", "4"],
-            background=rx.color_mode_cond(light="white", dark="gray.900"),
-        ),
-        open=PermissionsManagementState.perm_show_edit_modal
-        if is_edit
-        else PermissionsManagementState.perm_show_add_modal,
-        on_open_change=lambda x: rx.cond(
-            ~x, PermissionsManagementState.close_perm_modals(), None
-        ),
+                open=PermissionsManagementState.perm_show_edit_modal
+                if is_edit
+                else PermissionsManagementState.perm_show_add_modal,
+                on_open_change=lambda x: rx.cond(
+                    ~x, PermissionsManagementState.close_perm_modals(), None
+                ),
+            )
+        )
     )
 
 
 def delete_confirmation_modal() -> rx.Component:
     """Delete confirmation modal."""
-    return rx.dialog.root(
-        rx.dialog.content(
-            rx.dialog.title("Delete Permission"),
-            rx.dialog.description(
-                (
-                    f"Are you sure you want to delete the permission "
-                    f"'{PermissionsManagementState.perm_deleting_id}'? "
-                    "This action cannot be undone."
-                ),
-                margin_bottom="4",
-            ),
-            rx.hstack(
-                rx.dialog.close(
-                    rx.button("Cancel", variant="soft", color_scheme="gray"),
-                ),
-                rx.dialog.close(
-                    rx.button(
-                        "Delete",
-                        color_scheme="red",
-                        on_click=PermissionsManagementState.delete_permission,
-                        loading=PermissionsManagementState.perm_is_loading,
+    return rx.box(
+        rx.flex(
+            rx.dialog.root(
+                rx.dialog.content(
+                    rx.dialog.title("Delete Permission"),
+                    rx.dialog.description(
+                        (
+                            f"Are you sure you want to delete the permission "
+                            f"'{PermissionsManagementState.perm_deleting_id}'? "
+                            "This action cannot be undone."
+                        ),
+                        margin_bottom="4",
                     ),
+                    rx.hstack(
+                        rx.dialog.close(
+                            rx.button("Cancel", variant="soft", color_scheme="gray"),
+                        ),
+                        rx.dialog.close(
+                            rx.button(
+                                "Delete",
+                                color_scheme="red",
+                                on_click=PermissionsManagementState.delete_permission,
+                                loading=PermissionsManagementState.perm_is_loading,
+                            ),
+                        ),
+                        spacing="3",
+                        margin_top="4",
+                        justify="end",
+                        flex_wrap="wrap",
+                    ),
+                    max_width=["90vw", "400px"],
+                    padding=["4", "6"],
+                    background=rx.color_mode_cond(light="white", dark="gray.900"),
                 ),
-                spacing="3",
-                margin_top="4",
-                justify="end",
-                flex_wrap="wrap",
-            ),
-            max_width=["90vw", "400px"],
-            padding=["4", "6"],
-            background=rx.color_mode_cond(light="white", dark="gray.900"),
-        ),
-        open=PermissionsManagementState.perm_show_delete_modal,
-        on_open_change=lambda x: rx.cond(
-            ~x, PermissionsManagementState.close_perm_modals(), None
-        ),
+                open=PermissionsManagementState.perm_show_delete_modal,
+                on_open_change=lambda x: rx.cond(
+                    ~x, PermissionsManagementState.close_perm_modals(), None
+                ),
+            )
+        )
     )
 
 
@@ -437,8 +393,6 @@ def permissions_tab() -> rx.Component:
                     spacing="3",  # Increased spacing to prevent overlap
                     width="100%",
                 ),
-                overflow_y=rx.cond(permissions.length() > 6, "auto", "visible"),
-                max_height="450px",  # Increased to accommodate more cards
                 width="100%",
             ),
             spacing="4",  # Increased spacing between sections
