@@ -206,7 +206,7 @@ def search_and_filter() -> rx.Component:
             width="100%",  # Ensure full width
         ),
         padding=["3", "4"],
-        margin_bottom="6",
+        margin_bottom="6px",
         border_radius="var(--radius-3)",
         background=rx.color_mode_cond(light="gray.50", dark="gray.900"),
         border="1px solid var(--gray-4)",
@@ -231,7 +231,7 @@ def permission_form_modal(is_edit: bool = False) -> rx.Component:
                     rx.dialog.title(title),
                     rx.dialog.description(
                         "Fill in the permission details below.",
-                        margin_bottom="4",
+                        margin_bottom="4px",
                     ),
                     rx.vstack(
                         rx.input(
@@ -301,7 +301,7 @@ def permission_form_modal(is_edit: bool = False) -> rx.Component:
                         spacing="3",
                         padding="3",
                         width="100%",
-                        margin_bottom="4",
+                        margin_bottom="16px",
                     ),
                     rx.hstack(
                         rx.dialog.close(
@@ -317,8 +317,9 @@ def permission_form_modal(is_edit: bool = False) -> rx.Component:
                         spacing="2",
                         justify="end",
                     ),
+                    margin_top="16px",
                     max_width="95vw",
-                    width=["95vw", "400px"],
+                    width=["70vw", "400px"],
                     padding=["3", "4"],
                     background=rx.color_mode_cond(light="white", dark="gray.900"),
                 ),
@@ -346,7 +347,7 @@ def delete_confirmation_modal() -> rx.Component:
                             f"'{PermissionsManagementState.perm_deleting_id}'? "
                             "This action cannot be undone."
                         ),
-                        margin_bottom="4",
+                        margin_bottom="4px",
                     ),
                     rx.hstack(
                         rx.dialog.close(
@@ -361,7 +362,7 @@ def delete_confirmation_modal() -> rx.Component:
                             ),
                         ),
                         spacing="3",
-                        margin_top="4",
+                        margin_top="16px",
                         justify="end",
                         flex_wrap="wrap",
                     ),
@@ -386,7 +387,7 @@ def permissions_tab() -> rx.Component:
         category: str, permissions: List[Dict[str, Any]]
     ) -> rx.Component:
         return rx.vstack(
-            rx.heading(category, size="5", margin_bottom="2"),
+            rx.heading(category, size="5", margin_bottom="4px"),
             rx.box(
                 rx.vstack(
                     rx.foreach(permissions, permission_card),
@@ -440,7 +441,7 @@ def permissions_tab() -> rx.Component:
                             PermissionsManagementState.set_perm_search_query(""),
                             PermissionsManagementState.set_perm_category_filter("All"),
                         ],
-                        margin_top="2",
+                        margin_top="2px",
                     ),
                     spacing="2",
                     align="center",
