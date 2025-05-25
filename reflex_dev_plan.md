@@ -20,11 +20,11 @@
 ## Immediate Tasks (Next 1-2 Days)
 
 ### 🔴 High Priority
-- [ ] **Fix permission card length issue** - Cards length is not consisted
-- [ ] **Permission could be  deleted without checking role** - enable soft deletion--check before it's assinged to role.
-- [ ] **Fix logger username issue** - Need to update logger implementation with curret auth.
-- [ ] **remove unnecessary method from permisson state** - There are some unnecessary methods.
-- [ ] **add logger during update, create and change** - no direct logger in permission state
+- [x] **Fix permission card length issue** - Cards length is not consisted
+- [x] **Permission could be  deleted without checking role** - enable soft deletion--check before it's assinged to role.
+- [x] **Fix logger username issue** - Need to update logger implementation with curret auth.
+- [x]**remove unnecessary method from permisson state** - There are some unnecessary methods.
+- [x]**add logger during update, create and change** - no direct logger in permission state
 
 ### 🟡 Medium Priority
 - [ ] **Add bulk operations for permissions** - Select multiple permissions for batch actions
@@ -42,28 +42,16 @@
 **Issue:** Search filter not debounced, causing performance issues  
 **Impact:** API calls on every keystroke  
 **Solution:** Add 300ms debounce to search input  
-**Status:** 🔄 In Progress  
-
-### 2024-01-19
-**Anomaly:** Modal forms losing state on page refresh  
-**Impact:** Users lose form data if accidentally refreshed  
-**Solution:** Implement form state persistence with localStorage  
-**Status:** ❌ Not Started  
+**Status:** ✅ Fixed 
 
 ---
 
 ## Feature Requests & Enhancements
 
 ### UX Improvements
-- [ ] **Dark mode toggle** - User preference for theme switching
-- [ ] **Keyboard shortcuts** - Alt+N for new permission, Ctrl+K for search
-- [ ] **Breadcrumb navigation** - Show current location in app hierarchy
 - [ ] **Toast notification center** - History of recent notifications
 
 ### Technical Improvements
-- [ ] **Error boundary implementation** - Graceful error handling
-- [ ] **Loading skeletons** - Better loading states instead of spinners
-- [ ] **Offline mode support** - Cache critical operations
 - [ ] **Real-time updates** - WebSocket integration for live updates
 
 ---
