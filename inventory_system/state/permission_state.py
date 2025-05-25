@@ -13,8 +13,6 @@ class PermissionsManagementState(rx.State):
     permissions: List[Dict[str, Any]] = []
     perm_search_query: str = ""
     perm_selected_category: str = "All"
-    perm_current_page: int = 1
-    perm_items_per_page: int = 12
     perm_is_loading: bool = False
 
     # Modal states
@@ -65,20 +63,6 @@ class PermissionsManagementState(rx.State):
         return filtered
 
     @rx.var
-    def paginated_permissions(self) -> List[Dict[str, Any]]:
-        start = (self.perm_current_page - 1) * self.perm_items_per_page
-        end = start + self.perm_items_per_page
-        return self.filtered_permissions[start:end]
-
-    @rx.var
-    def perm_total_pages(self) -> int:
-        return max(
-            1,
-            (len(self.filtered_permissions) + self.perm_items_per_page - 1)
-            // self.perm_items_per_page,
-        )
-
-    @rx.var
     def filtered_permissions_by_category(self) -> Dict[str, List[Dict[str, Any]]]:
         """Group filtered permissions by category, sorted by category name."""
         grouped: Dict[str, List[Dict[str, Any]]] = {}
@@ -110,30 +94,11 @@ class PermissionsManagementState(rx.State):
     def set_perm_search_query(self, query: str) -> None:
         """Update search query and reset to first page."""
         self.perm_search_query = query
-        self.perm_current_page = 1
 
     @rx.event
     def set_perm_category_filter(self, category: str) -> None:
         """Update category filter and reset to first page."""
         self.perm_selected_category = category
-        self.perm_current_page = 1
-
-    @rx.event
-    def set_perm_page(self, page: int) -> None:
-        """Set current page."""
-        self.perm_current_page = max(1, min(page, self.perm_total_pages))
-
-    @rx.event
-    def next_perm_page(self) -> None:
-        """Go to next page."""
-        if self.perm_current_page < self.perm_total_pages:
-            self.perm_current_page += 1
-
-    @rx.event
-    def prev_perm_page(self) -> None:
-        """Go to previous page."""
-        if self.perm_current_page > 1:
-            self.perm_current_page -= 1
 
     # Modal handlers
     @rx.event
@@ -243,18 +208,9 @@ class PermissionsManagementState(rx.State):
                     Permission.delete_permission(name=perm.name, session=session)
                     session.commit()
                     self.load_permissions()
-                    if (
-                        len(self.paginated_permissions) == 0
-                        and self.perm_current_page > 1
-                    ):
-                        self.perm_current_page -= 1
                     self.close_perm_modals()
                     yield rx.toast.success("Permission deleted successfully")
         except Exception as e:
             yield rx.toast.error(f"Failed to delete permission: {str(e)}")
         finally:
             self.perm_is_loading = False
-
-    def get_category_color(self, category: str) -> str:
-        """Get color for a category from the dynamic color map."""
-        return self.category_colors.get(category, "gray")
