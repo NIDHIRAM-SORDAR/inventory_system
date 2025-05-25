@@ -396,16 +396,14 @@ def permission_form_modal(is_edit: bool = False) -> rx.Component:
                             style={"min_height": "44px"},
                         )
                     ),
-                    rx.dialog.close(
-                        rx.button(
-                            rx.cond(is_edit, "Update Permission", "Add Permission"),
-                            on_click=submit_handler,
-                            loading=PermissionsManagementState.perm_is_loading,
-                            size="3",
-                            color_scheme="blue",
-                            width=["100%", "auto"],
-                            style={"min_height": "44px", "font_weight": "600"},
-                        ),
+                    rx.button(
+                        rx.cond(is_edit, "Update Permission", "Add Permission"),
+                        on_click=submit_handler,
+                        loading=PermissionsManagementState.perm_is_loading,
+                        size="3",
+                        color_scheme="blue",
+                        width=["100%", "auto"],
+                        style={"min_height": "44px", "font_weight": "600"},
                     ),
                     spacing="3",
                     width="100%",
@@ -415,8 +413,8 @@ def permission_form_modal(is_edit: bool = False) -> rx.Component:
                 spacing="6",
                 width="100%",
             ),
-            max_width=["95vw", "500px"],
-            width=["90vw", "500px"],
+            max_width=["85vw", "500px"],
+            width=["80vw", "500px"],
             padding=["4", "6"],
             style={
                 "max_height": "90vh",
@@ -467,16 +465,14 @@ def delete_confirmation_modal() -> rx.Component:
                             style={"min_height": "44px"},
                         )
                     ),
-                    rx.dialog.close(
-                        rx.button(
-                            "Delete Permission",
-                            color_scheme="red",
-                            on_click=PermissionsManagementState.delete_permission,
-                            loading=PermissionsManagementState.perm_is_loading,
-                            size="3",
-                            width=["100%", "auto"],
-                            style={"min_height": "44px", "font_weight": "600"},
-                        )
+                    rx.button(
+                        "Delete Permission",
+                        color_scheme="red",
+                        on_click=PermissionsManagementState.delete_permission,
+                        loading=PermissionsManagementState.perm_is_loading,
+                        size="3",
+                        width=["100%", "auto"],
+                        style={"min_height": "44px", "font_weight": "600"},
                     ),
                     spacing="3",
                     width="100%",
@@ -486,8 +482,8 @@ def delete_confirmation_modal() -> rx.Component:
                 spacing="4",
                 width="100%",
             ),
-            max_width=["95vw", "450px"],
-            width=["90vw", "450px"],
+            max_width=["85vw", "450px"],
+            width=["80vw", "450px"],
             padding=["4", "6"],
         ),
         open=PermissionsManagementState.perm_show_delete_modal,
