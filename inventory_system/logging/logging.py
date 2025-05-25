@@ -48,7 +48,11 @@ def ensure_log_dir_exists() -> bool:
 
 
 def filter_unwanted_messages(record: Dict[str, Any]) -> bool:
-    """Filter out log messages containing '1 change detected'."""
+    """Filter out log messages containing '1 change detected', but allow errors."""
+    # Always allow ERROR and CRITICAL level messages
+    if record["level"].name in ["ERROR", "CRITICAL"]:
+        return True
+    # Filter out the unwanted messages for other levels
     return "1 change detected" not in record["message"]
 
 
@@ -62,14 +66,30 @@ def format_json_record(record: Dict[str, Any]) -> str:
         "file": record["file"].path,
         "line": record["line"],
     }
+
+    # Add exception info if present
+    if record.get("exception"):
+        log_entry["exception"] = {
+            "type": record["exception"].type.__name__
+            if record["exception"].type
+            else None,
+            "value": str(record["exception"].value)
+            if record["exception"].value
+            else None,
+            "traceback": record["exception"].traceback
+            if record["exception"].traceback
+            else None,
+        }
+
     return json.dumps(log_entry, cls=DateTimeEncoder)
 
 
 def format_record(record: Dict[str, Any]) -> str:
     """Format the record into a readable message with context."""
     timestamp = record["time"].strftime("%Y-%m-%d %H:%M:%S")
+    level = record["level"].name
     message = record["message"]
-    log_parts = [f"[{timestamp}] {message}"]
+    log_parts = [f"[{timestamp}] {level}: {message}"]
     extras = record.get("extra", {})
 
     try:
@@ -110,6 +130,10 @@ def format_record(record: Dict[str, Any]) -> str:
             if extra_fields:
                 log_parts.append(" | " + " ".join(extra_fields))
 
+        # Add exception information if present
+        if record.get("exception"):
+            log_parts.append(f"\nException: {record['exception']}")
+
     except Exception as e:
         log_parts.append(f" | formatting_error={str(e)}")
 
@@ -125,7 +149,9 @@ def setup_loguru():
     """Set up Loguru logging."""
     # Load configuration from environment variables
     log_config = {
-        "level": os.getenv("LOG_LEVEL", "INFO").upper(),
+        "level": os.getenv(
+            "LOG_LEVEL", "DEBUG"
+        ).upper(),  # Changed to DEBUG to capture more
         "format": os.getenv("LOG_FORMAT", "human").lower(),
         "rotation": os.getenv("LOG_ROTATION", "1 day"),
         "retention": os.getenv("LOG_RETENTION", "30 days"),
@@ -161,6 +187,7 @@ def setup_loguru():
             "Failed to set up file logging. Logs will only be sent to console."
         )
 
+    # Console logging with more verbose output for development
     patched_logger.add(
         sys.stderr,
         level=log_config["level"],
@@ -168,6 +195,8 @@ def setup_loguru():
         format="{extra[formatted_message]}",
         catch=True,
         colorize=True,
+        backtrace=True,
+        diagnose=True,
     )
 
     return patched_logger

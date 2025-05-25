@@ -1,3 +1,4 @@
+import contextlib
 from typing import List, Optional
 
 import reflex as rx
@@ -7,6 +8,10 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 
 from inventory_system import routes
+from inventory_system.logging.audit import (
+    clear_current_user_context,
+    set_current_user_context,
+)
 from inventory_system.logging.logging import audit_logger
 from inventory_system.models.user import Role, UserInfo
 
@@ -66,6 +71,18 @@ class AuthState(reflex_local_auth.LocalAuthState):
         """  # noqa: E501
         return self.is_authenticated and bool(self.user_id)
 
+    @contextlib.contextmanager
+    def audit_context(self):
+        """Context manager to set audit context for database operations."""
+        if self.is_authenticated_and_ready and self.username:
+            set_current_user_context(self.user_id, self.username)
+            try:
+                yield
+            finally:
+                clear_current_user_context()
+        else:
+            yield
+
     @rx.event
     async def load_user_data(self):
         """Load user data, roles, and permissions from the database.
@@ -82,6 +99,7 @@ class AuthState(reflex_local_auth.LocalAuthState):
                 reason="Not authenticated or no user",
             )
             yield rx.toast.error("Not authenticated or no user")
+            return
 
         self.auth_processing = True
         yield
@@ -103,11 +121,10 @@ class AuthState(reflex_local_auth.LocalAuthState):
                     )
                     self.reset_state()
                     yield rx.toast.error("User info not found. Please log in again.")
+                    return
 
                 # Update state with UserInfo
-                self.auth_profile_picture = (
-                    user_info.profile_picture
-                )  # Store the profile pitcure
+                self.auth_profile_picture = user_info.profile_picture
                 self.user_id = user_info.user_id
                 self.user_email = user_info.email
                 self.roles = user_info.get_roles()
@@ -142,59 +159,63 @@ class AuthState(reflex_local_auth.LocalAuthState):
                 error="No authenticated user",
             )
             yield rx.toast.error("No authenticated user")
+            return
 
         if not email:
             yield rx.toast.error("Email is required")
+            return
 
         self.auth_processing = True
         yield
+
+        original_email = self.user_email
         try:
-            with rx.session() as session:
-                validate_email(email, check_deliverability=False)
-                existing_user = session.exec(
-                    select(UserInfo).where(
-                        UserInfo.email == email,
-                        UserInfo.user_id != self.user_id,
+            with self.audit_context():
+                with rx.session() as session:
+                    validate_email(email, check_deliverability=False)
+                    existing_user = session.exec(
+                        select(UserInfo).where(
+                            UserInfo.email == email,
+                            UserInfo.user_id != self.user_id,
+                        )
+                    ).one_or_none()
+                    if existing_user:
+                        raise ValueError("This email is already in use by another user")
+
+                    user_info = session.exec(
+                        select(UserInfo)
+                        .where(UserInfo.user_id == self.user_id)
+                        .with_for_update()
+                    ).one_or_none()
+                    if not user_info:
+                        raise ValueError("User info not found")
+
+                    # Optimistic update for UI
+                    self.user_email = email
+
+                    user_info.email = email
+                    user_info.update_timestamp()
+                    session.add(user_info)
+
+                    # Update LocalUser email
+                    local_user = session.exec(
+                        select(reflex_local_auth.LocalUser).where(
+                            reflex_local_auth.LocalUser.id == self.user_id
+                        )
+                    ).one_or_none()
+                    if local_user:
+                        local_user.email = email
+                        session.add(local_user)
+
+                    session.commit()
+                    session.refresh(user_info)
+
+                    audit_logger.info(
+                        "update_user_info_success",
+                        user_id=self.user_id,
+                        email=email,
                     )
-                ).one_or_none()
-                if existing_user:
-                    raise ValueError("This email is already in use by another user")
-
-                user_info = session.exec(
-                    select(UserInfo)
-                    .where(UserInfo.user_id == self.user_id)
-                    .with_for_update()
-                ).one_or_none()
-                if not user_info:
-                    raise ValueError("User info not found")
-
-                # Optimistic update for UI
-                original_email = self.user_email
-                self.user_email = email
-
-                user_info.email = email
-                user_info.update_timestamp()
-                session.add(user_info)
-
-                # Update LocalUser email
-                local_user = session.exec(
-                    select(reflex_local_auth.LocalUser).where(
-                        reflex_local_auth.LocalUser.id == self.user_id
-                    )
-                ).one_or_none()
-                if local_user:
-                    local_user.email = email
-                    session.add(local_user)
-
-                session.commit()
-                session.refresh(user_info)
-
-                audit_logger.info(
-                    "update_user_info_success",
-                    user_id=self.user_id,
-                    email=email,
-                )
-                yield rx.toast.success("User info updated successfully")
+                    yield rx.toast.success("User info updated successfully")
         except Exception as e:
             session.rollback()
             self.user_email = original_email
@@ -219,39 +240,41 @@ class AuthState(reflex_local_auth.LocalAuthState):
                 error="No authenticated user",
             )
             yield rx.toast.error("No authenticated user")
+            return
 
         self.auth_processing = True
         yield
+
+        original_roles = self.roles
         try:
-            with rx.session() as session:
-                user_info = session.exec(
-                    select(UserInfo)
-                    .where(UserInfo.user_id == self.user_id)
-                    .with_for_update()
-                ).one_or_none()
-                if not user_info:
-                    raise ValueError("User info not found")
+            with self.audit_context():
+                with rx.session() as session:
+                    user_info = session.exec(
+                        select(UserInfo)
+                        .where(UserInfo.user_id == self.user_id)
+                        .with_for_update()
+                    ).one_or_none()
+                    if not user_info:
+                        raise ValueError("User info not found")
 
-                # Optimistic update for UI
-                original_roles = self.roles
-                self.roles = role_names
-                self.user_info.set_roles(role_names, session)  # Update user_info
+                    # Optimistic update for UI
+                    self.roles = role_names
 
-                user_info.set_roles(role_names, session)
-                session.commit()
-                session.refresh(user_info)
+                    user_info.set_roles(role_names, session)
+                    session.commit()
+                    session.refresh(user_info)
 
-                self.permissions = user_info.get_permissions(session=session)
+                    self.permissions = user_info.get_permissions(session=session)
 
-                audit_logger.info(
-                    "roles_updated",
-                    user_id=self.user_id,
-                    role_names=role_names,
-                )
-                yield rx.toast.success("Roles updated successfully")
+                    audit_logger.info(
+                        "roles_updated",
+                        user_id=self.user_id,
+                        role_names=role_names,
+                    )
+                    yield rx.toast.success("Roles updated successfully")
         except Exception as e:
             session.rollback()
-            self.set_roles(original_roles)
+            self.roles = original_roles
             audit_logger.error(
                 "roles_update_failed",
                 user_id=self.user_id,
@@ -283,6 +306,7 @@ class AuthState(reflex_local_auth.LocalAuthState):
                 self.reset_state()
                 yield rx.toast.error("Session invalid. Please log in.")
                 yield rx.redirect(routes.LOGIN_ROUTE)
+                return
 
             with rx.session() as session:
                 local_user = session.exec(
@@ -301,6 +325,7 @@ class AuthState(reflex_local_auth.LocalAuthState):
                     self.reset_state()
                     yield rx.toast.error("Session invalid. Please log in.")
                     yield rx.redirect(routes.LOGIN_ROUTE)
+                    return
 
                 audit_logger.info(
                     "validate_session_success",
@@ -332,4 +357,4 @@ class AuthState(reflex_local_auth.LocalAuthState):
         self.roles = []
         self.permissions = []
         self.auth_error_message = ""
-        self.auth_profile_picture = ""
+        self.auth_profile_picture = None

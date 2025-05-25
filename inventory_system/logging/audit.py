@@ -1,4 +1,7 @@
 # inventory_system/logging/audit.py
+import contextvars
+from typing import Optional
+
 import reflex as rx
 import reflex_local_auth
 from sqlalchemy import event, inspect
@@ -6,6 +9,32 @@ from sqlalchemy.orm import Mapper
 from sqlmodel import select
 
 from inventory_system.logging.logging import audit_logger
+
+# Context variable to store current user info during operations
+current_user_context = contextvars.ContextVar("current_user", default=None)
+
+
+class CurrentUserInfo:
+    """Container for current user information during audit operations."""
+
+    def __init__(self, user_id: int, username: str):
+        self.user_id = user_id
+        self.username = username
+
+
+def set_current_user_context(user_id: int, username: str):
+    """Set the current user context for audit logging."""
+    current_user_context.set(CurrentUserInfo(user_id, username))
+
+
+def get_current_user_context() -> Optional[CurrentUserInfo]:
+    """Get the current user context for audit logging."""
+    return current_user_context.get()
+
+
+def clear_current_user_context():
+    """Clear the current user context."""
+    current_user_context.set(None)
 
 
 def get_username_by_user_id(user_id):
@@ -24,6 +53,29 @@ def get_username_by_user_id(user_id):
         return None
 
 
+def get_user_info_for_audit(target):
+    """Get user information for audit logging with fallback strategies."""
+    # Strategy 1: Use current user context
+    # (for operations initiated by authenticated users)
+    current_user = get_current_user_context()
+    if current_user:
+        return current_user.user_id, current_user.username
+
+    # Strategy 2: Check if target has user_id (for user-owned entities)
+    if hasattr(target, "user_id") and target.user_id:
+        username = get_username_by_user_id(target.user_id)
+        return target.user_id, username
+
+    # Strategy 3: For association tables, try to derive user from relationships
+    if target.__tablename__ == "userrole":
+        # Try to get username from the user_id in the association
+        username = get_username_by_user_id(target.user_id)
+        return target.user_id, username
+
+    # Strategy 4: System operation (no specific user)
+    return None, "system"
+
+
 def get_entity_id(target):
     """Generate an entity_id for a model, handling association tables."""
     if hasattr(target, "id"):
@@ -38,8 +90,7 @@ def get_entity_id(target):
 
 def log_insert(mapper: Mapper, connection, target):
     """Log insertion of a new record."""
-    user_id = getattr(target, "user_id", None)
-    username = get_username_by_user_id(user_id) if user_id else None
+    user_id, username = get_user_info_for_audit(target)
     details = {
         "new": {k: v for k, v in target.__dict__.items() if not k.startswith("_")}
     }
@@ -57,8 +108,7 @@ def log_insert(mapper: Mapper, connection, target):
 def log_update(mapper: Mapper, connection, target):
     """Log updates to an existing record."""
     state = inspect(target)
-    user_id = getattr(target, "user_id", None)
-    username = get_username_by_user_id(user_id) if user_id else None
+    user_id, username = get_user_info_for_audit(target)
     changes = {}
     for attr in state.attrs:
         if attr.history.has_changes():
@@ -81,8 +131,7 @@ def log_update(mapper: Mapper, connection, target):
 
 def log_delete(mapper: Mapper, connection, target):
     """Log deletion of a record."""
-    user_id = getattr(target, "user_id", None)
-    username = get_username_by_user_id(user_id) if user_id else None
+    user_id, username = get_user_info_for_audit(target)
     details = {
         "deleted": {
             attr: getattr(target, attr)

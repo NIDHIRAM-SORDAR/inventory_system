@@ -3,7 +3,9 @@ from typing import Any, Dict, List, Optional
 import reflex as rx
 from sqlmodel import select
 
-from inventory_system.models.user import Permission
+from inventory_system.logging.logging import audit_logger
+from inventory_system.models.user import Permission, Role, RolePermission
+from inventory_system.state.auth import AuthState
 
 
 class PermissionsManagementState(rx.State):
@@ -71,6 +73,23 @@ class PermissionsManagementState(rx.State):
             grouped.setdefault(cat, []).append(p)
         # Sort categories alphabetically
         return dict(sorted(grouped.items()))
+
+    @rx.var
+    def permission_assigned_roles(self) -> List[str]:
+        """Get roles assigned to the permission being deleted."""
+        if self.perm_deleting_id is None:
+            return []
+        with rx.session() as session:
+            role_permissions = session.exec(
+                select(RolePermission).where(
+                    RolePermission.permission_id == self.perm_deleting_id
+                )
+            ).all()
+            role_ids = [rp.role_id for rp in role_permissions]
+            if not role_ids:
+                return []
+            roles = session.exec(select(Role).where(Role.id.in_(role_ids))).all()
+            return [role.name for role in roles if role.is_active]
 
     # Initial data load
     def load_permissions(self) -> None:
@@ -147,20 +166,48 @@ class PermissionsManagementState(rx.State):
             return
         self.perm_is_loading = True
         try:
-            with rx.session() as session:
-                Permission.create_permission(
+            # Get the AuthState instance from the current state
+            auth_state = await self.get_state(AuthState)
+
+            with auth_state.audit_context():
+                audit_logger.info(
+                    f"{auth_state.username} is attempting to add a new permission",
                     name=self.perm_form_name,
                     description=self.perm_form_description,
                     category=self.perm_form_category,
-                    session=session,
                 )
-                session.commit()
-                self.load_permissions()
-                self.close_perm_modals()
-                yield rx.toast.success(
-                    f"Permission '{self.perm_form_name}' added successfully"
-                )
+                with rx.session() as session:
+                    Permission.create_permission(
+                        name=self.perm_form_name,
+                        description=self.perm_form_description,
+                        category=self.perm_form_category,
+                        session=session,
+                    )
+                    session.commit()
+                    self.load_permissions()
+                    self.close_perm_modals()
+                    new_perm = session.exec(
+                        select(Permission).where(Permission.name == self.perm_form_name)
+                    ).one()
+                    audit_logger.info(
+                        "add_permission_success",
+                        permission_id=new_perm.id,
+                        name=new_perm.name,
+                        description=new_perm.description,
+                        category=new_perm.category,
+                    )
+                    yield rx.toast.success(
+                        f"Permission '{self.perm_form_name}' added successfully"
+                    )
         except Exception as e:
+            session.rollback()
+            audit_logger.error(
+                "add_permission_failed",
+                name=self.perm_form_name,
+                description=self.perm_form_description,
+                category=self.perm_form_category,
+                error=str(e),
+            )
             yield rx.toast.error(f"Failed to add permission: {str(e)}")
         finally:
             self.perm_is_loading = False
@@ -173,24 +220,41 @@ class PermissionsManagementState(rx.State):
             return
         self.perm_is_loading = True
         try:
-            with rx.session() as session:
-                perm = session.exec(
-                    select(Permission).where(Permission.id == self.perm_editing_id)
-                ).one_or_none()
-                if perm:
-                    perm.update_permission(
-                        session=session,
-                        name=self.perm_form_name,
-                        description=self.perm_form_description,
-                        category=self.perm_form_category,
-                    )
-                    session.commit()
-                    self.load_permissions()
-                    self.close_perm_modals()
-                    yield rx.toast.success(
-                        f"Permission '{self.perm_form_name}' updated successfully"
-                    )
+            auth_state = await self.get_state(AuthState)
+            with auth_state.audit_context():
+                with rx.session() as session:
+                    perm = session.exec(
+                        select(Permission).where(Permission.id == self.perm_editing_id)
+                    ).one_or_none()
+                    if perm:
+                        audit_logger.info(
+                            f"{auth_state.username} is attempting to update a permission",
+                            permission_id=perm.id,
+                            name=perm.name,
+                            description=perm.description,
+                            category=perm.category,
+                        )
+                        perm.update_permission(
+                            session=session,
+                            name=self.perm_form_name,
+                            description=self.perm_form_description,
+                            category=self.perm_form_category,
+                        )
+                        session.commit()
+                        self.load_permissions()
+                        self.close_perm_modals()
+                        yield rx.toast.success(
+                            f"Permission '{self.perm_form_name}' updated successfully"
+                        )
         except Exception as e:
+            session.rollback()
+            audit_logger.error(
+                "update_permission_failed",
+                name=self.perm_form_name,
+                description=self.perm_form_description,
+                category=self.perm_form_category,
+                error=str(e),
+            )
             yield rx.toast.error(f"Failed to update permission: {str(e)}")
         finally:
             self.perm_is_loading = False
@@ -200,17 +264,50 @@ class PermissionsManagementState(rx.State):
         """Delete a permission."""
         self.perm_is_loading = True
         try:
-            with rx.session() as session:
-                perm = session.exec(
-                    select(Permission).where(Permission.id == self.perm_deleting_id)
-                ).one_or_none()
-                if perm:
-                    Permission.delete_permission(name=perm.name, session=session)
-                    session.commit()
-                    self.load_permissions()
-                    self.close_perm_modals()
-                    yield rx.toast.success("Permission deleted successfully")
+            auth_state = await self.get_state(AuthState)
+            with auth_state.audit_context():
+                with rx.session() as session:
+                    perm = session.exec(
+                        select(Permission).where(Permission.id == self.perm_deleting_id)
+                    ).one_or_none()
+                    if perm:
+                        role_permissions = session.exec(
+                            select(RolePermission).where(
+                                RolePermission.permission_id == perm.id
+                            )
+                        ).all()
+                        if role_permissions:
+                            role_names = self.permission_assigned_roles
+                            yield rx.toast.error(
+                                f"Cannot delete permission '{perm.name}' as it is assigned to roles: {', '.join(role_names)}. Detach it first."
+                            )
+                            return
+
+                        # NEW: Log before state
+                        audit_logger.info(
+                            f"{auth_state.username} is attempting to delete a permission",
+                            permission_id=perm.id,
+                            name=perm.name,
+                            description=perm.description,
+                            category=perm.category,
+                        )
+                        Permission.delete_permission(name=perm.name, session=session)
+                        session.commit()
+                        self.load_permissions()
+                        self.close_perm_modals()
+                        audit_logger.info(
+                            "delete_permission_success",
+                            permission_id=perm.id,
+                            name=perm.name,
+                        )
+                        yield rx.toast.success("Permission deleted successfully")
         except Exception as e:
+            session.rollback()
+            audit_logger.error(
+                "delete_permission_failed",
+                name=perm.name,
+                error=str(e),
+            )
             yield rx.toast.error(f"Failed to delete permission: {str(e)}")
         finally:
             self.perm_is_loading = False

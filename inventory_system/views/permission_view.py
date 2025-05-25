@@ -447,14 +447,88 @@ def delete_confirmation_modal() -> rx.Component:
                     spacing="3",
                 ),
                 rx.dialog.description(
-                    "Are you sure you want to delete this permission? This action "
-                    "cannot be undone and may affect users "
-                    "who currently have this permission.",
-                    size="3",
-                    color=rx.color_mode_cond(light="gray.700", dark="gray.300"),
-                    line_height="1.5",
+                    rx.cond(
+                        PermissionsManagementState.permission_assigned_roles,
+                        # MODIFIED: Updated to show message directing to role tab
+                        rx.vstack(
+                            rx.text(
+                                "This permission is assigned to the following roles and cannot be deleted until detached:",
+                                size="3",
+                                color=rx.color_mode_cond(
+                                    light="gray.700", dark="gray.300"
+                                ),
+                                line_height="1.5",
+                            ),
+                            # NEW: Wrap badges in flex container with wrapping
+                            rx.flex(
+                                rx.foreach(
+                                    PermissionsManagementState.permission_assigned_roles,
+                                    lambda role: rx.badge(
+                                        role,
+                                        color_scheme="orange",
+                                        variant="soft",
+                                        size="2",
+                                        margin="2px",  # MODIFIED: Adjusted margin for flex layout
+                                    ),
+                                ),
+                                wrap="wrap",
+                                spacing="2",
+                                width="100%",
+                            ),
+                            # NEW: Message to direct user to role tab
+                            rx.text(
+                                "Please navigate to the Role Management tab to detach this permission from the listed roles.",
+                                size="3",
+                                color=rx.color_mode_cond(
+                                    light="gray.700", dark="gray.300"
+                                ),
+                                line_height="1.5",
+                                font_weight="600",
+                            ),
+                            # REMOVED: Detach from All Roles button
+                            spacing="3",
+                            width="100%",
+                        ),
+                        # MODIFIED: Default description when no roles are assigned
+                        rx.text(
+                            "Are you sure you want to delete this permission? This action "
+                            "cannot be undone and may affect users "
+                            "who currently have this permission.",
+                            size="3",
+                            color=rx.color_mode_cond(light="gray.700", dark="gray.300"),
+                            line_height="1.5",
+                        ),
+                    ),
+                    width="100%",
                 ),
-                rx.hstack(
+                # MODIFIED: Show delete button only if no roles are assigned
+                rx.cond(
+                    ~PermissionsManagementState.permission_assigned_roles,
+                    rx.hstack(
+                        rx.dialog.close(
+                            rx.button(
+                                "Cancel",
+                                variant="soft",
+                                color_scheme="gray",
+                                size="3",
+                                width=["100%", "auto"],
+                                style={"min_height": "44px"},
+                            )
+                        ),
+                        rx.button(
+                            "Delete Permission",
+                            color_scheme="red",
+                            on_click=PermissionsManagementState.delete_permission,
+                            loading=PermissionsManagementState.perm_is_loading,
+                            size="3",
+                            width=["100%", "auto"],
+                            style={"min_height": "44px", "font_weight": "600"},
+                        ),
+                        spacing="3",
+                        width="100%",
+                        justify="end",
+                        flex_direction=["column-reverse", "row"],
+                    ),
                     rx.dialog.close(
                         rx.button(
                             "Cancel",
@@ -465,19 +539,6 @@ def delete_confirmation_modal() -> rx.Component:
                             style={"min_height": "44px"},
                         )
                     ),
-                    rx.button(
-                        "Delete Permission",
-                        color_scheme="red",
-                        on_click=PermissionsManagementState.delete_permission,
-                        loading=PermissionsManagementState.perm_is_loading,
-                        size="3",
-                        width=["100%", "auto"],
-                        style={"min_height": "44px", "font_weight": "600"},
-                    ),
-                    spacing="3",
-                    width="100%",
-                    justify="end",
-                    flex_direction=["column-reverse", "row"],
                 ),
                 spacing="4",
                 width="100%",
