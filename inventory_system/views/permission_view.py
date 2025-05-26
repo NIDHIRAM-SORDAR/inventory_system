@@ -39,8 +39,10 @@ def permission_card(permission: Dict[str, str]) -> rx.Component:
                         variant="ghost",
                         size="2",
                         color_scheme="blue",
-                        on_click=lambda: PermissionsManagementState.open_perm_edit_modal(
-                            permission["id"]
+                        on_click=lambda: (
+                            PermissionsManagementState.open_perm_edit_modal(
+                                permission["id"]
+                            )
                         ),
                         style={
                             "min_width": ["40px", "40px", "auto"],
@@ -53,8 +55,10 @@ def permission_card(permission: Dict[str, str]) -> rx.Component:
                         variant="ghost",
                         size="2",
                         color_scheme="red",
-                        on_click=lambda: PermissionsManagementState.open_perm_delete_modal(
-                            permission["id"]
+                        on_click=lambda: (
+                            PermissionsManagementState.open_perm_delete_modal(
+                                permission["id"]
+                            )
                         ),
                         style={
                             "min_width": ["40px", "40px", "auto"],
@@ -452,7 +456,8 @@ def delete_confirmation_modal() -> rx.Component:
                         # MODIFIED: Updated to show message directing to role tab
                         rx.vstack(
                             rx.text(
-                                "This permission is assigned to the following roles and cannot be deleted until detached:",
+                                "This permission is assigned to the following "
+                                "roles and cannot be deleted until detached:",
                                 size="3",
                                 color=rx.color_mode_cond(
                                     light="gray.700", dark="gray.300"
@@ -613,7 +618,8 @@ def empty_state() -> rx.Component:
                 text_align="center",
             ),
             rx.text(
-                "Try adjusting your search terms or category filter to find what you're looking for.",
+                "Try adjusting your search terms or category "
+                "filter to find what you're looking for.",
                 size="3",
                 color=rx.color_mode_cond(light="gray.500", dark="gray.500"),
                 text_align="center",

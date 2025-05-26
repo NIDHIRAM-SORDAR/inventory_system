@@ -6,6 +6,7 @@ from inventory_system.state.auth import AuthState
 from inventory_system.state.user_mgmt_state import UserManagementState
 from inventory_system.templates.template import template
 from inventory_system.views.permission_view import permissions_tab
+from inventory_system.views.role_view import role_management_page
 
 
 def _header_cell(text: str, icon: str) -> rx.Component:
@@ -443,7 +444,7 @@ def user_management() -> rx.Component:
                 value="profiles",
             ),
             rx.tabs.content(
-                rx.text("Roles content to be implemented."),
+                role_management_page(),
                 value="roles",
             ),
             rx.tabs.content(

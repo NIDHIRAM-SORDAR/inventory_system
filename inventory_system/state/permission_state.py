@@ -279,7 +279,9 @@ class PermissionsManagementState(rx.State):
                         if role_permissions:
                             role_names = self.permission_assigned_roles
                             yield rx.toast.error(
-                                f"Cannot delete permission '{perm.name}' as it is assigned to roles: {', '.join(role_names)}. Detach it first."
+                                f"Cannot delete permission '{perm.name}' as it is "
+                                f"assigned to roles: {', '.join(role_names)}. "
+                                "Detach it first."
                             )
                             return
 
