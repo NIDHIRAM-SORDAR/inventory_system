@@ -20,7 +20,74 @@ def _header_cell(text: str, icon: str) -> rx.Component:
     )
 
 
+def _role_badge(role: str) -> rx.Component:
+    """Create a styled badge for individual roles"""
+    # Define role-specific colors for better visual distinction
+    role_colors = {
+        "admin": "red",
+        "manager": "blue",
+        "employee": "green",
+        "viewer": "gray",
+        "supplier": "orange",
+    }
+
+    return rx.badge(
+        role.to(str).capitalize(),
+        color_scheme=role_colors.get(role, "gray"),
+        variant="soft",
+        size="1",
+    )
+
+
+def _roles_display(roles: rx.Var) -> rx.Component:
+    """Display multiple roles as badges with proper wrapping"""
+    return rx.flex(
+        rx.foreach(
+            roles,
+            lambda role: _role_badge(role),
+        ),
+        wrap="wrap",
+        gap="1",
+        align="center",
+    )
+
+
+def _role_selection_checkboxes() -> rx.Component:
+    """Create checkboxes for role selection with improved layout"""
+    return rx.vstack(
+        rx.text("Select Roles:", weight="bold", size="2"),
+        rx.grid(
+            rx.foreach(
+                UserManagementState.available_roles.to(list),
+                lambda role: rx.flex(
+                    rx.checkbox(
+                        role.to(str).capitalize(),
+                        checked=rx.cond(
+                            UserManagementState.selected_roles.contains(role),
+                            True,
+                            False,
+                        ),
+                        on_change=lambda _: UserManagementState.toggle_role_selection(
+                            role
+                        ),
+                        size="2",
+                    ),
+                    align="center",
+                    min_width="120px",  # Ensure consistent spacing
+                ),
+            ),
+            columns=rx.breakpoints(initial="1", sm="2", md="3"),
+            spacing="3",
+            width="100%",
+        ),
+        spacing="3",
+        width="100%",
+        align="start",
+    )
+
+
 def _edit_dialog(user: rx.Var) -> rx.Component:
+    """Updated edit dialog with multiple role selection and improved mobile UI"""
     return rx.dialog.root(
         rx.dialog.trigger(
             rx.cond(
@@ -28,23 +95,24 @@ def _edit_dialog(user: rx.Var) -> rx.Component:
                 rx.icon_button(
                     rx.icon("square-pen"),
                     on_click=lambda: UserManagementState.open_edit_dialog(
-                        user["id"], user["role"]
+                        user["id"], user["roles"]
                     ),
                     color_scheme="blue",
                     size="2",
                     variant="solid",
-                    disabled=(user["role"] == "supplier"),
+                    # Remove supplier restriction since we now support multiple roles
                 ),
                 None,
             )
         ),
         rx.dialog.content(
             rx.vstack(
-                rx.dialog.title("Change User Role"),
+                rx.dialog.title("Change User Roles"),
                 rx.dialog.description(
-                    f"Select a new role for {user['username']}.",
+                    f"Select roles for {user['username']}. Multiple roles can be assigned.",
                     size="2",
                 ),
+                # User info display - improved for mobile
                 rx.desktop_only(
                     rx.inset(
                         rx.table.root(
@@ -52,93 +120,98 @@ def _edit_dialog(user: rx.Var) -> rx.Component:
                                 rx.table.row(
                                     rx.table.column_header_cell("Username"),
                                     rx.table.column_header_cell("Email"),
-                                    rx.table.column_header_cell("Role"),
+                                    rx.table.column_header_cell("Current Roles"),
                                 ),
                             ),
                             rx.table.body(
                                 rx.table.row(
                                     rx.table.row_header_cell(user["username"]),
                                     rx.table.cell(user["email"]),
-                                    rx.table.cell(rx.text(user["role"])),
+                                    rx.table.cell(
+                                        _roles_display(user["roles"].to(list))
+                                    ),
                                 ),
                             ),
                             width="100%",
                         ),
                         side="x",
-                        margin_y="24px",
+                        margin_y="16px",
                     ),
                 ),
                 rx.mobile_and_tablet(
-                    rx.vstack(
-                        rx.hstack(
-                            rx.text("Username:", weight="bold"),
-                            rx.text(user["username"]),
-                            spacing="2",
-                            align="center",
+                    rx.card(
+                        rx.vstack(
+                            rx.hstack(
+                                rx.text("Username:", weight="bold", size="2"),
+                                rx.text(user["username"], size="2"),
+                                spacing="2",
+                                align="center",
+                                wrap="wrap",
+                            ),
+                            rx.hstack(
+                                rx.text("Email:", weight="bold", size="2"),
+                                rx.text(user["email"], size="2"),
+                                spacing="2",
+                                align="center",
+                                wrap="wrap",
+                            ),
+                            rx.vstack(
+                                rx.text("Current Roles:", weight="bold", size="2"),
+                                _roles_display(user["roles"].to(list)),
+                                spacing="2",
+                                align="start",
+                                width="100%",
+                            ),
+                            spacing="3",
+                            width="100%",
+                            align="start",
                         ),
-                        rx.hstack(
-                            rx.text("Email:", weight="bold"),
-                            rx.text(user["email"]),
-                            spacing="2",
-                            align="center",
-                        ),
-                        rx.hstack(
-                            rx.text("Role:", weight="bold"),
-                            rx.text(user["role"]),
-                            spacing="2",
-                            align="center",
-                        ),
-                        spacing="4",
+                        padding="3",
                         width="100%",
-                        padding_y="16px",
                     ),
                 ),
-                rx.flex(
-                    rx.select(
-                        ["admin", "employee"],
-                        value=UserManagementState.selected_role,
-                        on_change=UserManagementState.set_selected_role,
-                        placeholder="Select a role",
-                        size="3",
-                        width=rx.breakpoints(initial="100%", lg="70%"),
-                    ),
-                    rx.button(
-                        "Update Role",
-                        color_scheme="blue",
-                        size="2",
-                        on_click=lambda: UserManagementState.change_user_role(
-                            user["id"], UserManagementState.selected_role
-                        ),
-                        width=rx.breakpoints(initial="100%", lg="auto"),
-                    ),
-                    direction=rx.breakpoints(initial="column", lg="row"),
-                    flex_wrap="wrap",
-                    spacing="3",
+                # Role selection section with improved layout
+                rx.card(
+                    _role_selection_checkboxes(),
+                    padding="4",
                     width="100%",
-                    align="center",
                 ),
+                # Action buttons with improved mobile layout
                 rx.flex(
+                    rx.button(
+                        "Update Roles",
+                        color_scheme="blue",
+                        size="3",
+                        on_click=lambda: UserManagementState.change_user_roles(
+                            user["id"], UserManagementState.selected_roles
+                        ),
+                        width=rx.breakpoints(initial="100%", sm="auto"),
+                        disabled=UserManagementState.is_loading,
+                    ),
                     rx.dialog.close(
                         rx.button(
-                            "Close",
+                            "Cancel",
                             variant="soft",
                             color_scheme="gray",
-                            size="2",
-                            width=rx.breakpoints(initial="100%", md="120px"),
+                            size="3",
+                            width=rx.breakpoints(initial="100%", sm="auto"),
                             on_click=UserManagementState.cancel_edit_dialog,
                         )
                     ),
-                    justify=rx.breakpoints(initial="center", md="end"),
+                    direction=rx.breakpoints(initial="column", sm="row"),
+                    spacing="3",
                     width="100%",
-                    margin_top="16px",
+                    justify=rx.breakpoints(initial="center", sm="end"),
                 ),
                 spacing="4",
                 width="100%",
                 padding="16px",
             ),
             style={
-                "max_width": rx.breakpoints(initial="90vw", md="500px"),
+                "max_width": rx.breakpoints(initial="95vw", md="600px"),
                 "width": "100%",
+                "max_height": "90vh",
+                "overflow_y": "auto",
             },
         ),
         open=UserManagementState.show_edit_dialog
@@ -147,12 +220,15 @@ def _edit_dialog(user: rx.Var) -> rx.Component:
 
 
 def _show_user(user: rx.Var, index: int) -> rx.Component:
+    """Updated user row display with multiple roles support"""
     bg_color = rx.cond(index % 2 == 0, rx.color("gray", 1), rx.color("accent", 2))
     hover_color = rx.cond(index % 2 == 0, rx.color("gray", 3), rx.color("accent", 3))
     return rx.table.row(
         rx.table.row_header_cell(user["username"]),
         rx.table.cell(user["email"]),
-        rx.table.cell(rx.text(user["role"])),
+        rx.table.cell(
+            _roles_display(user["roles"].to(list))
+        ),  # Updated to show multiple roles
         rx.table.cell(
             rx.hstack(
                 _edit_dialog(user),
@@ -173,6 +249,7 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
                 align="center",
             )
         ),
+        # Improved delete confirmation dialog with better mobile layout
         rx.alert_dialog.root(
             rx.alert_dialog.content(
                 rx.vstack(
@@ -182,55 +259,94 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
                         "This action cannot be undone.",
                         size="2",
                     ),
-                    rx.inset(
-                        rx.table.root(
-                            rx.table.header(
-                                rx.table.row(
-                                    rx.table.column_header_cell("Username"),
-                                    rx.table.column_header_cell("Email"),
-                                    rx.table.column_header_cell("Role"),
+                    rx.desktop_only(
+                        rx.inset(
+                            rx.table.root(
+                                rx.table.header(
+                                    rx.table.row(
+                                        rx.table.column_header_cell("Username"),
+                                        rx.table.column_header_cell("Email"),
+                                        rx.table.column_header_cell("Roles"),
+                                    ),
                                 ),
-                            ),
-                            rx.table.body(
-                                rx.table.row(
-                                    rx.table.row_header_cell(user["username"]),
-                                    rx.table.cell(user["email"]),
-                                    rx.table.cell(rx.text(user["role"])),
+                                rx.table.body(
+                                    rx.table.row(
+                                        rx.table.row_header_cell(user["username"]),
+                                        rx.table.cell(user["email"]),
+                                        rx.table.cell(
+                                            _roles_display(user["roles"].to(list))
+                                        ),
+                                    ),
                                 ),
+                                width="100%",
                             ),
-                            width="100%",
+                            side="x",
+                            margin_y="16px",
                         ),
-                        side="x",
-                        margin_y="16px",
                     ),
+                    rx.mobile_and_tablet(
+                        rx.card(
+                            rx.vstack(
+                                rx.hstack(
+                                    rx.text("Username:", weight="bold"),
+                                    rx.text(user["username"]),
+                                    spacing="2",
+                                    wrap="wrap",
+                                ),
+                                rx.hstack(
+                                    rx.text("Email:", weight="bold"),
+                                    rx.text(user["email"]),
+                                    spacing="2",
+                                    wrap="wrap",
+                                ),
+                                rx.vstack(
+                                    rx.text("Roles:", weight="bold"),
+                                    _roles_display(user["roles"].to(list)),
+                                    spacing="2",
+                                    align="start",
+                                    width="100%",
+                                ),
+                                spacing="3",
+                                width="100%",
+                                align="start",
+                            ),
+                            padding="3",
+                        ),
+                    ),
+                    # Improved button layout for mobile
                     rx.flex(
                         rx.alert_dialog.cancel(
                             rx.button(
                                 "Cancel",
                                 variant="soft",
                                 color_scheme="gray",
-                                size="2",
+                                size="3",
                                 on_click=UserManagementState.cancel_delete,
+                                width=rx.breakpoints(initial="100%", sm="auto"),
                             )
                         ),
                         rx.alert_dialog.action(
                             rx.button(
                                 "Delete",
                                 color_scheme="red",
-                                size="2",
+                                size="3",
                                 on_click=UserManagementState.delete_user,
+                                width=rx.breakpoints(initial="100%", sm="auto"),
                             )
                         ),
-                        direction="column",
+                        direction=rx.breakpoints(initial="column", sm="row"),
                         spacing="3",
                         width="100%",
-                        align="stretch",
+                        justify=rx.breakpoints(initial="center", sm="end"),
                     ),
                     spacing="4",
                     width="100%",
                     padding="16px",
                 ),
-                style={"max_width": "90vw", "width": "400px"},
+                style={
+                    "max_width": rx.breakpoints(initial="95vw", md="500px"),
+                    "width": "100%",
+                },
             ),
             open=UserManagementState.show_delete_dialog
             & (UserManagementState.user_to_delete == user["id"]),
@@ -358,6 +474,7 @@ def user_management() -> rx.Component:
             ),
             rx.tabs.content(
                 rx.card(
+                    # Enhanced search and filter section
                     rx.flex(
                         rx.flex(
                             rx.cond(
@@ -378,7 +495,10 @@ def user_management() -> rx.Component:
                                 ),
                             ),
                             rx.select(
-                                ["username", "email", "role"],
+                                [
+                                    "username",
+                                    "email",
+                                ],  # Removed "role" since we now have multiple roles
                                 placeholder="Sort By: Username",
                                 size="3",
                                 on_change=UserManagementState.set_sort_value,
@@ -397,9 +517,14 @@ def user_management() -> rx.Component:
                                     ),
                                 ),
                                 value=UserManagementState.search_value,
-                                placeholder="Search here...",
+                                placeholder="Search users, emails, or roles...",
                                 size="3",
-                                max_width=["150px", "150px", "200px", "250px"],
+                                max_width=[
+                                    "200px",
+                                    "200px",
+                                    "250px",
+                                    "300px",
+                                ],  # Increased for better mobile experience
                                 width="100%",
                                 variant="surface",
                                 color_scheme="gray",
@@ -418,12 +543,13 @@ def user_management() -> rx.Component:
                         width="100%",
                         padding_bottom="1em",
                     ),
+                    # Enhanced table with better mobile support
                     rx.table.root(
                         rx.table.header(
                             rx.table.row(
                                 _header_cell("Username", "user"),
                                 _header_cell("Email", "mail"),
-                                _header_cell("Role", "shield"),
+                                _header_cell("Roles", "shield"),  # Updated header text
                                 _header_cell("Actions", "settings"),
                             ),
                         ),

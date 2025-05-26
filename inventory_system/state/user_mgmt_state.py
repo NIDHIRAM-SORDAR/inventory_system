@@ -23,8 +23,11 @@ class UserManagementState(AuthState):
     search_value: str = ""
     show_edit_dialog: bool = False
     target_user_id: Optional[int] = None
-    selected_role: str = ""
-    current_user_role: str = ""
+    # Changed from single role to multiple roles support
+    selected_roles: List[str] = []
+    current_user_roles: List[str] = []
+    # Added dynamic role loading
+    available_roles: List[str] = []
     active_tab: str = "profiles"
 
     def check_auth_and_load(self):
@@ -44,26 +47,47 @@ class UserManagementState(AuthState):
                 .where(UserInfo.user_id != current_user_id)
             )
             results = session.exec(stmt).all()
+
+            # Load users data with multiple roles support
             self.users_data = [
                 {
                     "username": username,
                     "id": user_info.user_id,
                     "email": user_info.email,
-                    "role": user_info.get_roles()[0]
-                    if user_info.get_roles()
-                    else "none",
+                    "roles": user_info.get_roles()
+                    or ["none"],  # Changed to support multiple roles
                 }
                 for user_info, username in results
             ]
+
+            # Load all available roles dynamically from existing users
+            all_roles = set()
+            for user_data in self.users_data:
+                all_roles.update(user_data["roles"])
+
+            # Add common roles if not present and filter out 'none'
+            common_roles = {"admin", "employee", "manager", "viewer"}
+            all_roles.update(common_roles)
+            all_roles.discard("none")  # Remove 'none' from available roles
+
+            self.available_roles = sorted(list(all_roles))
         self.is_loading = False
 
     @rx.event
-    async def change_user_role(self, user_id: int, selected_role: str):
+    async def change_user_roles(self, user_id: int, selected_roles: List[str]):
+        """Updated to handle multiple roles assignment"""
         if "edit_user" not in self.permissions:
             yield rx.toast.error(
-                "Permission denied: Cannot change user role", position="bottom-right"
+                "Permission denied: Cannot change user roles", position="bottom-right"
             )
             return
+
+        if not selected_roles:
+            yield rx.toast.error(
+                "Please select at least one role", position="bottom-right"
+            )
+            return
+
         self.is_loading = True
         self.setvar("admin_error_message", "")
         self.setvar("admin_success_message", "")
@@ -74,11 +98,11 @@ class UserManagementState(AuthState):
         ip_address = self.router.session.client_ip
 
         audit_logger.info(
-            "attempt_change_role",
+            "attempt_change_roles",
             acting_user_id=acting_user_id,
             acting_username=acting_username,
             target_user_id=user_id,
-            target_role=selected_role,
+            target_roles=selected_roles,
             ip_address=ip_address,
         )
         with rx.session() as session:
@@ -91,7 +115,7 @@ class UserManagementState(AuthState):
                 if not user_info:
                     self.setvar("admin_error_message", "User info not found.")
                     audit_logger.error(
-                        "fail_change_role",
+                        "fail_change_roles",
                         acting_user_id=acting_user_id,
                         acting_username=acting_username,
                         target_user_id=user_id,
@@ -102,6 +126,7 @@ class UserManagementState(AuthState):
                     yield rx.toast.error(
                         self.admin_error_message, position="bottom-right", duration=5000
                     )
+                    return
 
                 local_user = session.exec(
                     select(reflex_local_auth.LocalUser).where(
@@ -111,7 +136,7 @@ class UserManagementState(AuthState):
                 if not local_user:
                     self.setvar("admin_error_message", "User not found.")
                     audit_logger.error(
-                        "fail_change_role",
+                        "fail_change_roles",
                         acting_user_id=acting_user_id,
                         acting_username=acting_username,
                         target_user_id=user_id,
@@ -122,35 +147,39 @@ class UserManagementState(AuthState):
                     yield rx.toast.error(
                         self.admin_error_message, position="bottom-right", duration=5000
                     )
+                    return
 
                 target_username = local_user.username
                 original_roles = user_info.get_roles()
-                if selected_role in original_roles:
+
+                # Check if roles are actually changing
+                if set(selected_roles) == set(original_roles):
                     self.setvar("is_loading", False)
                     yield rx.toast.info(
-                        f"No change: User {target_username} "
-                        "already has role {selected_role}.",
+                        f"No change: User {target_username} already has these roles.",
                         position="bottom-right",
                         duration=5000,
                     )
+                    return
 
                 session.add(user_info)
                 session.refresh(user_info)
-                user_info.set_roles([selected_role], session)
+                user_info.set_roles(selected_roles, session)
                 session.commit()
 
                 audit_logger.info(
-                    "success_change_role",
+                    "success_change_roles",
                     acting_user_id=acting_user_id,
                     acting_username=acting_username,
                     target_user_id=user_id,
                     original_roles=original_roles,
-                    new_role=selected_role,
+                    new_roles=selected_roles,
                     ip_address=ip_address,
                 )
+                roles_str = ", ".join(selected_roles)
                 self.setvar(
                     "admin_success_message",
-                    f"User {target_username} role changed to {selected_role}.",
+                    f"User {target_username} roles updated to: {roles_str}.",
                 )
                 self.check_auth_and_load()
                 self.setvar("is_loading", False)
@@ -162,9 +191,9 @@ class UserManagementState(AuthState):
 
             except Exception as e:
                 session.rollback()
-                self.setvar("admin_error_message", f"Failed to change role: {str(e)}")
+                self.setvar("admin_error_message", f"Failed to change roles: {str(e)}")
                 audit_logger.error(
-                    "fail_change_role",
+                    "fail_change_roles",
                     acting_user_id=acting_user_id,
                     acting_username=acting_username,
                     target_user_id=user_id,
@@ -223,6 +252,7 @@ class UserManagementState(AuthState):
                     yield rx.toast.error(
                         self.admin_error_message, position="bottom-right", duration=5000
                     )
+                    return
 
                 local_user = session.exec(
                     select(reflex_local_auth.LocalUser).where(
@@ -243,6 +273,7 @@ class UserManagementState(AuthState):
                     yield rx.toast.error(
                         self.admin_error_message, position="bottom-right", duration=5000
                     )
+                    return
 
                 target_username = local_user.username
                 if local_user:
@@ -298,7 +329,9 @@ class UserManagementState(AuthState):
                 for u in data
                 if self.search_value.lower() in u["username"].lower()
                 or self.search_value.lower() in u["email"].lower()
-                or self.search_value.lower() in u["role"].lower()
+                or any(
+                    self.search_value.lower() in role.lower() for role in u["roles"]
+                )  # Updated for multiple roles search
             ]
         return sorted(data, key=lambda x: x[self.sort_value], reverse=self.sort_reverse)
 
@@ -308,17 +341,20 @@ class UserManagementState(AuthState):
         end = start + self.page_size
         return self.filtered_users[start:end]
 
-    def open_edit_dialog(self, user_id: int, current_role: str):
+    def open_edit_dialog(self, user_id: int, current_roles: List[str]):
+        """Updated to handle multiple roles"""
         self.target_user_id = user_id
-        self.current_user_role = current_role
-        self.selected_role = current_role
+        self.current_user_roles = current_roles
+        self.selected_roles = (
+            current_roles.copy()
+        )  # Copy the list to avoid reference issues
         self.show_edit_dialog = True
 
     def cancel_edit_dialog(self):
         self.show_edit_dialog = False
         self.target_user_id = None
-        self.selected_role = ""
-        self.current_user_role = ""
+        self.selected_roles = []
+        self.current_user_roles = []
 
     def confirm_delete_user(self, user_id: int):
         self.user_to_delete = user_id
@@ -338,6 +374,14 @@ class UserManagementState(AuthState):
         self.search_value = value
         self.page_number = 1
 
+    # New methods for handling multiple role selection
+    def toggle_role_selection(self, role: str):
+        """Toggle a role in the selected roles list"""
+        if role in self.selected_roles:
+            self.selected_roles = [r for r in self.selected_roles if r != role]
+        else:
+            self.selected_roles = self.selected_roles + [role]
+
     def first_page(self):
         self.page_number = 1
 
@@ -351,3 +395,6 @@ class UserManagementState(AuthState):
 
     def last_page(self):
         self.page_number = self.total_pages
+
+    def set_active_tab(self, tab: str):
+        self.active_tab = tab
