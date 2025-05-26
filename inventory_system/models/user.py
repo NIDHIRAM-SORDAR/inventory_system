@@ -96,6 +96,7 @@ class Permission(rx.Model, table=True):
                 self.category = category
             self.update_timestamp()
             session.add(self)
+            session.flush()
             audit_logger.info(
                 "update_permission_success",
                 permission_id=self.id,
@@ -215,6 +216,8 @@ class Role(rx.Model, table=True):
             self.version += 1  # Increment version for optimistic locking
             self.update_timestamp()
             session.add(self)
+            # Force flush to ensure database operations complete
+            session.flush()
             audit_logger.info(
                 "set_permissions_success",
                 entity="role_permission",
@@ -259,6 +262,7 @@ class Role(rx.Model, table=True):
             self.version += 1
             self.update_timestamp()
             session.add(self)
+            session.flush()
             audit_logger.info(
                 "update_role_success",
                 role_id=self.id,
@@ -299,6 +303,7 @@ class Role(rx.Model, table=True):
             role.version += 1
             role.update_timestamp()
             session.add(role)
+            session.flush()
             audit_logger.info("delete_role_success", role_name=name)
         except Exception as e:
             session.rollback()
@@ -361,6 +366,7 @@ class UserInfo(rx.Model, table=True):
             self.version += 1  # Increment version for optimistic locking
             self.update_timestamp()
             session.add(self)
+            session.flush()
             audit_logger.info(
                 "set_roles_success",
                 entity="user_role",

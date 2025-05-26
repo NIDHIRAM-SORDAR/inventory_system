@@ -239,6 +239,7 @@ class RoleManagementState(rx.State):
                     )
                     session.commit()
                     self.load_roles()
+                    yield AuthState.load_user_data()
                     self.close_role_modals()
                     yield rx.toast.success(
                         f"Role '{self.role_form_name}' created successfully"
@@ -282,6 +283,7 @@ class RoleManagementState(rx.State):
                         )
                         session.commit()
                         self.load_roles()
+                        yield AuthState.load_user_data()
                         self.close_role_modals()
                         yield rx.toast.success(
                             f"Role '{self.role_form_name}' updated successfully"
@@ -327,6 +329,7 @@ class RoleManagementState(rx.State):
                         Role.delete_role(name=role.name, session=session)
                         session.commit()
                         self.load_roles()
+                        yield AuthState.load_user_data()
                         self.close_role_modals()
                         yield rx.toast.success(
                             f"Role '{role.name}' deleted successfully"
@@ -362,6 +365,7 @@ class RoleManagementState(rx.State):
                         role.set_permissions(self.selected_permissions, session)
                         session.commit()
                         self.load_roles()
+                        yield AuthState.load_user_data()
                         self.close_role_modals()
                         yield rx.toast.success(
                             f"Permissions updated for role '{role.name}'"

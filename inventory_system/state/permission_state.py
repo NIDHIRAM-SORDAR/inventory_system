@@ -196,6 +196,7 @@ class PermissionsManagementState(rx.State):
                         description=new_perm.description,
                         category=new_perm.category,
                     )
+                    yield AuthState.load_user_data()
                     yield rx.toast.success(
                         f"Permission '{self.perm_form_name}' added successfully"
                     )
@@ -242,6 +243,7 @@ class PermissionsManagementState(rx.State):
                         )
                         session.commit()
                         self.load_permissions()
+                        yield AuthState.load_user_data()
                         self.close_perm_modals()
                         yield rx.toast.success(
                             f"Permission '{self.perm_form_name}' updated successfully"
@@ -296,6 +298,7 @@ class PermissionsManagementState(rx.State):
                         Permission.delete_permission(name=perm.name, session=session)
                         session.commit()
                         self.load_permissions()
+                        yield AuthState.load_user_data()
                         self.close_perm_modals()
                         audit_logger.info(
                             "delete_permission_success",
