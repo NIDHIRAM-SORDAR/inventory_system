@@ -5,6 +5,18 @@ import reflex as rx
 from inventory_system.state.permission_state import PermissionsManagementState
 
 
+def _category_badge(permisssion: str) -> rx.Component:
+    """Create a styled badge for individual roles with dynamic colors"""
+    color_map_dict = PermissionsManagementState.category_color_map
+
+    return rx.badge(
+        rx.text(permisssion.capitalize(), size="2"),
+        color_scheme=color_map_dict[permisssion],
+        variant="soft",
+        size="1",
+    )
+
+
 def permission_card(permission: Dict[str, str]) -> rx.Component:
     """Responsive permission card with improved mobile layout."""
     return rx.card(
@@ -21,14 +33,7 @@ def permission_card(permission: Dict[str, str]) -> rx.Component:
                         variant="surface",
                         size="1",
                     ),
-                    rx.badge(
-                        rx.icon("layers-2", size=14),
-                        rx.text(permission["category"], size="1"),
-                        color_scheme="blue",
-                        radius="large",
-                        variant="surface",
-                        size="1",
-                    ),
+                    _category_badge(permission["category"].to(str)),
                 ),
                 rx.spacer(),
                 # Action buttons - always visible on mobile for better UX
@@ -587,7 +592,7 @@ def category_section(category: str, permissions: List[Dict[str, Any]]) -> rx.Com
             ),
             rx.badge(
                 f"{permissions.length()} permission{rx.cond(permissions.length() != 1, 's', '')}",
-                color_scheme="blue",
+                color_scheme=PermissionsManagementState.category_color_map[category],
                 variant="soft",
                 size="1",
             ),

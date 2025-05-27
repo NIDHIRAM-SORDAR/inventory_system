@@ -91,6 +91,46 @@ class PermissionsManagementState(rx.State):
             roles = session.exec(select(Role).where(Role.id.in_(role_ids))).all()
             return [role.name for role in roles if role.is_active]
 
+    @rx.var
+    def category_color_map(self) -> Dict[str, str]:
+        """Create a mapping of roles to colors"""
+        available_colors = [
+            "tomato",
+            "red",
+            "ruby",
+            "crimson",
+            "pink",
+            "plum",
+            "purple",
+            "violet",
+            "iris",
+            "indigo",
+            "blue",
+            "cyan",
+            "teal",
+            "jade",
+            "green",
+            "grass",
+            "brown",
+            "orange",
+            "sky",
+            "mint",
+            "lime",
+            "yellow",
+            "amber",
+            "gold",
+            "bronze",
+        ]
+
+        color_map_category = {}
+        filtered_categories = [
+            cat for cat in self.perm_categories if cat.lower() != "all"
+        ]
+        for category in filtered_categories:
+            category_hash = hash(category.lower()) % len(available_colors)
+            color_map_category[category] = available_colors[category_hash]
+        return color_map_category
+
     # Initial data load
     def load_permissions(self) -> None:
         """Load permissions from the database."""

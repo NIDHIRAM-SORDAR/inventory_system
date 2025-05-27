@@ -114,7 +114,6 @@ class UserManagementState(AuthState):
         for role in self.available_roles:
             role_hash = hash(role.lower()) % len(available_colors)
             color_map[role] = available_colors[role_hash]
-        print(color_map)
         return color_map
 
     @rx.event
