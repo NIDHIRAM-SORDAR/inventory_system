@@ -5,6 +5,7 @@ from inventory_system import routes
 from inventory_system.state.auth import AuthState
 from inventory_system.state.user_mgmt_state import UserManagementState
 from inventory_system.templates.template import template
+from inventory_system.views.bulk_operations_tab import bulk_operations_tab
 from inventory_system.views.permission_view import permissions_tab
 from inventory_system.views.role_view import role_management_page
 
@@ -461,6 +462,12 @@ def user_management() -> rx.Component:
                     size="3",
                     width="100px",
                 ),
+                rx.tabs.trigger(
+                    "Role&Permission Assignment",
+                    value="bulk_role_perm",
+                    size="3",
+                    width="100px",
+                ),
                 justify="start",
                 spacing="2",
                 padding_bottom="1em",
@@ -569,6 +576,10 @@ def user_management() -> rx.Component:
             rx.tabs.content(
                 permissions_tab(),
                 value="permissions",
+            ),
+            rx.tabs.content(
+                bulk_operations_tab(),
+                value="bulk_role_perm",
             ),
             value=UserManagementState.active_tab,
             on_change=lambda val: UserManagementState.set_active_tab(val),
