@@ -5,7 +5,7 @@ import reflex_local_auth
 from sqlmodel import select
 
 from inventory_system.logging.logging import audit_logger
-from inventory_system.models.user import UserInfo
+from inventory_system.models.user import Role, UserInfo
 from inventory_system.state.auth import AuthState
 
 
@@ -26,8 +26,6 @@ class UserManagementState(AuthState):
     # Changed from single role to multiple roles support
     selected_roles: List[str] = []
     current_user_roles: List[str] = []
-    # Added dynamic role loading
-    available_roles: List[str] = []
     active_tab: str = "profiles"
 
     def check_auth_and_load(self):
@@ -59,19 +57,65 @@ class UserManagementState(AuthState):
                 }
                 for user_info, username in results
             ]
-
-            # Load all available roles dynamically from existing users
-            all_roles = set()
-            for user_data in self.users_data:
-                all_roles.update(user_data["roles"])
-
-            # Add common roles if not present and filter out 'none'
-            common_roles = {"admin", "employee", "manager", "viewer"}
-            all_roles.update(common_roles)
-            all_roles.discard("none")  # Remove 'none' from available roles
-
-            self.available_roles = sorted(list(all_roles))
         self.is_loading = False
+
+    @rx.var
+    def available_roles(self) -> List[str]:
+        """Get all available roles from the database dynamically"""
+        with rx.session() as session:
+            try:
+                # Get all roles from the database
+                roles = session.exec(select(Role)).all()
+                role_names = [role.name for role in roles]
+                all_roles = set(role_names)
+
+                return sorted(list(all_roles))
+            except Exception as e:
+                # Fallback to common roles if database query fails
+                audit_logger.error(
+                    "loading_roles_failed",
+                    reason=f"Database error: {str(e)}",
+                )
+                return sorted(["admin", "employee", "manager", "viewer"])
+
+    @rx.var
+    def role_color_map(self) -> Dict[str, str]:
+        """Create a mapping of roles to colors"""
+        available_colors = [
+            "tomato",
+            "red",
+            "ruby",
+            "crimson",
+            "pink",
+            "plum",
+            "purple",
+            "violet",
+            "iris",
+            "indigo",
+            "blue",
+            "cyan",
+            "teal",
+            "jade",
+            "green",
+            "grass",
+            "brown",
+            "orange",
+            "sky",
+            "mint",
+            "lime",
+            "yellow",
+            "amber",
+            "gold",
+            "bronze",
+            "gray",
+        ]
+
+        color_map = {}
+        for role in self.available_roles:
+            role_hash = hash(role.lower()) % len(available_colors)
+            color_map[role] = available_colors[role_hash]
+        print(color_map)
+        return color_map
 
     @rx.event
     async def change_user_roles(self, user_id: int, selected_roles: List[str]):

@@ -21,19 +21,12 @@ def _header_cell(text: str, icon: str) -> rx.Component:
 
 
 def _role_badge(role: str) -> rx.Component:
-    """Create a styled badge for individual roles"""
-    # Define role-specific colors for better visual distinction
-    role_colors = {
-        "admin": "red",
-        "manager": "blue",
-        "employee": "green",
-        "viewer": "gray",
-        "supplier": "orange",
-    }
+    """Create a styled badge for individual roles with dynamic colors"""
+    color_map_dict = UserManagementState.role_color_map
 
     return rx.badge(
-        role.to(str).capitalize(),
-        color_scheme=role_colors.get(role, "gray"),
+        rx.text(role.capitalize(), size="2"),
+        color_scheme=color_map_dict[role],
         variant="soft",
         size="1",
     )
@@ -44,7 +37,7 @@ def _roles_display(roles: rx.Var) -> rx.Component:
     return rx.flex(
         rx.foreach(
             roles,
-            lambda role: _role_badge(role),
+            lambda role: _role_badge(role.to(str)),
         ),
         wrap="wrap",
         gap="1",
