@@ -1,6 +1,6 @@
 # inventory_system/models/user.py
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import reflex as rx
 from sqlalchemy import Column, Integer
@@ -211,8 +211,13 @@ class Role(rx.Model, table=True):
                     RolePermission.role_id == self.id
                 )
             )
-            for perm in permissions:
-                session.add(RolePermission(role_id=self.id, permission_id=perm.id))
+            # Bulk insert new permissions
+            if permissions:
+                role_permissions = [
+                    {"role_id": self.id, "permission_id": perm.id}
+                    for perm in permissions
+                ]
+                session.exec(RolePermission.__table__.insert().values(role_permissions))
             self.version += 1  # Increment version for optimistic locking
             self.update_timestamp()
             session.add(self)
@@ -310,6 +315,144 @@ class Role(rx.Model, table=True):
             audit_logger.error("delete_role_failed", role_name=name, error=str(e))
             raise ValueError(f"Failed to delete role: {str(e)}")
 
+    @classmethod
+    def bulk_set_permissions(
+        cls,
+        role_ids: List[int],
+        permission_names: List[str],
+        session: Session,
+        operation: str = "replace",  # "replace", "add", "remove"
+    ) -> Dict[str, Any]:
+        """
+        Bulk assign/remove permissions to multiple roles.
+
+        Args:
+            role_ids: List of role IDs to modify
+            permission_names: List of permission names to assign/remove
+            session: Database session
+            operation: "replace" (default), "add", or "remove"
+
+        Returns:
+            Dict with success/failure information
+        """
+        try:
+            # Validate roles exist
+            roles = session.exec(
+                select(Role)
+                .where(Role.id.in_(role_ids), Role.is_active)
+                .with_for_update()
+            ).all()
+
+            if len(roles) != len(role_ids):
+                found_ids = {role.id for role in roles}
+                missing_ids = set(role_ids) - found_ids
+                raise ValueError(f"Roles not found or inactive: {missing_ids}")
+
+            # Validate permissions exist
+            permissions = session.exec(
+                select(Permission).where(Permission.name.in_(permission_names))
+            ).all()
+
+            if len(permissions) != len(permission_names):
+                missing = set(permission_names) - {perm.name for perm in permissions}
+                raise ValueError(f"Permissions not found: {missing}")
+
+            permission_ids = [perm.id for perm in permissions]
+            results = {"success": [], "failed": [], "unchanged": []}
+
+            for role in roles:
+                try:
+                    if operation == "replace":
+                        # Delete existing permissions
+                        session.exec(
+                            RolePermission.__table__.delete().where(
+                                RolePermission.role_id == role.id
+                            )
+                        )
+                        # Insert new permissions
+                        if permission_ids:
+                            role_permissions = [
+                                {"role_id": role.id, "permission_id": perm_id}
+                                for perm_id in permission_ids
+                            ]
+                            session.exec(
+                                RolePermission.__table__.insert().values(
+                                    role_permissions
+                                )
+                            )
+
+                    elif operation == "add":
+                        # Get existing permission IDs for this role
+                        existing_perm_ids = set(
+                            session.exec(
+                                select(RolePermission.permission_id).where(
+                                    RolePermission.role_id == role.id
+                                )
+                            ).all()
+                        )
+                        # Only add permissions that don't already exist
+                        new_perm_ids = [
+                            pid
+                            for pid in permission_ids
+                            if pid not in existing_perm_ids
+                        ]
+                        if new_perm_ids:
+                            role_permissions = [
+                                {"role_id": role.id, "permission_id": perm_id}
+                                for perm_id in new_perm_ids
+                            ]
+                            session.exec(
+                                RolePermission.__table__.insert().values(
+                                    role_permissions
+                                )
+                            )
+                        else:
+                            results["unchanged"].append(role.id)
+                            continue
+
+                    elif operation == "remove":
+                        # Remove specific permissions
+                        session.exec(
+                            RolePermission.__table__.delete().where(
+                                RolePermission.role_id == role.id,
+                                RolePermission.permission_id.in_(permission_ids),
+                            )
+                        )
+
+                    # Update role version and timestamp
+                    role.version += 1
+                    role.update_timestamp()
+                    session.add(role)
+                    results["success"].append(role.id)
+
+                except Exception as role_error:
+                    results["failed"].append(
+                        {"role_id": role.id, "error": str(role_error)}
+                    )
+
+            session.flush()
+
+            audit_logger.info(
+                "bulk_set_permissions_success",
+                operation=operation,
+                role_ids=role_ids,
+                permission_names=permission_names,
+                results=results,
+            )
+
+            return results
+
+        except Exception as e:
+            session.rollback()
+            audit_logger.error(
+                "bulk_set_permissions_failed",
+                operation=operation,
+                role_ids=role_ids,
+                permission_names=permission_names,
+                error=str(e),
+            )
+            raise ValueError(f"Failed to bulk {operation} permissions: {str(e)}")
+
 
 class UserInfo(rx.Model, table=True):
     """User information model linked to LocalUser in a one-to-one relationship."""
@@ -361,8 +504,12 @@ class UserInfo(rx.Model, table=True):
                 missing = set(role_names) - {role.name for role in roles}
                 raise ValueError(f"Roles not found or inactive: {missing}")
             session.exec(UserRole.__table__.delete().where(UserRole.user_id == self.id))
-            for role in roles:
-                session.add(UserRole(user_id=self.id, role_id=role.id))
+            # Bulk insert new roles
+            if roles:
+                user_roles = [
+                    {"user_id": self.id, "role_id": role.id} for role in roles
+                ]
+                session.exec(UserRole.__table__.insert().values(user_roles))
             self.version += 1  # Increment version for optimistic locking
             self.update_timestamp()
             session.add(self)
@@ -414,6 +561,134 @@ class UserInfo(rx.Model, table=True):
     def has_permission(self, permission_name: str, session: Session = None) -> bool:
         """Check if the user has a specific permission."""
         return permission_name in self.get_permissions(session)
+
+    # In UserInfo class:
+
+    @classmethod
+    def bulk_set_roles(
+        cls,
+        user_ids: List[int],
+        role_names: List[str],
+        session: Session,
+        operation: str = "replace",  # "replace", "add", "remove"
+    ) -> Dict[str, Any]:
+        """
+        Bulk assign/remove roles to multiple users.
+
+        Args:
+            user_ids: List of user IDs to modify
+            role_names: List of role names to assign/remove
+            session: Database session
+            operation: "replace" (default), "add", or "remove"
+
+        Returns:
+            Dict with success/failure information
+        """
+        try:
+            # Validate users exist
+            users = session.exec(
+                select(UserInfo).where(UserInfo.id.in_(user_ids)).with_for_update()
+            ).all()
+
+            if len(users) != len(user_ids):
+                found_ids = {user.id for user in users}
+                missing_ids = set(user_ids) - found_ids
+                raise ValueError(f"Users not found: {missing_ids}")
+
+            # Validate roles exist
+            roles = session.exec(
+                select(Role).where(Role.name.in_(role_names), Role.is_active)
+            ).all()
+
+            if len(roles) != len(role_names):
+                missing = set(role_names) - {role.name for role in roles}
+                raise ValueError(f"Roles not found or inactive: {missing}")
+
+            role_ids = [role.id for role in roles]
+            results = {"success": [], "failed": [], "unchanged": []}
+
+            for user in users:
+                try:
+                    if operation == "replace":
+                        # Delete existing roles
+                        session.exec(
+                            UserRole.__table__.delete().where(
+                                UserRole.user_id == user.id
+                            )
+                        )
+                        # Insert new roles
+                        if role_ids:
+                            user_roles = [
+                                {"user_id": user.id, "role_id": role_id}
+                                for role_id in role_ids
+                            ]
+                            session.exec(UserRole.__table__.insert().values(user_roles))
+
+                    elif operation == "add":
+                        # Get existing role IDs for this user
+                        existing_role_ids = set(
+                            session.exec(
+                                select(UserRole.role_id).where(
+                                    UserRole.user_id == user.id
+                                )
+                            ).all()
+                        )
+                        # Only add roles that don't already exist
+                        new_role_ids = [
+                            rid for rid in role_ids if rid not in existing_role_ids
+                        ]
+                        if new_role_ids:
+                            user_roles = [
+                                {"user_id": user.id, "role_id": role_id}
+                                for role_id in new_role_ids
+                            ]
+                            session.exec(UserRole.__table__.insert().values(user_roles))
+                        else:
+                            results["unchanged"].append(user.id)
+                            continue
+
+                    elif operation == "remove":
+                        # Remove specific roles
+                        session.exec(
+                            UserRole.__table__.delete().where(
+                                UserRole.user_id == user.id,
+                                UserRole.role_id.in_(role_ids),
+                            )
+                        )
+
+                    # Update user version and timestamp
+                    user.version += 1
+                    user.update_timestamp()
+                    session.add(user)
+                    results["success"].append(user.id)
+
+                except Exception as user_error:
+                    results["failed"].append(
+                        {"user_id": user.id, "error": str(user_error)}
+                    )
+
+            session.flush()
+
+            audit_logger.info(
+                "bulk_set_roles_success",
+                operation=operation,
+                user_ids=user_ids,
+                role_names=role_names,
+                results=results,
+            )
+
+            return results
+
+        except Exception as e:
+            session.rollback()
+            audit_logger.error(
+                "bulk_set_roles_failed",
+                operation=operation,
+                user_ids=user_ids,
+                role_names=role_names,
+                error=str(e),
+            )
+            raise ValueError(f"Failed to bulk {operation} roles: {str(e)}")
 
 
 class Supplier(rx.Model, table=True):
