@@ -442,149 +442,154 @@ def user_management() -> rx.Component:
             align="center",
             padding_bottom="1em",
         ),
-        rx.tabs.root(
-            rx.tabs.list(
-                rx.tabs.trigger(
-                    "Profiles",
-                    value="profiles",
-                    size="3",
-                    width="100px",
+        rx.flex(
+            rx.tabs.root(
+                rx.tabs.list(
+                    rx.tabs.trigger(
+                        "Profiles",
+                        value="profiles",
+                    ),
+                    rx.tabs.trigger(
+                        "Roles",
+                        value="roles",
+                    ),
+                    rx.tabs.trigger(
+                        "Permissions",
+                        value="permissions",
+                    ),
+                    rx.tabs.trigger(
+                        "Role&Permission Assignment",
+                        value="bulk_role_perm",
+                    ),
+                    justify="start",
+                    spacing="4",
+                    padding_bottom="1em",
+                    width="100%",
+                    size="2",
+                    style={
+                        "display": "flex",
+                        "gap": "2em",
+                    },
                 ),
-                rx.tabs.trigger(
-                    "Roles",
-                    value="roles",
-                    size="3",
-                    width="100px",
-                ),
-                rx.tabs.trigger(
-                    "Permissions",
-                    value="permissions",
-                    size="3",
-                    width="100px",
-                ),
-                rx.tabs.trigger(
-                    "Role&Permission Assignment",
-                    value="bulk_role_perm",
-                    size="3",
-                    width="100px",
-                ),
-                justify="start",
-                spacing="2",
-                padding_bottom="1em",
-            ),
-            rx.tabs.content(
-                rx.card(
-                    # Enhanced search and filter section
-                    rx.flex(
+                rx.tabs.content(
+                    rx.card(
+                        # Enhanced search and filter section
                         rx.flex(
-                            rx.cond(
-                                UserManagementState.sort_reverse,
-                                rx.icon(
-                                    "arrow-down-z-a",
-                                    size=28,
-                                    stroke_width=1.5,
-                                    cursor="pointer",
-                                    on_click=UserManagementState.toggle_sort,
-                                ),
-                                rx.icon(
-                                    "arrow-down-a-z",
-                                    size=28,
-                                    stroke_width=1.5,
-                                    cursor="pointer",
-                                    on_click=UserManagementState.toggle_sort,
-                                ),
-                            ),
-                            rx.select(
-                                [
-                                    "username",
-                                    "email",
-                                ],  # Removed "role" since we now have multiple roles
-                                placeholder="Sort By: Username",
-                                size="3",
-                                on_change=UserManagementState.set_sort_value,
-                            ),
-                            rx.input(
-                                rx.input.slot(rx.icon("search")),
-                                rx.input.slot(
-                                    rx.icon("x"),
-                                    justify="end",
-                                    cursor="pointer",
-                                    on_click=UserManagementState.setvar(
-                                        "search_value", ""
+                            rx.flex(
+                                rx.cond(
+                                    UserManagementState.sort_reverse,
+                                    rx.icon(
+                                        "arrow-down-z-a",
+                                        size=28,
+                                        stroke_width=1.5,
+                                        cursor="pointer",
+                                        on_click=UserManagementState.toggle_sort,
                                     ),
-                                    display=rx.cond(
-                                        UserManagementState.search_value, "flex", "none"
+                                    rx.icon(
+                                        "arrow-down-a-z",
+                                        size=28,
+                                        stroke_width=1.5,
+                                        cursor="pointer",
+                                        on_click=UserManagementState.toggle_sort,
                                     ),
                                 ),
-                                value=UserManagementState.search_value,
-                                placeholder="Search users, emails, or roles...",
-                                size="3",
-                                max_width=[
-                                    "200px",
-                                    "200px",
-                                    "250px",
-                                    "300px",
-                                ],  # Increased for better mobile experience
+                                rx.select(
+                                    [
+                                        "username",
+                                        "email",
+                                    ],  # Removed "role" since we now have multiple roles
+                                    placeholder="Sort By: Username",
+                                    size="3",
+                                    on_change=UserManagementState.set_sort_value,
+                                ),
+                                rx.input(
+                                    rx.input.slot(rx.icon("search")),
+                                    rx.input.slot(
+                                        rx.icon("x"),
+                                        justify="end",
+                                        cursor="pointer",
+                                        on_click=UserManagementState.setvar(
+                                            "search_value", ""
+                                        ),
+                                        display=rx.cond(
+                                            UserManagementState.search_value,
+                                            "flex",
+                                            "none",
+                                        ),
+                                    ),
+                                    value=UserManagementState.search_value,
+                                    placeholder="Search users, emails, or roles...",
+                                    size="3",
+                                    max_width=[
+                                        "200px",
+                                        "200px",
+                                        "250px",
+                                        "300px",
+                                    ],  # Increased for better mobile experience
+                                    width="100%",
+                                    variant="surface",
+                                    color_scheme="gray",
+                                    on_change=UserManagementState.set_search_value,
+                                ),
+                                flex_direction=["column", "column", "row"],
+                                align="center",
+                                justify="end",
+                                spacing="3",
                                 width="100%",
-                                variant="surface",
-                                color_scheme="gray",
-                                on_change=UserManagementState.set_search_value,
                             ),
-                            flex_direction=["column", "column", "row"],
-                            align="center",
-                            justify="end",
+                            direction="column",
                             spacing="3",
+                            justify="between",
+                            wrap="wrap",
+                            width="100%",
+                            padding_bottom="1em",
+                        ),
+                        # Enhanced table with better mobile support
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    _header_cell("Username", "user"),
+                                    _header_cell("Email", "mail"),
+                                    _header_cell(
+                                        "Roles", "shield"
+                                    ),  # Updated header text
+                                    _header_cell("Actions", "settings"),
+                                ),
+                            ),
+                            rx.table.body(
+                                rx.foreach(
+                                    UserManagementState.current_page,
+                                    lambda user, index: _show_user(user, index),
+                                )
+                            ),
+                            variant="surface",
+                            size="3",
                             width="100%",
                         ),
-                        direction="column",
-                        spacing="3",
-                        justify="between",
-                        wrap="wrap",
+                        _pagination_view(),
                         width="100%",
-                        padding_bottom="1em",
+                        padding="16px",
                     ),
-                    # Enhanced table with better mobile support
-                    rx.table.root(
-                        rx.table.header(
-                            rx.table.row(
-                                _header_cell("Username", "user"),
-                                _header_cell("Email", "mail"),
-                                _header_cell("Roles", "shield"),  # Updated header text
-                                _header_cell("Actions", "settings"),
-                            ),
-                        ),
-                        rx.table.body(
-                            rx.foreach(
-                                UserManagementState.current_page,
-                                lambda user, index: _show_user(user, index),
-                            )
-                        ),
-                        variant="surface",
-                        size="3",
-                        width="100%",
-                    ),
-                    _pagination_view(),
-                    width="100%",
-                    padding="16px",
+                    value="profiles",
                 ),
-                value="profiles",
+                rx.tabs.content(
+                    role_management_page(),
+                    value="roles",
+                ),
+                rx.tabs.content(
+                    permissions_tab(),
+                    value="permissions",
+                ),
+                rx.tabs.content(
+                    bulk_operations_tab(),
+                    value="bulk_role_perm",
+                ),
+                value=UserManagementState.active_tab,
+                on_change=lambda val: UserManagementState.set_active_tab(val),
+                width="100%",
+                padding="16px",
             ),
-            rx.tabs.content(
-                role_management_page(),
-                value="roles",
-            ),
-            rx.tabs.content(
-                permissions_tab(),
-                value="permissions",
-            ),
-            rx.tabs.content(
-                bulk_operations_tab(),
-                value="bulk_role_perm",
-            ),
-            value=UserManagementState.active_tab,
-            on_change=lambda val: UserManagementState.set_active_tab(val),
-            width="100%",
-            padding="16px",
+            spacing="2",
         ),
         width="100%",
     )
