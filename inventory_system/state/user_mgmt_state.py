@@ -4,6 +4,7 @@ import reflex as rx
 import reflex_local_auth
 from sqlmodel import select
 
+from inventory_system.constants import available_colors
 from inventory_system.logging.logging import audit_logger
 from inventory_system.models.user import Role, UserInfo, UserRole
 from inventory_system.state.auth import AuthState
@@ -81,33 +82,6 @@ class UserManagementState(AuthState):
     @rx.var
     def role_color_map(self) -> Dict[str, str]:
         """Create a mapping of roles to colors"""
-        available_colors = [
-            "tomato",
-            "red",
-            "ruby",
-            "crimson",
-            "pink",
-            "plum",
-            "purple",
-            "violet",
-            "iris",
-            "indigo",
-            "blue",
-            "cyan",
-            "teal",
-            "jade",
-            "green",
-            "grass",
-            "brown",
-            "orange",
-            "sky",
-            "mint",
-            "lime",
-            "yellow",
-            "amber",
-            "gold",
-            "bronze",
-        ]
 
         color_map = {}
         for role in self.available_roles:

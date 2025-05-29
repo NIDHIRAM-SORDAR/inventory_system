@@ -8,6 +8,18 @@ from inventory_system.state.role_state import RoleManagementState
 from inventory_system.state.user_mgmt_state import UserManagementState
 
 
+def _permission_count_badge(count: str, role: str) -> rx.Component:
+    """Create a styled badge for individual roles with dynamic colors"""
+    color_map_dict = UserManagementState.role_color_map
+
+    return rx.badge(
+        rx.text(count, size="2"),
+        color_scheme=color_map_dict[role],
+        variant="soft",
+        size="1",
+    )
+
+
 def _role_badge(role: str) -> rx.Component:
     """Create a styled badge for individual roles with dynamic colors"""
     color_map_dict = UserManagementState.role_color_map
@@ -776,11 +788,9 @@ def bulk_operations_tab() -> rx.Component:
                                         role["description"].to(str) | "No description"
                                     ),
                                     rx.table.cell(
-                                        rx.badge(
+                                        _permission_count_badge(
                                             f"{role['permissions'].to(list).length()}",
-                                            variant="soft",
-                                            size="2",
-                                            color_scheme="blue",
+                                            role["name"].to(str),
                                         )
                                     ),
                                     style={
