@@ -1,7 +1,6 @@
-# Complete implementation for bulk_roles_state.py
-
 import csv
 import io
+from dataclasses import dataclass
 from typing import Any, Dict, List, Set
 
 import reflex as rx
@@ -14,6 +13,24 @@ from inventory_system.state.auth import AuthState
 from inventory_system.state.register_state import CustomRegisterState
 
 from ..constants import DEFAULT_PROFILE_PICTURE
+
+
+@dataclass
+class PermissionInfo:
+    """Dataclass for individual permission details."""
+
+    id: int
+    name: str
+    description: str
+    category: str
+
+
+@dataclass
+class GroupedPermission:
+    """Dataclass for permissions grouped by category."""
+
+    category: str
+    permissions: List[PermissionInfo]
 
 
 class BulkOperationsState(AuthState):
@@ -62,18 +79,18 @@ class BulkOperationsState(AuthState):
                 return []
 
     @rx.var
-    def available_permissions_for_bulk(self) -> List[Dict[str, Any]]:
+    def available_permissions_for_bulk(self) -> List[PermissionInfo]:
         """Get available permissions for bulk assignment."""
         with rx.session() as session:
             try:
                 perms = session.exec(select(Permission)).all()
                 return [
-                    {
-                        "id": p.id,
-                        "name": p.name,
-                        "description": p.description,
-                        "category": p.category or "Uncategorized",
-                    }
+                    PermissionInfo(
+                        id=p.id,
+                        name=p.name,
+                        description=p.description,
+                        category=p.category or "Uncategorized",
+                    )
                     for p in perms
                 ]
             except Exception as e:
@@ -81,21 +98,21 @@ class BulkOperationsState(AuthState):
                 return []
 
     @rx.var
-    def grouped_permissions_for_bulk(self) -> List[Dict[str, Any]]:
+    def grouped_permissions_for_bulk(self) -> List[GroupedPermission]:
         """Get permissions grouped by category for bulk assignment."""
         permissions = self.available_permissions_for_bulk
 
         # Group permissions by category
-        categories = {}
+        categories: Dict[str, List[PermissionInfo]] = {}
         for perm in permissions:
-            category = perm["category"] or "Uncategorized"
+            category = perm.category or "Uncategorized"
             if category not in categories:
                 categories[category] = []
             categories[category].append(perm)
 
-        # Convert to list format expected by UI
+        # Convert to list of GroupedPermission objects
         return [
-            {"category": category, "permissions": perms}
+            GroupedPermission(category=category, permissions=perms)
             for category, perms in sorted(categories.items())
         ]
 
@@ -111,18 +128,9 @@ class BulkOperationsState(AuthState):
     @rx.event
     def select_all_current_page_users(self) -> None:
         """Select all users on current page."""
-        # This method needs to get current page users from UserManagementState
-        # We'll implement this by accessing the current page data
         try:
-            # Get current state instance to access current page users
-            # Note: This is a simplified approach - in practice you might want to
-            # pass the user IDs from the UI or use a different pattern
             with rx.session() as session:
-                # For now, we'll select all active users - this should be refined
-                # to work with the actual current page from UserManagementState
-                users = session.exec(
-                    select(UserInfo).where(UserInfo.is_active == True).limit(20)
-                ).all()
+                users = session.exec(select(UserInfo).limit(20)).all()
                 user_ids = [user.id for user in users]
                 self.selected_user_ids.update(user_ids)
         except Exception as e:
@@ -208,19 +216,15 @@ class BulkOperationsState(AuthState):
 
         try:
             with rx.session() as session:
-                # Convert set to list for the bulk operation
                 user_ids = list(self.selected_user_ids)
-
                 results = UserInfo.bulk_set_roles(
                     user_ids=user_ids,
                     role_names=self.bulk_selected_roles,
                     session=session,
                     operation=self.bulk_operation_type,
                 )
-
                 session.commit()
 
-                # Create success message
                 success_count = len(results["success"])
                 failed_count = len(results["failed"])
                 unchanged_count = len(results["unchanged"])
@@ -242,7 +246,6 @@ class BulkOperationsState(AuthState):
                 if unchanged_count > 0:
                     yield rx.toast.info(f"{unchanged_count} user(s) had no changes")
 
-                # Log the operation
                 audit_logger.info(
                     "bulk_role_assignment_completed",
                     operation=self.bulk_operation_type,
@@ -252,7 +255,6 @@ class BulkOperationsState(AuthState):
                     acting_user=self.username,
                 )
 
-                # Refresh user data and close modal
                 from inventory_system.state.user_mgmt_state import UserManagementState
 
                 user_mgmt_state = await self.get_state(UserManagementState)
@@ -327,19 +329,15 @@ class BulkOperationsState(AuthState):
 
         try:
             with rx.session() as session:
-                # Convert set to list for the bulk operation
                 role_ids = list(self.selected_role_ids)
-
                 results = Role.bulk_set_permissions(
                     role_ids=role_ids,
                     permission_names=self.bulk_selected_permissions,
                     session=session,
                     operation=self.bulk_role_operation_type,
                 )
-
                 session.commit()
 
-                # Create success message
                 success_count = len(results["success"])
                 failed_count = len(results["failed"])
                 unchanged_count = len(results["unchanged"])
@@ -362,7 +360,6 @@ class BulkOperationsState(AuthState):
                 if unchanged_count > 0:
                     yield rx.toast.info(f"{unchanged_count} role(s) had no changes")
 
-                # Log the operation
                 audit_logger.info(
                     "bulk_permission_assignment_completed",
                     operation=self.bulk_role_operation_type,
@@ -372,7 +369,6 @@ class BulkOperationsState(AuthState):
                     acting_user=self.username,
                 )
 
-                # Refresh role data and close modal
                 from inventory_system.state.role_state import RoleManagementState
 
                 role_mgmt_state = await self.get_state(RoleManagementState)
@@ -526,7 +522,6 @@ class BulkOperationsState(AuthState):
                     session.commit()
                     session.refresh(user_info)
 
-                    # Log the operation
                     audit_logger.info(
                         "user_created_via_direct_operations",
                         new_user_id=user_info.id,
@@ -540,7 +535,6 @@ class BulkOperationsState(AuthState):
                         f"User '{form_data['username']}' created successfully"
                     )
 
-                    # Refresh the user management state to show the new user
                     from inventory_system.state.user_mgmt_state import (
                         UserManagementState,
                     )
@@ -559,7 +553,6 @@ class BulkOperationsState(AuthState):
                         user_id=register_state.new_user_id,
                         error=str(db_error),
                     )
-
                     yield rx.toast.error(register_state.registration_error)
                     session.rollback()
                     return
@@ -582,8 +575,6 @@ class BulkOperationsState(AuthState):
         try:
             with rx.session() as session:
                 users = session.exec(select(UserInfo)).all()
-
-                # Create CSV data
                 csv_data = []
                 for user in users:
                     csv_data.append(
@@ -604,7 +595,6 @@ class BulkOperationsState(AuthState):
                         }
                     )
 
-                # Convert to CSV string
                 output = io.StringIO()
                 if csv_data:
                     fieldnames = csv_data[0].keys()
@@ -615,7 +605,6 @@ class BulkOperationsState(AuthState):
                 csv_content = output.getvalue()
                 output.close()
 
-                # Trigger download
                 yield rx.download(
                     data=csv_content, filename="users_export.csv", media_type="text/csv"
                 )
@@ -625,7 +614,6 @@ class BulkOperationsState(AuthState):
                     user_count=len(csv_data),
                     acting_user=self.username,
                 )
-
                 yield rx.toast.success(f"Exported {len(csv_data)} users to CSV")
 
         except Exception as e:
@@ -640,7 +628,6 @@ class BulkOperationsState(AuthState):
         try:
             with rx.session() as session:
                 roles = session.exec(select(Role)).all()
-
                 csv_data = []
                 for role in roles:
                     csv_data.append(
@@ -679,7 +666,6 @@ class BulkOperationsState(AuthState):
                     role_count=len(csv_data),
                     acting_user=self.username,
                 )
-
                 yield rx.toast.success(f"Exported {len(csv_data)} roles to CSV")
 
         except Exception as e:
@@ -694,7 +680,6 @@ class BulkOperationsState(AuthState):
         try:
             with rx.session() as session:
                 permissions = session.exec(select(Permission)).all()
-
                 csv_data = []
                 for perm in permissions:
                     csv_data.append(
@@ -730,7 +715,6 @@ class BulkOperationsState(AuthState):
                     permission_count=len(csv_data),
                     acting_user=self.username,
                 )
-
                 yield rx.toast.success(f"Exported {len(csv_data)} permissions to CSV")
 
         except Exception as e:

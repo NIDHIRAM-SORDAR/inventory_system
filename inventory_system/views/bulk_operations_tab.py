@@ -7,6 +7,31 @@ from inventory_system.state.role_state import RoleManagementState
 from inventory_system.state.user_mgmt_state import UserManagementState
 
 
+def _role_badge(role: str) -> rx.Component:
+    """Create a styled badge for individual roles with dynamic colors"""
+    color_map_dict = UserManagementState.role_color_map
+
+    return rx.badge(
+        rx.text(role.capitalize(), size="2"),
+        color_scheme=color_map_dict[role],
+        variant="soft",
+        size="1",
+    )
+
+
+def _roles_display(roles: rx.Var) -> rx.Component:
+    """Display multiple roles as badges with proper wrapping"""
+    return rx.flex(
+        rx.foreach(
+            roles,
+            lambda role: _role_badge(role.to(str)),
+        ),
+        wrap="wrap",
+        gap="1",
+        align="center",
+    )
+
+
 def _user_selection_checkbox(
     user: rx.Var, bulk_state: BulkOperationsState
 ) -> rx.Component:
@@ -23,8 +48,8 @@ def _role_selection_checkbox(
 ) -> rx.Component:
     """Checkbox for selecting roles in bulk operations"""
     return rx.checkbox(
-        checked=rx.cond(bulk_state.selected_role_ids.contains(role), True, False),
-        on_change=lambda _: bulk_state.toggle_role_selection(role),
+        checked=bulk_state.selected_role_ids.contains(role["id"]),
+        on_change=lambda _: bulk_state.toggle_role_selection(role["id"]),
         size="2",
     )
 
@@ -43,45 +68,63 @@ def _bulk_role_assignment_modal() -> rx.Component:
                 rx.card(
                     rx.vstack(
                         rx.text("Operation Type:", weight="bold", size="2"),
-                        rx.radio_cards.root(
-                            rx.radio_cards.item(
-                                rx.flex(
+                        rx.radio.root(
+                            rx.flex(
+                                rx.radio.item(value="replace"),
+                                rx.vstack(
                                     rx.text("Replace", weight="bold"),
                                     rx.text(
                                         "Replace all existing roles",
                                         size="1",
                                         color="gray",
                                     ),
-                                    direction="column",
+                                    spacing="1",
                                     align="start",
                                 ),
-                                value="replace",
+                                direction="row",
+                                align="center",
+                                spacing="2",
+                                width="100%",
                             ),
-                            rx.radio_cards.item(
-                                rx.flex(
+                            rx.flex(
+                                rx.radio.item(value="add"),
+                                rx.vstack(
                                     rx.text("Add", weight="bold"),
                                     rx.text(
-                                        "Add to existing roles", size="1", color="gray"
+                                        "Add to existing roles",
+                                        size="1",
+                                        color="gray",
                                     ),
-                                    direction="column",
+                                    spacing="1",
                                     align="start",
                                 ),
-                                value="add",
+                                direction="row",
+                                align="center",
+                                spacing="2",
+                                width="100%",
                             ),
-                            rx.radio_cards.item(
-                                rx.flex(
+                            rx.flex(
+                                rx.radio.item(value="remove"),
+                                rx.vstack(
                                     rx.text("Remove", weight="bold"),
                                     rx.text(
-                                        "Remove selected roles", size="1", color="gray"
+                                        "Remove selected roles",
+                                        size="1",
+                                        color="gray",
                                     ),
-                                    direction="column",
+                                    spacing="1",
                                     align="start",
                                 ),
-                                value="remove",
+                                direction="row",
+                                align="center",
+                                spacing="2",
+                                width="100%",
                             ),
                             value=BulkOperationsState.bulk_operation_type,
                             on_change=BulkOperationsState.set_bulk_operation_type,
-                            columns=rx.breakpoints(initial="1", sm="3"),
+                            direction=rx.breakpoints(initial="column", sm="row"),
+                            spacing="3",
+                            width="100%",
                         ),
                         spacing="3",
                         width="100%",
@@ -169,49 +212,63 @@ def _bulk_permission_assignment_modal() -> rx.Component:
                 rx.card(
                     rx.vstack(
                         rx.text("Operation Type:", weight="bold", size="2"),
-                        rx.radio_cards.root(
-                            rx.radio_cards.item(
-                                rx.flex(
+                        rx.radio.root(
+                            rx.flex(
+                                rx.radio.item(value="replace"),
+                                rx.vstack(
                                     rx.text("Replace", weight="bold"),
                                     rx.text(
                                         "Replace all existing permissions",
                                         size="1",
                                         color="gray",
                                     ),
-                                    direction="column",
+                                    spacing="1",
                                     align="start",
                                 ),
-                                value="replace",
+                                direction="row",
+                                align="center",
+                                spacing="2",
+                                width="100%",
                             ),
-                            rx.radio_cards.item(
-                                rx.flex(
+                            rx.flex(
+                                rx.radio.item(value="add"),
+                                rx.vstack(
                                     rx.text("Add", weight="bold"),
                                     rx.text(
                                         "Add to existing permissions",
                                         size="1",
                                         color="gray",
                                     ),
-                                    direction="column",
+                                    spacing="1",
                                     align="start",
                                 ),
-                                value="add",
+                                direction="row",
+                                align="center",
+                                spacing="2",
+                                width="100%",
                             ),
-                            rx.radio_cards.item(
-                                rx.flex(
+                            rx.flex(
+                                rx.radio.item(value="remove"),
+                                rx.vstack(
                                     rx.text("Remove", weight="bold"),
                                     rx.text(
                                         "Remove selected permissions",
                                         size="1",
                                         color="gray",
                                     ),
-                                    direction="column",
+                                    spacing="1",
                                     align="start",
                                 ),
-                                value="remove",
+                                direction="row",
+                                align="center",
+                                spacing="2",
+                                width="100%",
                             ),
                             value=BulkOperationsState.bulk_role_operation_type,
                             on_change=BulkOperationsState.set_bulk_role_operation_type,
-                            columns=rx.breakpoints(initial="1", sm="3"),
+                            direction=rx.breakpoints(initial="column", sm="row"),
+                            spacing="3",
+                            width="100%",
                         ),
                         spacing="3",
                         width="100%",
@@ -226,26 +283,26 @@ def _bulk_permission_assignment_modal() -> rx.Component:
                             BulkOperationsState.grouped_permissions_for_bulk,
                             lambda category_perms: rx.vstack(
                                 rx.text(
-                                    category_perms["category"],
+                                    category_perms.category,
                                     weight="bold",
                                     size="2",
                                     color="blue",
                                 ),
                                 rx.grid(
                                     rx.foreach(
-                                        category_perms["permissions"],
+                                        category_perms.permissions,
                                         lambda perm: rx.tooltip(
                                             rx.checkbox(
-                                                perm["name"].replace("_", " ").title(),
+                                                perm.name.replace("_", " ").title(),
                                                 checked=BulkOperationsState.bulk_selected_permissions.contains(
-                                                    perm["name"]
+                                                    perm.name
                                                 ),
                                                 on_change=lambda _: BulkOperationsState.toggle_bulk_permission(
-                                                    perm["name"]
+                                                    perm.name
                                                 ),
                                                 size="2",
                                             ),
-                                            content=perm["description"],
+                                            content=perm.description,
                                         ),
                                     ),
                                     columns=rx.breakpoints(initial="1", sm="2"),
@@ -321,7 +378,7 @@ def _user_creation_modal() -> rx.Component:
                 rx.vstack(
                     rx.dialog.title("Create New User"),
                     rx.dialog.description(
-                        "Fill in the user details to create a new account",
+                        "Fill in the user details",
                         size="2",
                     ),
                     register_error(),
@@ -329,28 +386,28 @@ def _user_creation_modal() -> rx.Component:
                         rx.vstack(
                             rx.flex(
                                 rx.vstack(
-                                    rx.text("Username", weight="bold", size="2"),
+                                    rx.text("Username", weight="medium"),
                                     rx.input(
                                         placeholder="Enter username",
                                         name="username",
                                         required=True,
-                                        size="3",
+                                        size="2",
                                         width="100%",
                                     ),
-                                    spacing="1",
+                                    spacing="2",
                                     width="100%",
                                 ),
                                 rx.vstack(
-                                    rx.text("Email", weight="bold", size="2"),
+                                    rx.text("Email", weight="medium"),
                                     rx.input(
                                         placeholder="Enter email address",
                                         name="email",
                                         type="email",
                                         required=True,
-                                        size="3",
+                                        size="2",
                                         width="100%",
                                     ),
-                                    spacing="1",
+                                    spacing="2",
                                     width="100%",
                                 ),
                                 direction=rx.breakpoints(initial="column", sm="row"),
@@ -359,16 +416,16 @@ def _user_creation_modal() -> rx.Component:
                             ),
                             rx.flex(
                                 rx.vstack(
-                                    rx.text("Password", weight="bold", size="2"),
+                                    rx.text("Password", weight="medium", size="2"),
                                     rx.input(
                                         placeholder="Enter password",
                                         name="password",
                                         type="password",
                                         required=True,
-                                        size="3",
+                                        size="2",
                                         width="100%",
                                     ),
-                                    spacing="1",
+                                    spacing="2",
                                     width="100%",
                                 ),
                                 rx.vstack(
@@ -380,18 +437,20 @@ def _user_creation_modal() -> rx.Component:
                                         name="confirm_password",
                                         type="password",
                                         required=True,
-                                        size="3",
+                                        size="2",
                                         width="100%",
                                     ),
-                                    spacing="1",
+                                    spacing="2",
                                     width="100%",
                                 ),
                                 direction=rx.breakpoints(initial="column", sm="row"),
                                 spacing="3",
                                 width="100%",
                             ),
+                            spacing="3",
                         ),
                         padding="3",
+                        width="100%",
                     ),
                     # Role assignment
                     rx.card(
@@ -411,7 +470,7 @@ def _user_creation_modal() -> rx.Component:
                                 width="100%",
                             ),
                             spacing="3",
-                            width="100%",
+                            width_auto="100%",
                         ),
                         padding="3",
                     ),
@@ -432,14 +491,14 @@ def _user_creation_modal() -> rx.Component:
                                 color_scheme="gray",
                                 size="3",
                                 width=rx.breakpoints(initial="100%", sm="auto"),
-                            )
+                            ),
                         ),
                         direction=rx.breakpoints(initial="column", sm="row"),
                         spacing="3",
                         width="100%",
                         justify=rx.breakpoints(initial="center", sm="end"),
                     ),
-                    spacing="4",
+                    spacingEmily="4",
                     width="100%",
                     padding="16px",
                 ),
@@ -459,20 +518,20 @@ def _export_section() -> rx.Component:
     """Import/Export functionality section"""
     return rx.card(
         rx.vstack(
-            rx.flex(
+            rx.hstack(
                 rx.icon("download", size=20),
-                rx.text("Import/Export", weight="bold", size="3"),
+                rx.text("Import/Export", weight="bold"),
                 align="center",
                 spacing="2",
             ),
             rx.divider(),
             # Export section
             rx.vstack(
-                rx.text("Export Data", weight="bold", size="2"),
-                rx.flex(
+                rx.text("Export Data", weight="medium", size="2"),
+                rx.hstack(
                     rx.button(
-                        rx.icon("users", size=16),
                         "Export Users",
+                        source=rx.icon("users", size=16),
                         color_scheme="blue",
                         variant="outline",
                         size="2",
@@ -497,7 +556,7 @@ def _export_section() -> rx.Component:
                         on_click=BulkOperationsState.export_permissions,
                         width=rx.breakpoints(initial="100%", sm="auto"),
                     ),
-                    direction=rx.breakpoints(initial="column", sm="row"),
+                    flex_direction=rx.breakpoints(initial="column", sm="row"),
                     spacing="2",
                     width="100%",
                     wrap="wrap",
@@ -514,6 +573,7 @@ def _export_section() -> rx.Component:
 
 def bulk_operations_tab() -> rx.Component:
     """Complete bulk operations tab with all functionality"""
+
     return rx.vstack(
         # Header with action buttons
         rx.flex(
@@ -614,19 +674,7 @@ def bulk_operations_tab() -> rx.Component:
                                 ),
                                 rx.table.cell(user["username"]),
                                 rx.table.cell(user["email"]),
-                                rx.table.cell(
-                                    rx.flex(
-                                        rx.foreach(
-                                            user["roles"].to(list),
-                                            lambda role: rx.badge(
-                                                role.to(str).capitalize(),
-                                                variant="soft",
-                                            ),
-                                        ),
-                                        wrap="wrap",
-                                        gap="1",
-                                    )
-                                ),
+                                rx.table.cell(_roles_display(user["roles"].to(list))),
                                 style={
                                     "_hover": {"bg": rx.color("accent", 2)},
                                     "bg": rx.cond(
@@ -722,19 +770,16 @@ def bulk_operations_tab() -> rx.Component:
                                             role, BulkOperationsState
                                         )
                                     ),
+                                    rx.table.cell(_role_badge(role["name"].to(str))),
+                                    rx.table.cell(
+                                        role["description"].to(str) | "No description"
+                                    ),
                                     rx.table.cell(
                                         rx.badge(
-                                            rx.text(role["name"]),
+                                            f"{role['permissions'].to(list).length()}",
+                                            variant="soft",
+                                            size="2",
                                             color_scheme="blue",
-                                        )
-                                    ),
-                                    rx.table.cell(
-                                        role.get("description", "No description")
-                                    ),
-                                    rx.table.cell(
-                                        rx.badge(
-                                            str(role["permissions"].to(list).length()),
-                                            variant="outline",
                                         )
                                     ),
                                     style={
@@ -762,8 +807,8 @@ def bulk_operations_tab() -> rx.Component:
             None,
         ),
         # Import/Export section
-        _export_section(),
-        # Modals
+        # _export_section(),
+        # # Modals
         _bulk_role_assignment_modal(),
         _bulk_permission_assignment_modal(),
         spacing="4",

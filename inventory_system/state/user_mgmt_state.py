@@ -107,7 +107,6 @@ class UserManagementState(AuthState):
             "amber",
             "gold",
             "bronze",
-            "gray",
         ]
 
         color_map = {}
