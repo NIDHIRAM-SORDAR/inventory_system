@@ -31,7 +31,7 @@ class UserRole(rx.Model, table=True):
     """Association table for User-Role many-to-many relationship."""
 
     user_id: Optional[int] = Field(
-        foreign_key="userinfo.user_id", primary_key=True, index=True, ondelete="CASCADE"
+        foreign_key="userinfo.id", primary_key=True, index=True, ondelete="CASCADE"
     )
     role_id: Optional[int] = Field(
         foreign_key="role.id", primary_key=True, index=True, ondelete="CASCADE"

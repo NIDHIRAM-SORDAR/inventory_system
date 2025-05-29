@@ -3,6 +3,7 @@ import reflex as rx
 from inventory_system.pages.register import register_error
 from inventory_system.state.auth import AuthState
 from inventory_system.state.bulk_roles_state import BulkOperationsState
+from inventory_system.state.register_state import CustomRegisterState
 from inventory_system.state.role_state import RoleManagementState
 from inventory_system.state.user_mgmt_state import UserManagementState
 
@@ -481,7 +482,7 @@ def _user_creation_modal() -> rx.Component:
                             type="submit",
                             color_scheme="green",
                             size="3",
-                            loading=BulkOperationsState.bulk_is_loading,
+                            loading=CustomRegisterState.is_submitting,
                             width=rx.breakpoints(initial="100%", sm="auto"),
                         ),
                         rx.dialog.close(
@@ -502,7 +503,7 @@ def _user_creation_modal() -> rx.Component:
                     width="100%",
                     padding="16px",
                 ),
-                on_submit=BulkOperationsState.create_new_user,
+                on_submit=CustomRegisterState.create_new_user,
             ),
             style={
                 "max_width": rx.breakpoints(initial="95vw", md="600px"),

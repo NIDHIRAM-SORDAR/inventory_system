@@ -5,7 +5,7 @@ import reflex_local_auth
 from sqlmodel import select
 
 from inventory_system.logging.logging import audit_logger
-from inventory_system.models.user import Role, UserInfo
+from inventory_system.models.user import Role, UserInfo, UserRole
 from inventory_system.state.auth import AuthState
 
 
@@ -318,6 +318,16 @@ class UserManagementState(AuthState):
                     return
 
                 target_username = local_user.username
+
+                # CRITICAL: Delete UserRole records first to prevent orphaned records
+                # This handles the case where UserRole.user_id references userinfo.user_id
+                session.exec(
+                    UserRole.__table__.delete().where(
+                        UserRole.user_id == user_info.user_id
+                    )
+                )
+
+                # Then delete UserInfo and LocalUser
                 if local_user:
                     session.delete(local_user)
                 session.delete(user_info)
