@@ -89,6 +89,24 @@ color_picker_style = {
     },
 }
 
+# Add to styles.py
+card_transition_style = {
+    "transition": "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+    "cursor": "pointer",
+    "&:hover": {
+        "transform": "translateY(-2px)",
+        "box_shadow": rx.color_mode_cond(
+            light="0 8px 25px rgba(0, 0, 0, 0.1)",
+            dark="0 8px 25px rgba(0, 0, 0, 0.3)",
+        ),
+        "border_color": accent_text_color,  # Use existing accent_text_color
+    },
+    "&:active": {
+        "transform": "translateY(0px)",
+        "transition": "transform 0.1s ease",
+    },
+}
+
 
 base_stylesheets = [
     "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",

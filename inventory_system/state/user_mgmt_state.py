@@ -29,6 +29,9 @@ class UserManagementState(AuthState):
     current_user_roles: List[str] = []
     active_tab: str = "profiles"
 
+    # New state variables for mobile layout
+    mobile_displayed_count: int = 10  # Initial number of users to display on mobile
+
     def check_auth_and_load(self):
         if not self.is_authenticated or not (
             self.is_authenticated_and_ready and "manage_users" in self.permissions
@@ -367,6 +370,20 @@ class UserManagementState(AuthState):
         end = start + self.page_size
         return self.filtered_users[start:end]
 
+    @rx.var
+    def mobile_displayed_users(self) -> List[Dict[str, Any]]:
+        """Computes the list of users to display on mobile based on mobile_displayed_count."""
+        return self.filtered_users[: self.mobile_displayed_count]
+
+    @rx.var
+    def has_more_users(self) -> bool:
+        """Determines if there are more users to load on mobile."""
+        return len(self.filtered_users) > self.mobile_displayed_count
+
+    def load_more(self):
+        """Increments the number of displayed users on mobile by page_size."""
+        self.mobile_displayed_count += self.page_size
+
     def open_edit_dialog(self, user_id: int, current_roles: List[str]):
         """Updated to handle multiple roles"""
         self.target_user_id = user_id
@@ -392,13 +409,16 @@ class UserManagementState(AuthState):
 
     def set_sort_value(self, value: str):
         self.sort_value = value
+        self.mobile_displayed_count = 10  # Reset for mobile
 
     def toggle_sort(self):
         self.sort_reverse = not self.sort_reverse
+        self.mobile_displayed_count = 10  # Reset for mobile
 
     def set_search_value(self, value: str):
         self.search_value = value
-        self.page_number = 1
+        self.page_number = 1  # For desktop pagination
+        self.mobile_displayed_count = 10  # Reset for mobile
 
     # New methods for handling multiple role selection
     def toggle_role_selection(self, role: str):

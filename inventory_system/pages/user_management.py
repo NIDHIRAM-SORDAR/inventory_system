@@ -1,7 +1,7 @@
 import reflex as rx
 import reflex_local_auth
 
-from inventory_system import routes
+from inventory_system import routes, styles
 from inventory_system.state.auth import AuthState
 from inventory_system.state.user_mgmt_state import UserManagementState
 from inventory_system.templates.template import template
@@ -41,7 +41,7 @@ def _roles_display(roles: rx.Var) -> rx.Component:
             lambda role: _role_badge(role.to(str)),
         ),
         wrap="wrap",
-        gap="1",
+        gap="2",
         align="center",
     )
 
@@ -350,6 +350,110 @@ def _show_user(user: rx.Var, index: int) -> rx.Component:
     )
 
 
+# Update the _user_card function in user_management.py
+def _user_card(user: rx.Var) -> rx.Component:
+    """Creates a compact card for each user on mobile/tablet, styled consistently with the app's theme."""
+    return rx.card(
+        rx.vstack(
+            rx.heading(
+                user["username"],
+                size="3",
+                weight="bold",
+                color=rx.color_mode_cond(
+                    light="gray.900", dark="gray.100"
+                ),  # Match permission_view.py
+            ),
+            rx.hstack(
+                rx.text(
+                    "Email:",
+                    size="2",
+                    weight="medium",
+                    color=rx.color_mode_cond(
+                        light="gray.700", dark="gray.300"
+                    ),  # Theme-aware
+                ),
+                rx.text(
+                    user["email"],
+                    size="2",
+                    weight="bold",
+                    color=rx.color_mode_cond(light="gray.900", dark="gray.100"),
+                ),
+                spacing="2",
+                align="center",
+                wrap="wrap",
+            ),
+            rx.vstack(
+                rx.text(
+                    "Roles:",
+                    size="2",
+                    weight="medium",
+                    color=rx.color_mode_cond(light="gray.700", dark="gray.300"),
+                ),
+                _roles_display(user["roles"].to(list)),
+                spacing="1",
+                align="start",
+                width="100%",
+            ),
+            rx.hstack(
+                _edit_button(user),
+                _delete_button(user),
+                spacing="2",
+                justify="end",
+                width="100%",
+            ),
+            spacing="2",
+            align="start",
+            width="100%",
+        ),
+        width="100%",
+        padding="12px",
+        variant="surface",
+        border=styles.border,  # Use app-wide border style
+        background=rx.color_mode_cond(
+            light="white", dark="var(--gray-2)"
+        ),  # Match permission_view.py
+        style=styles.card_transition_style,
+    )
+
+
+# Update _edit_button and _delete_button in user_management.py for consistent styling
+# Update _edit_button and _delete_button in user_management.py
+def _edit_button(user: rx.Var) -> rx.Component:
+    """Renders a touch-friendly edit button with theme-consistent styling."""
+    return rx.cond(
+        AuthState.permissions.contains("edit_user"),
+        rx.icon_button(
+            rx.icon("square-pen"),
+            on_click=lambda: UserManagementState.open_edit_dialog(
+                user["id"], user["roles"]
+            ),
+            color=styles.accent_text_color,  # Use app accent color
+            size="3",
+            variant="ghost",
+            aria_label="Edit user",
+            **styles.hover_accent_color,  # Apply hover effect from styles.py
+        ),
+        None,
+    )
+
+
+def _delete_button(user: rx.Var) -> rx.Component:
+    """Renders a touch-friendly delete button with theme-consistent styling."""
+    return rx.cond(
+        AuthState.permissions.contains("delete_user"),
+        rx.icon_button(
+            rx.icon("trash-2"),
+            on_click=lambda: UserManagementState.confirm_delete_user(user["id"]),
+            color=rx.color("red", 9),  # Consistent red shade for delete actions
+            size="3",
+            variant="ghost",
+            aria_label="Delete user",
+            _hover={"color": rx.color("red", 11)},  # Darker red on hover
+        ),
+        None,
+    )
+
+
 def _pagination_view() -> rx.Component:
     return rx.hstack(
         rx.text(
@@ -471,37 +575,102 @@ def user_management() -> rx.Component:
                         "gap": "2em",
                     },
                 ),
+                # Inside the user_management() function, update the "profiles" tab content
                 rx.tabs.content(
-                    rx.card(
-                        # Enhanced search and filter section
-                        rx.flex(
+                    rx.desktop_only(
+                        rx.card(
+                            # Search and filter section remains unchanged for desktop
                             rx.flex(
-                                rx.cond(
-                                    UserManagementState.sort_reverse,
-                                    rx.icon(
-                                        "arrow-down-z-a",
-                                        size=28,
-                                        stroke_width=1.5,
-                                        cursor="pointer",
-                                        on_click=UserManagementState.toggle_sort,
+                                rx.flex(
+                                    rx.cond(
+                                        UserManagementState.sort_reverse,
+                                        rx.icon(
+                                            "arrow-down-z-a",
+                                            size=28,
+                                            stroke_width=1.5,
+                                            cursor="pointer",
+                                            on_click=UserManagementState.toggle_sort,
+                                        ),
+                                        rx.icon(
+                                            "arrow-down-a-z",
+                                            size=28,
+                                            stroke_width=1.5,
+                                            cursor="pointer",
+                                            on_click=UserManagementState.toggle_sort,
+                                        ),
                                     ),
-                                    rx.icon(
-                                        "arrow-down-a-z",
-                                        size=28,
-                                        stroke_width=1.5,
-                                        cursor="pointer",
-                                        on_click=UserManagementState.toggle_sort,
+                                    rx.select(
+                                        ["username", "email"],
+                                        placeholder="Sort By: Username",
+                                        size="3",
+                                        on_change=UserManagementState.set_sort_value,
+                                    ),
+                                    rx.input(
+                                        rx.input.slot(rx.icon("search")),
+                                        rx.input.slot(
+                                            rx.icon("x"),
+                                            justify="end",
+                                            cursor="pointer",
+                                            on_click=UserManagementState.setvar(
+                                                "search_value", ""
+                                            ),
+                                            display=rx.cond(
+                                                UserManagementState.search_value,
+                                                "flex",
+                                                "none",
+                                            ),
+                                        ),
+                                        value=UserManagementState.search_value,
+                                        placeholder="Search users, emails, or roles...",
+                                        size="3",
+                                        max_width=["200px", "200px", "250px", "300px"],
+                                        width="100%",
+                                        variant="surface",
+                                        color_scheme="gray",
+                                        on_change=UserManagementState.set_search_value,
+                                    ),
+                                    flex_direction=["column", "column", "row"],
+                                    align="center",
+                                    justify="end",
+                                    spacing="3",
+                                    width="100%",
+                                ),
+                                direction="column",
+                                spacing="3",
+                                justify="between",
+                                wrap="wrap",
+                                width="100%",
+                                padding_bottom="1em",
+                            ),
+                            # Existing table for desktop users
+                            rx.table.root(
+                                rx.table.header(
+                                    rx.table.row(
+                                        _header_cell("Username", "user"),
+                                        _header_cell("Email", "mail"),
+                                        _header_cell("Roles", "shield"),
+                                        _header_cell("Actions", "settings"),
                                     ),
                                 ),
-                                rx.select(
-                                    [
-                                        "username",
-                                        "email",
-                                    ],  # Removed "role" since we now have multiple roles
-                                    placeholder="Sort By: Username",
-                                    size="3",
-                                    on_change=UserManagementState.set_sort_value,
+                                rx.table.body(
+                                    rx.foreach(
+                                        UserManagementState.current_page,
+                                        lambda user, index: _show_user(user, index),
+                                    )
                                 ),
+                                variant="surface",
+                                size="3",
+                                width="100%",
+                            ),
+                            _pagination_view(),  # Desktop pagination controls
+                            width="100%",
+                            padding="16px",
+                        ),
+                    ),
+                    rx.mobile_and_tablet(
+                        rx.container(
+                            rx.vstack(
+                                # Full-width search bar for mobile
                                 rx.input(
                                     rx.input.slot(rx.icon("search")),
                                     rx.input.slot(
@@ -520,55 +689,37 @@ def user_management() -> rx.Component:
                                     value=UserManagementState.search_value,
                                     placeholder="Search users, emails, or roles...",
                                     size="3",
-                                    max_width=[
-                                        "200px",
-                                        "200px",
-                                        "250px",
-                                        "300px",
-                                    ],  # Increased for better mobile experience
-                                    width="100%",
+                                    width="100%",  # Full-width within the container
                                     variant="surface",
                                     color_scheme="gray",
                                     on_change=UserManagementState.set_search_value,
                                 ),
-                                flex_direction=["column", "column", "row"],
-                                align="center",
-                                justify="end",
-                                spacing="3",
-                                width="100%",
-                            ),
-                            direction="column",
-                            spacing="3",
-                            justify="between",
-                            wrap="wrap",
-                            width="100%",
-                            padding_bottom="1em",
-                        ),
-                        # Enhanced table with better mobile support
-                        rx.table.root(
-                            rx.table.header(
-                                rx.table.row(
-                                    _header_cell("Username", "user"),
-                                    _header_cell("Email", "mail"),
-                                    _header_cell(
-                                        "Roles", "shield"
-                                    ),  # Updated header text
-                                    _header_cell("Actions", "settings"),
-                                ),
-                            ),
-                            rx.table.body(
+                                # Card-based user list for mobile
                                 rx.foreach(
-                                    UserManagementState.current_page,
-                                    lambda user, index: _show_user(user, index),
-                                )
+                                    UserManagementState.mobile_displayed_users,
+                                    lambda user: _user_card(user),
+                                ),
+                                # "Load More" button for mobile pagination
+                                rx.cond(
+                                    UserManagementState.has_more_users,
+                                    rx.button(
+                                        "Load More",
+                                        on_click=UserManagementState.load_more,
+                                        size="3",
+                                        width="100%",
+                                        color_scheme="blue",
+                                    ),
+                                ),
+                                spacing="4",  # Consistent spacing between elements
+                                width="100%",  # Full-width within the container
+                                align="center",  # Ensure internal alignment
                             ),
-                            variant="surface",
-                            size="3",
-                            width="100%",
+                            max_width="600px",  # Constrain width to prevent overflow, suitable for mobile/tablet
+                            width="100%",  # Ensure it scales down appropriately
+                            padding_x="16px",  # Horizontal padding for edge spacing
+                            padding_y="16px",  # Vertical padding for consistency
+                            margin="0 auto",  # Center the container
                         ),
-                        _pagination_view(),
-                        width="100%",
-                        padding="16px",
                     ),
                     value="profiles",
                 ),
