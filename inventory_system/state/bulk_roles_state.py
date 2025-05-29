@@ -398,17 +398,12 @@ class BulkOperationsState(AuthState):
                     csv_data.append(
                         {
                             "id": user.id,
-                            "username": user.username,
                             "email": user.email,
-                            "is_active": user.is_active,
                             "roles": ",".join([role.name for role in user.roles])
                             if user.roles
                             else "",
                             "created_at": user.created_at.isoformat()
                             if user.created_at
-                            else "",
-                            "last_login": user.last_login.isoformat()
-                            if user.last_login
                             else "",
                         }
                     )
@@ -423,9 +418,7 @@ class BulkOperationsState(AuthState):
                 csv_content = output.getvalue()
                 output.close()
 
-                yield rx.download(
-                    data=csv_content, filename="users_export.csv", media_type="text/csv"
-                )
+                yield rx.download(data=csv_content, filename="users_export.csv")
 
                 audit_logger.info(
                     "users_exported",
@@ -476,7 +469,8 @@ class BulkOperationsState(AuthState):
                 output.close()
 
                 yield rx.download(
-                    data=csv_content, filename="roles_export.csv", media_type="text/csv"
+                    data=csv_content,
+                    filename="roles_export.csv",
                 )
 
                 audit_logger.info(
@@ -525,7 +519,6 @@ class BulkOperationsState(AuthState):
                 yield rx.download(
                     data=csv_content,
                     filename="permissions_export.csv",
-                    media_type="text/csv",
                 )
 
                 audit_logger.info(

@@ -543,12 +543,12 @@ def _export_section() -> rx.Component:
                 rx.text("Export Data", weight="medium", size="2"),
                 rx.hstack(
                     rx.button(
+                        rx.icon("users", size=16),
                         "Export Users",
-                        source=rx.icon("users", size=16),
                         color_scheme="blue",
                         variant="outline",
                         size="2",
-                        on_click=BulkOperationsState.export_users,
+                        on_click=lambda: BulkOperationsState.export_users,
                         width=rx.breakpoints(initial="100%", sm="auto"),
                     ),
                     rx.button(
@@ -557,7 +557,7 @@ def _export_section() -> rx.Component:
                         color_scheme="blue",
                         variant="outline",
                         size="2",
-                        on_click=BulkOperationsState.export_roles,
+                        on_click=lambda: BulkOperationsState.export_roles,
                         width=rx.breakpoints(initial="100%", sm="auto"),
                     ),
                     rx.button(
@@ -566,7 +566,7 @@ def _export_section() -> rx.Component:
                         color_scheme="blue",
                         variant="outline",
                         size="2",
-                        on_click=BulkOperationsState.export_permissions,
+                        on_click=lambda: BulkOperationsState.export_permissions,
                         width=rx.breakpoints(initial="100%", sm="auto"),
                     ),
                     flex_direction=rx.breakpoints(initial="column", sm="row"),
@@ -818,7 +818,7 @@ def bulk_operations_tab() -> rx.Component:
             None,
         ),
         # Import/Export section
-        # _export_section(),
+        _export_section(),
         # # Modals
         _bulk_role_assignment_modal(),
         _bulk_permission_assignment_modal(),
