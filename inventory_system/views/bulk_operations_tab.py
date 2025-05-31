@@ -324,41 +324,49 @@ def _collapsible_section(
     color_scheme: str = "blue",
 ) -> rx.Component:
     """Reusable collapsible section component with full width support"""
-    return rx.box(  # Changed from rx.card to rx.box
-        rx.vstack(
-            # Header with toggle functionality
-            rx.hstack(
-                rx.icon(icon, size=20),
-                rx.text(title, weight="bold", size="3"),
-                rx.spacer(),
-                rx.icon_button(
-                    rx.cond(
-                        is_open_var,
-                        rx.icon("chevron-up", size=18),
-                        rx.icon("chevron-down", size=18),
+    return rx.card(  # Changed from rx.card to rx.box
+        rx.inset(
+            rx.vstack(
+                # Header with toggle functionality
+                rx.hstack(
+                    rx.icon(icon, size=20),
+                    rx.text(title, weight="bold", size="3"),
+                    rx.spacer(),
+                    rx.icon_button(
+                        rx.cond(
+                            is_open_var,
+                            rx.icon("chevron-up", size=18),
+                            rx.icon("chevron-down", size=18),
+                        ),
+                        variant="ghost",
+                        size="2",
+                        on_click=toggle_func,
                     ),
-                    variant="ghost",
-                    size="2",
-                    on_click=toggle_func,
-                ),
-                align="center",
-                width="100%",
-                cursor="pointer",
-            ),
-            # Collapsible content
-            rx.cond(
-                is_open_var,
-                rx.vstack(
-                    rx.divider(width="100%"),
-                    content,
-                    spacing="3",
+                    align="center",
                     width="100%",
-                    align="start",
+                    cursor="pointer",
                 ),
+                # Collapsible content
+                rx.cond(
+                    is_open_var,
+                    rx.vstack(
+                        rx.divider(),
+                        rx.box(
+                            content,
+                            width="100%",
+                        ),
+                        spacing="3",
+                        width="100%",
+                        align="start",
+                    ),
+                    None,
+                ),
+                spacing="3",  # Increased spacing
+                width="100%",
+                align="start",
             ),
-            spacing="3",  # Increased spacing
+            side="x",
             width="100%",
-            align="start",
         ),
         width="100%",
         border="1px solid",
@@ -972,63 +980,6 @@ def _user_creation_modal() -> rx.Component:
     )
 
 
-def _export_section() -> rx.Component:
-    """Import/Export functionality section"""
-    return rx.card(
-        rx.vstack(
-            rx.hstack(
-                rx.icon("download", size=20),
-                rx.text("Import/Export", weight="bold"),
-                align="center",
-                spacing="2",
-            ),
-            rx.divider(),
-            # Export section
-            rx.vstack(
-                rx.text("Export Data", weight="medium", size="2"),
-                rx.hstack(
-                    rx.button(
-                        rx.icon("users", size=16),
-                        "Export Users",
-                        color_scheme="blue",
-                        variant="outline",
-                        size="2",
-                        on_click=lambda: BulkOperationsState.export_users,
-                        width=rx.breakpoints(initial="100%", sm="auto"),
-                    ),
-                    rx.button(
-                        rx.icon("shield", size=16),
-                        "Export Roles",
-                        color_scheme="blue",
-                        variant="outline",
-                        size="2",
-                        on_click=lambda: BulkOperationsState.export_roles,
-                        width=rx.breakpoints(initial="100%", sm="auto"),
-                    ),
-                    rx.button(
-                        rx.icon("key", size=16),
-                        "Export Permissions",
-                        color_scheme="blue",
-                        variant="outline",
-                        size="2",
-                        on_click=lambda: BulkOperationsState.export_permissions,
-                        width=rx.breakpoints(initial="100%", sm="auto"),
-                    ),
-                    flex_direction=rx.breakpoints(initial="column", sm="row"),
-                    spacing="2",
-                    width="100%",
-                    wrap="wrap",
-                ),
-                spacing="2",
-                width="100%",
-                align="start",
-            ),
-        ),
-        padding="4",
-        width="100%",
-    )
-
-
 def bulk_operations_tab() -> rx.Component:
     """Complete bulk operations tab with enhanced functionality and collapsible sections"""
     return rx.container(
@@ -1067,153 +1018,137 @@ def bulk_operations_tab() -> rx.Component:
             _collapsible_section(
                 title="Bulk User Role Assignment",
                 icon="users",
-                content=rx.vstack(
+                content=rx.fragment(
                     # Desktop layout with full-width table
                     rx.desktop_only(
-                        rx.box(
-                            rx.vstack(
+                        rx.vstack(
+                            rx.flex(
+                                rx.text(
+                                    f"Selected: {BulkOperationsState.selected_user_count} users",
+                                    size="2",
+                                ),
                                 rx.flex(
-                                    rx.text(
-                                        f"Selected: {BulkOperationsState.selected_user_count} users",
+                                    rx.button(
+                                        "Select All Page",
+                                        variant="outline",
                                         size="2",
+                                        on_click=BulkOperationsState.select_all_current_page_users,
                                     ),
-                                    rx.flex(
-                                        rx.button(
-                                            "Select All Page",
-                                            variant="outline",
-                                            size="2",
-                                            on_click=BulkOperationsState.select_all_current_page_users,
-                                        ),
-                                        rx.button(
-                                            "Deselect All",
-                                            variant="outline",
-                                            size="2",
-                                            on_click=BulkOperationsState.deselect_all_users,
-                                        ),
-                                        rx.button(
-                                            "Assign Roles",
-                                            color_scheme="blue",
-                                            size="2",
-                                            on_click=BulkOperationsState.open_bulk_roles_modal,
-                                            disabled=BulkOperationsState.selected_user_count
-                                            == 0,
-                                        ),
-                                        spacing="2",
+                                    rx.button(
+                                        "Deselect All",
+                                        variant="outline",
+                                        size="2",
+                                        on_click=BulkOperationsState.deselect_all_users,
                                     ),
-                                    justify="between",
+                                    rx.button(
+                                        "Assign Roles",
+                                        color_scheme="blue",
+                                        size="2",
+                                        on_click=BulkOperationsState.open_bulk_roles_modal,
+                                        disabled=BulkOperationsState.selected_user_count
+                                        == 0,
+                                    ),
+                                    spacing="2",
+                                ),
+                                justify="between",
+                                width="100%",
+                            ),
+                            # Search and sort controls for desktop
+                            rx.flex(
+                                rx.cond(
+                                    BulkOperationsState.user_sort_reverse,
+                                    rx.icon(
+                                        "arrow-down-z-a",
+                                        size=28,
+                                        stroke_width=1.5,
+                                        cursor="pointer",
+                                        on_click=BulkOperationsState.toggle_user_sort,
+                                    ),
+                                    rx.icon(
+                                        "arrow-down-a-z",
+                                        size=28,
+                                        stroke_width=1.5,
+                                        cursor="pointer",
+                                        on_click=BulkOperationsState.toggle_user_sort,
+                                    ),
+                                ),
+                                rx.select(
+                                    ["username", "email"],
+                                    placeholder="Sort By: Username",
+                                    size="3",
+                                    on_change=BulkOperationsState.set_user_sort_value,
+                                ),
+                                rx.input(
+                                    rx.input.slot(rx.icon("search")),
+                                    rx.input.slot(
+                                        rx.icon("x"),
+                                        justify="end",
+                                        cursor="pointer",
+                                        on_click=BulkOperationsState.setvar(
+                                            "user_search_value", ""
+                                        ),
+                                        display=rx.cond(
+                                            BulkOperationsState.user_search_value,
+                                            "flex",
+                                            "none",
+                                        ),
+                                    ),
+                                    value=BulkOperationsState.user_search_value,
+                                    placeholder="Search users, emails, or roles...",
+                                    size="3",
+                                    max_width=["200px", "200px", "250px", "300px"],
                                     width="100%",
+                                    variant="surface",
+                                    color_scheme="gray",
+                                    on_change=BulkOperationsState.set_user_search_value,
                                 ),
-                                # Search and sort controls for desktop
-                                rx.flex(
-                                    rx.cond(
-                                        BulkOperationsState.user_sort_reverse,
-                                        rx.icon(
-                                            "arrow-down-z-a",
-                                            size=28,
-                                            stroke_width=1.5,
-                                            cursor="pointer",
-                                            on_click=BulkOperationsState.toggle_user_sort,
-                                        ),
-                                        rx.icon(
-                                            "arrow-down-a-z",
-                                            size=28,
-                                            stroke_width=1.5,
-                                            cursor="pointer",
-                                            on_click=BulkOperationsState.toggle_user_sort,
-                                        ),
-                                    ),
-                                    rx.select(
-                                        ["username", "email"],
-                                        placeholder="Sort By: Username",
-                                        size="3",
-                                        on_change=BulkOperationsState.set_user_sort_value,
-                                    ),
-                                    rx.input(
-                                        rx.input.slot(rx.icon("search")),
-                                        rx.input.slot(
-                                            rx.icon("x"),
-                                            justify="end",
-                                            cursor="pointer",
-                                            on_click=BulkOperationsState.setvar(
-                                                "user_search_value", ""
-                                            ),
-                                            display=rx.cond(
-                                                BulkOperationsState.user_search_value,
-                                                "flex",
-                                                "none",
-                                            ),
-                                        ),
-                                        value=BulkOperationsState.user_search_value,
-                                        placeholder="Search users, emails, or roles...",
-                                        size="3",
-                                        max_width=["200px", "200px", "250px", "300px"],
-                                        width="100%",
-                                        variant="surface",
-                                        color_scheme="gray",
-                                        on_change=BulkOperationsState.set_user_search_value,
-                                    ),
-                                    flex_direction=["column", "column", "row"],
-                                    align="center",
-                                    justify="end",
-                                    spacing="3",
-                                    width="100%",
-                                ),
-                                # Full-width table container
-                                rx.box(
-                                    rx.table.root(
-                                        rx.table.header(
-                                            rx.table.row(
-                                                rx.table.column_header_cell("Select"),
-                                                rx.table.column_header_cell("Username"),
-                                                rx.table.column_header_cell("Email"),
-                                                rx.table.column_header_cell(
-                                                    "Current Roles"
-                                                ),
-                                            ),
-                                        ),
-                                        rx.table.body(
-                                            rx.foreach(
-                                                BulkOperationsState.current_users_page,
-                                                lambda user, index: rx.table.row(
-                                                    rx.table.cell(
-                                                        _user_selection_checkbox(
-                                                            user, BulkOperationsState
-                                                        )
-                                                    ),
-                                                    rx.table.cell(user["username"]),
-                                                    rx.table.cell(user["email"]),
-                                                    rx.table.cell(
-                                                        _roles_display(
-                                                            user["roles"].to(list)
-                                                        )
-                                                    ),
-                                                    style={
-                                                        "_hover": {
-                                                            "bg": rx.color("accent", 2)
-                                                        },
-                                                        "bg": rx.cond(
-                                                            index % 2 == 0,
-                                                            rx.color("gray", 1),
-                                                            "transparent",
-                                                        ),
-                                                    },
-                                                ),
-                                            )
-                                        ),
-                                        variant="surface",
-                                        size="3",
-                                        width="100%",  # Ensure full width
-                                    ),
-                                    width="100%",  # Full width container
-                                    overflow_x="auto",  # Allow horizontal scrolling if needed
-                                ),
-                                _user_pagination_view(),
+                                flex_direction=["column", "column", "row"],
+                                align="center",
+                                justify="end",
                                 spacing="3",
                                 width="100%",
                             ),
+                            # Full-width table container
+                            rx.table.root(
+                                rx.table.header(
+                                    rx.table.row(
+                                        rx.table.column_header_cell("Select"),
+                                        rx.table.column_header_cell("Username"),
+                                        rx.table.column_header_cell("Email"),
+                                        rx.table.column_header_cell("Current Roles"),
+                                    ),
+                                ),
+                                rx.table.body(
+                                    rx.foreach(
+                                        BulkOperationsState.current_users_page,
+                                        lambda user, index: rx.table.row(
+                                            rx.table.cell(
+                                                _user_selection_checkbox(
+                                                    user, BulkOperationsState
+                                                )
+                                            ),
+                                            rx.table.cell(user["username"]),
+                                            rx.table.cell(user["email"]),
+                                            rx.table.cell(
+                                                _roles_display(user["roles"].to(list))
+                                            ),
+                                            style={
+                                                "_hover": {"bg": rx.color("accent", 2)},
+                                                "bg": rx.cond(
+                                                    index % 2 == 0,
+                                                    rx.color("gray", 1),
+                                                    "transparent",
+                                                ),
+                                            },
+                                        ),
+                                    )
+                                ),
+                                width="100%",  # Ensure full width
+                            ),
+                            _user_pagination_view(),
+                            spacing="3",
                             width="100%",
-                            overflow_x="auto",
-                        )
+                        ),
                     ),
                     # Mobile layout with improved controls
                     rx.mobile_and_tablet(
@@ -1245,9 +1180,6 @@ def bulk_operations_tab() -> rx.Component:
                             margin="0 auto",
                         ),
                     ),
-                    spacing="3",
-                    width="100%",
-                    align="start",
                 ),
                 is_open_var=BulkOperationsState.user_section_open,
                 toggle_func=BulkOperationsState.toggle_user_section,
@@ -1259,7 +1191,7 @@ def bulk_operations_tab() -> rx.Component:
                 _collapsible_section(
                     title="Bulk Role Permission Assignment",
                     icon="shield",
-                    content=rx.vstack(
+                    content=rx.fragment(
                         # Desktop layout with full-width table
                         rx.desktop_only(
                             rx.vstack(
@@ -1451,9 +1383,6 @@ def bulk_operations_tab() -> rx.Component:
                                 margin="0 auto",
                             ),
                         ),
-                        spacing="3",
-                        width="100%",
-                        align="start",
                     ),
                     is_open_var=BulkOperationsState.role_section_open,
                     toggle_func=BulkOperationsState.toggle_role_section,
@@ -1465,7 +1394,7 @@ def bulk_operations_tab() -> rx.Component:
             _collapsible_section(
                 title="Import/Export",
                 icon="download",
-                content=rx.vstack(
+                content=rx.fragment(
                     rx.text("Export Data", weight="medium", size="2"),
                     rx.hstack(
                         rx.button(
@@ -1500,9 +1429,6 @@ def bulk_operations_tab() -> rx.Component:
                         width="100%",
                         wrap="wrap",
                     ),
-                    spacing="2",
-                    width="100%",
-                    align="start",
                 ),
                 is_open_var=BulkOperationsState.export_section_open,
                 toggle_func=BulkOperationsState.toggle_export_section,

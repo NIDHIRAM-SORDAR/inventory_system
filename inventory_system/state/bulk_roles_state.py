@@ -61,7 +61,7 @@ class BulkOperationsState(AuthState):
     user_sort_reverse: bool = False  # Sort direction (False: ascending)
     user_page_number: int = 1  # Current page number
     user_page_size: int = 10  # Items per page
-    user_mobile_displayed_count: int = 10  # Number of users shown on mobile
+    user_mobile_displayed_count: int = 5  # Number of users shown on mobile
 
     # Added variables for role table search, sort, pagination, and mobile display
     role_search_value: str = ""  # Search term for roles
@@ -69,11 +69,11 @@ class BulkOperationsState(AuthState):
     role_sort_reverse: bool = False  # Sort direction (False: ascending)
     role_page_number: int = 1  # Current page number
     role_page_size: int = 10  # Items per page
-    role_mobile_displayed_count: int = 10  # Number of roles shown on mobile
+    role_mobile_displayed_count: int = 5  # Number of roles shown on mobile
     _roles_data: List[Dict[str, Any]] = []
 
-    user_section_open: bool = True
-    role_section_open: bool = True
+    user_section_open: bool = False
+    role_section_open: bool = False
     export_section_open: bool = False
 
     # Existing computed vars remain unchanged
