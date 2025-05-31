@@ -11,6 +11,7 @@ from inventory_system import routes
 from inventory_system.logging.logging import audit_logger
 from inventory_system.models.user import Role, UserInfo
 from inventory_system.state.auth import AuthState
+from inventory_system.state.user_mgmt_state import UserManagementState
 
 from ..constants import DEFAULT_PROFILE_PICTURE
 
@@ -223,6 +224,11 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                 session.commit()
                 session.refresh(user_info)
 
+                # Refresh user management state if needed
+
+                user_mgmt_state = await self.get_state(UserManagementState)
+                user_mgmt_state.check_auth_and_load()
+
                 # Log success
                 audit_logger.info(
                     "success_registration",
@@ -410,7 +416,6 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
             )
 
             # Refresh user management state if needed
-            from inventory_system.state.user_mgmt_state import UserManagementState
 
             user_mgmt_state = await self.get_state(UserManagementState)
             user_mgmt_state.check_auth_and_load()

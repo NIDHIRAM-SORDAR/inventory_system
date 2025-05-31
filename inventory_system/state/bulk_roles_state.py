@@ -9,6 +9,8 @@ from sqlmodel import select
 from inventory_system.logging.logging import audit_logger
 from inventory_system.models.user import Permission, Role, UserInfo
 from inventory_system.state.auth import AuthState
+from inventory_system.state.role_data_service import RoleDataService
+from inventory_system.state.user_data_service import UserDataService
 
 
 @dataclass
@@ -53,15 +55,215 @@ class BulkOperationsState(AuthState):
     # User creation state
     create_user_form_data: Dict[str, Any] = {}
 
+    # Added variables for user table search, sort, pagination, and mobile display
+    user_search_value: str = ""  # Search term for users
+    user_sort_value: str = "username"  # Column to sort by (default: username)
+    user_sort_reverse: bool = False  # Sort direction (False: ascending)
+    user_page_number: int = 1  # Current page number
+    user_page_size: int = 10  # Items per page
+    user_mobile_displayed_count: int = 10  # Number of users shown on mobile
+
+    # Added variables for role table search, sort, pagination, and mobile display
+    role_search_value: str = ""  # Search term for roles
+    role_sort_value: str = "name"  # Column to sort by (default: name)
+    role_sort_reverse: bool = False  # Sort direction (False: ascending)
+    role_page_number: int = 1  # Current page number
+    role_page_size: int = 10  # Items per page
+    role_mobile_displayed_count: int = 10  # Number of roles shown on mobile
+    _roles_data: List[Dict[str, Any]] = []
+
+    user_section_open: bool = True
+    role_section_open: bool = True
+    export_section_open: bool = False
+
+    # Existing computed vars remain unchanged
     @rx.var
     def selected_user_count(self) -> int:
-        """Count of selected users."""
         return len(self.selected_user_ids)
 
     @rx.var
     def selected_role_count(self) -> int:
-        """Count of selected roles."""
         return len(self.selected_role_ids)
+
+    # Added computed var for filtered users based on search and sort
+    @rx.var
+    def filtered_users(self) -> List[Dict[str, Any]]:
+        current_user_id = self.user_id if self.is_authenticated_and_ready else None
+        users_data = UserDataService.load_users_data(exclude_user_id=current_user_id)
+
+        return UserDataService.filter_users(
+            users_data=users_data,
+            search_value=self.user_search_value,
+            sort_value=self.user_sort_value,
+            sort_reverse=self.user_sort_reverse,
+        )
+
+    # Added computed var for current page of users (desktop)
+    @rx.var
+    def current_users_page(self) -> List[Dict[str, Any]]:
+        start = (self.user_page_number - 1) * self.user_page_size
+        end = start + self.user_page_size
+        return self.filtered_users[start:end]
+
+    # Added computed var for total pages of users
+    @rx.var
+    def users_total_pages(self) -> int:
+        return max(
+            1,
+            (len(self.filtered_users) + self.user_page_size - 1) // self.user_page_size,
+        )
+
+    # Added computed var for mobile displayed users
+    @rx.var
+    def mobile_displayed_users(self) -> List[Dict[str, Any]]:
+        return self.filtered_users[: self.user_mobile_displayed_count]
+
+    # Added computed var to check if more users are available on mobile
+    @rx.var
+    def has_more_users(self) -> bool:
+        return len(self.filtered_users) > self.user_mobile_displayed_count
+
+    # Added computed var for filtered roles based on search and sort
+    @rx.var
+    def filtered_roles(self) -> List[Dict[str, Any]]:
+        roles_data = self._roles_data
+
+        return RoleDataService.filter_roles(
+            roles_data=roles_data,
+            search_value=self.role_search_value,
+            sort_value=self.role_sort_value,
+            sort_reverse=self.role_sort_reverse,
+        )
+
+    # Added computed var for current page of roles (desktop)
+    @rx.var
+    def current_roles_page(self) -> List[Dict[str, Any]]:
+        start = (self.role_page_number - 1) * self.role_page_size
+        end = start + self.role_page_size
+        return self.filtered_roles[start:end]
+
+    # Added computed var for total pages of roles
+    @rx.var
+    def roles_total_pages(self) -> int:
+        return max(
+            1,
+            (len(self.filtered_roles) + self.role_page_size - 1) // self.role_page_size,
+        )
+
+    # Added computed var for mobile displayed roles
+    @rx.var
+    def mobile_displayed_roles(self) -> List[Dict[str, Any]]:
+        return self.filtered_roles[: self.role_mobile_displayed_count]
+
+    # Added computed var to check if more roles are available on mobile
+    @rx.var
+    def has_more_roles(self) -> bool:
+        return len(self.filtered_roles) > self.role_mobile_displayed_count
+
+    @rx.event
+    def on_mount(self):
+        self._roles_data = RoleDataService.load_roles_data()
+
+    @rx.event
+    def refresh_role_data(self):
+        """Force refresh of role data by triggering re-computation."""
+        # Reset pagination and search to ensure clean state
+        self.role_page_number = 1
+        self.role_mobile_displayed_count = 10
+        self._roles_data = RoleDataService.load_roles_data()
+        # The computed vars will automatically re-evaluate on next access
+
+    @rx.event
+    async def refresh_roles_with_toast(self):
+        """Refresh roles and show confirmation."""
+        self.refresh_role_data()
+        yield rx.toast.info("Role data refreshed")
+
+    # Added methods for user search, sort, and pagination
+    def set_user_search_value(self, value: str):
+        self.user_search_value = value
+        self.user_page_number = 1  # Reset to first page
+        self.user_mobile_displayed_count = 10  # Reset mobile display count
+
+    def set_user_sort_value(self, value: str):
+        self.user_sort_value = value
+        self.user_mobile_displayed_count = 10  # Reset mobile display count
+
+    def toggle_user_sort(self):
+        self.user_sort_reverse = not self.user_sort_reverse
+        self.user_mobile_displayed_count = 10  # Reset mobile display count
+
+    def user_first_page(self):
+        self.user_page_number = 1
+
+    def user_prev_page(self):
+        if self.user_page_number > 1:
+            self.user_page_number -= 1
+
+    def user_next_page(self):
+        if self.user_page_number < self.users_total_pages:
+            self.user_page_number += 1
+
+    def user_last_page(self):
+        self.user_page_number = self.users_total_pages
+
+    def load_more_users(self):
+        self.user_mobile_displayed_count += self.user_page_size
+
+    # Added method for selecting all visible users on mobile
+    def select_all_visible_users(self):
+        visible_users = self.mobile_displayed_users
+        user_ids = [user["id"] for user in visible_users]
+        self.selected_user_ids.update(user_ids)
+
+    # Added methods for role search, sort, and pagination
+    def set_role_search_value(self, value: str):
+        self.role_search_value = value
+        self.role_page_number = 1  # Reset to first page
+        self.role_mobile_displayed_count = 10  # Reset mobile display count
+
+    def set_role_sort_value(self, value: str):
+        self.role_sort_value = value
+        self.role_mobile_displayed_count = 10  # Reset mobile display count
+
+    def toggle_role_sort(self):
+        self.role_sort_reverse = not self.role_sort_reverse
+        self.role_mobile_displayed_count = 10  # Reset mobile display count
+
+    def role_first_page(self):
+        self.role_page_number = 1
+
+    def role_prev_page(self):
+        if self.role_page_number > 1:
+            self.role_page_number -= 1
+
+    def role_next_page(self):
+        if self.role_page_number < self.roles_total_pages:
+            self.role_page_number += 1
+
+    def role_last_page(self):
+        self.role_page_number = self.roles_total_pages
+
+    def load_more_roles(self):
+        self.role_mobile_displayed_count += self.role_page_size
+
+    # Added method for selecting all visible roles on mobile
+    def select_all_visible_roles(self):
+        visible_roles = self.mobile_displayed_roles
+        role_ids = [role["id"] for role in visible_roles]
+        self.selected_role_ids.update(role_ids)
+
+    def toggle_user_section(self):
+        """Toggle the user section open/closed state"""
+        self.user_section_open = not self.user_section_open
+
+    def toggle_role_section(self):
+        """Toggle the role section open/closed state"""
+        self.role_section_open = not self.role_section_open
+
+    def toggle_export_section(self):
+        """Toggle the export section open/closed state"""
+        self.export_section_open = not self.export_section_open
 
     @rx.var
     def available_roles_for_bulk(self) -> List[str]:

@@ -8,6 +8,7 @@ from inventory_system.constants import available_colors
 from inventory_system.logging.logging import audit_logger
 from inventory_system.models.user import Role, UserInfo, UserRole
 from inventory_system.state.auth import AuthState
+from inventory_system.state.user_data_service import UserDataService
 
 
 class UserManagementState(AuthState):
@@ -38,29 +39,10 @@ class UserManagementState(AuthState):
         ):
             return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
         self.is_loading = True
-        with rx.session() as session:
-            current_user_id = self.user_id if self.is_authenticated_and_ready else None
-            stmt = (
-                select(UserInfo, reflex_local_auth.LocalUser.username)
-                .join(
-                    reflex_local_auth.LocalUser,
-                    UserInfo.user_id == reflex_local_auth.LocalUser.id,
-                )
-                .where(UserInfo.user_id != current_user_id)
-            )
-            results = session.exec(stmt).all()
-
-            # Load users data with multiple roles support
-            self.users_data = [
-                {
-                    "username": username,
-                    "id": user_info.user_id,
-                    "email": user_info.email,
-                    "roles": user_info.get_roles()
-                    or ["none"],  # Changed to support multiple roles
-                }
-                for user_info, username in results
-            ]
+        current_user_id = self.user_id if self.is_authenticated_and_ready else None
+        self.users_data = UserDataService.load_users_data(
+            exclude_user_id=current_user_id
+        )
         self.is_loading = False
 
     @rx.var
@@ -351,18 +333,12 @@ class UserManagementState(AuthState):
 
     @rx.var
     def filtered_users(self) -> List[Dict[str, Any]]:
-        data = self.users_data
-        if self.search_value:
-            data = [
-                u
-                for u in data
-                if self.search_value.lower() in u["username"].lower()
-                or self.search_value.lower() in u["email"].lower()
-                or any(
-                    self.search_value.lower() in role.lower() for role in u["roles"]
-                )  # Updated for multiple roles search
-            ]
-        return sorted(data, key=lambda x: x[self.sort_value], reverse=self.sort_reverse)
+        return UserDataService.filter_users(
+            users_data=self.users_data,
+            search_value=self.search_value,
+            sort_value=self.sort_value,
+            sort_reverse=self.sort_reverse,
+        )
 
     @rx.var
     def current_page(self) -> List[Dict[str, Any]]:

@@ -6,6 +6,7 @@ from sqlmodel import select
 from inventory_system.logging.logging import audit_logger
 from inventory_system.models.user import Permission, Role, RolePermission, UserRole
 from inventory_system.state.auth import AuthState
+from inventory_system.state.bulk_roles_state import BulkOperationsState
 
 
 class RoleManagementState(rx.State):
@@ -240,6 +241,9 @@ class RoleManagementState(rx.State):
                     session.commit()
                     self.load_roles()
                     yield AuthState.load_user_data()
+                    bulk_state = await self.get_state(BulkOperationsState)
+                    async for event in bulk_state.refresh_roles_with_toast():
+                        yield event
                     self.close_role_modals()
                     yield rx.toast.success(
                         f"Role '{self.role_form_name}' created successfully"
@@ -284,6 +288,10 @@ class RoleManagementState(rx.State):
                         session.commit()
                         self.load_roles()
                         yield AuthState.load_user_data()
+
+                        bulk_state = await self.get_state(BulkOperationsState)
+                        async for event in bulk_state.refresh_roles_with_toast():
+                            yield event
                         self.close_role_modals()
                         yield rx.toast.success(
                             f"Role '{self.role_form_name}' updated successfully"
@@ -330,7 +338,9 @@ class RoleManagementState(rx.State):
                         session.commit()
                         self.load_roles()
                         yield AuthState.load_user_data()
-                        self.close_role_modals()
+                        bulk_state = await self.get_state(BulkOperationsState)
+                        async for event in bulk_state.refresh_roles_with_toast():
+                            yield event
                         yield rx.toast.success(
                             f"Role '{role.name}' deleted successfully"
                         )
@@ -366,6 +376,9 @@ class RoleManagementState(rx.State):
                         session.commit()
                         self.load_roles()
                         yield AuthState.load_user_data()
+                        bulk_state = await self.get_state(BulkOperationsState)
+                        async for event in bulk_state.refresh_roles_with_toast():
+                            yield event
                         self.close_role_modals()
                         yield rx.toast.success(
                             f"Permissions updated for role '{role.name}'"
