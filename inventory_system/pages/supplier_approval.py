@@ -1,7 +1,7 @@
 import reflex as rx
 import reflex_local_auth
 
-from inventory_system import routes
+from inventory_system import routes, styles
 from inventory_system.state.auth import AuthState
 from inventory_system.state.supplier_approval_state import SupplierApprovalState
 from inventory_system.styles import border_radius
@@ -385,6 +385,99 @@ def _pagination_view() -> rx.Component:
     )
 
 
+def _supplier_card(user: rx.Var) -> rx.Component:
+    """Creates a compact card for each supplier on mobile/tablet, styled consistently with the app's theme."""
+    return rx.card(
+        rx.vstack(
+            rx.heading(
+                user["username"],
+                size="3",
+                weight="bold",
+                color=rx.color_mode_cond(light="gray.900", dark="gray.100"),
+            ),
+            rx.hstack(
+                rx.text(
+                    "Email:",
+                    size="2",
+                    weight="medium",
+                    color=rx.color_mode_cond(light="gray.700", dark="gray.300"),
+                ),
+                rx.text(
+                    user["email"],
+                    size="2",
+                    weight="bold",
+                    color=rx.color_mode_cond(light="gray.900", dark="gray.100"),
+                ),
+                spacing="2",
+                align="center",
+                wrap="wrap",
+            ),
+            rx.hstack(
+                rx.text(
+                    "Status:",
+                    size="2",
+                    weight="medium",
+                    color=rx.color_mode_cond(light="gray.700", dark="gray.300"),
+                ),
+                status_badge(user["status"].to(str)),
+                spacing="2",
+                align="center",
+            ),
+            rx.hstack(
+                _edit_button(user),
+                _delete_button(user),
+                spacing="2",
+                justify="end",
+                width="100%",
+            ),
+            spacing="2",
+            align="start",
+            width="100%",
+        ),
+        width="100%",
+        padding="12px",
+        variant="surface",
+        border=styles.border,
+        background=rx.color_mode_cond(light="white", dark="var(--gray-2)"),
+        style=styles.card_transition_style,
+    )
+
+
+def _edit_button(user: rx.Var) -> rx.Component:
+    """Renders a touch-friendly edit button with theme-consistent styling."""
+    return rx.cond(
+        AuthState.permissions.contains("manage_supplier_approval"),
+        rx.icon_button(
+            rx.icon("square-pen"),
+            on_click=SupplierApprovalState.open_edit_dialog(user["id"]),
+            color=styles.accent_text_color,
+            size="3",
+            variant="ghost",
+            aria_label="Edit supplier",
+            **styles.hover_accent_color,
+        ),
+        None,
+    )
+
+
+def _delete_button(user: rx.Var) -> rx.Component:
+    """Renders a touch-friendly delete button with theme-consistent styling."""
+    return rx.cond(
+        AuthState.permissions.contains("delete_supplier"),
+        rx.icon_button(
+            rx.icon("trash-2"),
+            on_click=SupplierApprovalState.open_delete_dialog(user["id"]),
+            color=rx.color("red", 9),
+            size="3",
+            variant="ghost",
+            aria_label="Delete supplier",
+            _hover={"color": rx.color("red", 11)},
+        ),
+        None,
+    )
+
+
+# Update supplier_approval to include mobile-first layout
 @template(
     route=routes.SUPPLIER_APPROVAL_ROUTE,
     title="Supplier Approval",
@@ -446,13 +539,14 @@ def supplier_approval() -> rx.Component:
                     value=SupplierApprovalState.search_value,
                     placeholder="Search here...",
                     size="3",
-                    max_width=["150px", "150px", "200px", "250px"],
                     width="100%",
+                    max_width=["150px", "150px", "200px", "250px"],
                     variant="surface",
                     color_scheme="gray",
                     on_change=SupplierApprovalState.set_search_value,
                 ),
                 flex_direction=["column", "column", "row"],
+                display=["none", "none", "none", "flex"],
                 align="center",
                 justify="end",
                 spacing="3",
@@ -468,27 +562,84 @@ def supplier_approval() -> rx.Component:
         rx.cond(
             SupplierApprovalState.is_loading,
             rx.center(rx.spinner(loading=SupplierApprovalState.is_loading)),
-            rx.table.root(
-                rx.table.header(
-                    rx.table.row(
-                        _header_cell("Username", "user"),
-                        _header_cell("Email", "mail"),
-                        _header_cell("Status", "shield"),
-                        _header_cell("Actions", "settings"),
+            rx.fragment(
+                rx.desktop_only(
+                    rx.card(
+                        rx.table.root(
+                            rx.table.header(
+                                rx.table.row(
+                                    _header_cell("Username", "user"),
+                                    _header_cell("Email", "mail"),
+                                    _header_cell("Status", "shield"),
+                                    _header_cell("Actions", "settings"),
+                                ),
+                            ),
+                            rx.table.body(
+                                rx.foreach(
+                                    SupplierApprovalState.current_page,
+                                    lambda user, index: _show_supplier(user, index),
+                                )
+                            ),
+                            variant="surface",
+                            size="3",
+                            width="100%",
+                        ),
+                        _pagination_view(),
+                        width="100%",
+                        padding="16px",
                     ),
                 ),
-                rx.table.body(
-                    rx.foreach(
-                        SupplierApprovalState.current_page,
-                        lambda user, index: _show_supplier(user, index),
-                    )
+                rx.mobile_and_tablet(
+                    rx.container(
+                        rx.vstack(
+                            rx.input(
+                                rx.input.slot(rx.icon("search")),
+                                rx.input.slot(
+                                    rx.icon("x"),
+                                    justify="end",
+                                    cursor="pointer",
+                                    on_click=SupplierApprovalState.clear_search_value,
+                                    display=rx.cond(
+                                        SupplierApprovalState.search_value,
+                                        "flex",
+                                        "none",
+                                    ),
+                                ),
+                                value=SupplierApprovalState.search_value,
+                                placeholder="Search suppliers, emails...",
+                                size="3",
+                                width="100%",
+                                variant="surface",
+                                color_scheme="gray",
+                                on_change=SupplierApprovalState.set_search_value,
+                            ),
+                            rx.foreach(
+                                SupplierApprovalState.mobile_displayed_suppliers,
+                                lambda user: _supplier_card(user),
+                            ),
+                            rx.cond(
+                                SupplierApprovalState.has_more_suppliers,
+                                rx.button(
+                                    "Load More",
+                                    on_click=SupplierApprovalState.load_more,
+                                    size="3",
+                                    width="100%",
+                                    color_scheme="blue",
+                                ),
+                            ),
+                            spacing="4",
+                            width="100%",
+                            align="center",
+                        ),
+                        max_width="600px",
+                        width="100%",
+                        padding_x="16px",
+                        padding_y="16px",
+                        margin="0 auto",
+                    ),
                 ),
-                variant="surface",
-                size="3",
-                width=rx.breakpoints(initial="100%", md="90%"),
             ),
         ),
-        _pagination_view(),
         width="100%",
         padding_x=["auto", "auto", "2em"],
         padding_top=["1em", "1em", "2em"],

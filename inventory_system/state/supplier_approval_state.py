@@ -28,6 +28,9 @@ class SupplierApprovalState(AuthState):
     revoke_checked: bool = False
     current_status: str = ""
 
+    # Add new state variables for mobile layout
+    mobile_displayed_count: int = 5  # Initial number of suppliers to display on mobile
+
     def check_auth_and_load(self):
         if not self.is_authenticated or "manage_suppliers" not in self.permissions:
             return rx.redirect(reflex_local_auth.routes.LOGIN_ROUTE)
@@ -596,13 +599,16 @@ class SupplierApprovalState(AuthState):
 
     def set_sort_value(self, value: str):
         self.sort_value = value
+        self.mobile_displayed_count = 5
 
     def toggle_sort(self):
         self.sort_reverse = not self.sort_reverse
+        self.mobile_displayed_count = 5  # Reset for mobile
 
     def set_search_value(self, value: str):
         self.search_value = value
         self.page_number = 1
+        self.mobile_displayed_count = 5  # Reset for mobile
 
     def first_page(self):
         self.page_number = 1
@@ -621,3 +627,19 @@ class SupplierApprovalState(AuthState):
     def clear_search_value(self):
         self.setvar("search_value", "")
         self.setvar("page_number", 1)
+
+    # Add new computed vars for mobile display
+    @rx.var
+    def mobile_displayed_suppliers(self) -> List[Dict[str, Any]]:
+        """Computes the list of suppliers to display on mobile based on mobile_displayed_count."""
+        return self.filtered_users[: self.mobile_displayed_count]
+
+    @rx.var
+    def has_more_suppliers(self) -> bool:
+        """Determines if there are more suppliers to load on mobile."""
+        return len(self.filtered_users) > self.mobile_displayed_count
+
+    # Add new method for mobile pagination
+    def load_more(self):
+        """Increments the number of displayed suppliers on mobile by page_size."""
+        self.mobile_displayed_count += self.page_size

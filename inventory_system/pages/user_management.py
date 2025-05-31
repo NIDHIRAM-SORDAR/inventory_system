@@ -562,18 +562,29 @@ def user_management() -> rx.Component:
                         value="permissions",
                     ),
                     rx.tabs.trigger(
-                        "Role&Permission Assignment",
+                        "Role & Perms",
                         value="bulk_role_perm",
                     ),
                     justify="start",
                     spacing="4",
                     padding_bottom="1em",
                     width="100%",
-                    size="2",
                     style={
                         "display": "flex",
-                        "gap": "2em",
+                        "gap": rx.breakpoints(
+                            initial="1em", md="2em"
+                        ),  # Reduce gap on small screens
+                        "overflow_x": rx.breakpoints(
+                            initial="auto", md="visible"
+                        ),  # Scroll on small screens
+                        "flex_wrap": "nowrap",  # Prevent wrapping
+                        "white_space": "nowrap",  # Keep labels on one line
+                        "padding_x": rx.breakpoints(
+                            initial="16px", md="0px"
+                        ),  # Add padding for scrollable area
+                        "-webkit-overflow-scrolling": "touch",  # Smooth scrolling on iOS
                     },
+                    size=rx.breakpoints(initial="1", md="2"),
                 ),
                 # Inside the user_management() function, update the "profiles" tab content
                 rx.tabs.content(
