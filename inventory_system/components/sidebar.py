@@ -56,7 +56,8 @@ def sidebar_item_icon(icon: str) -> rx.Component:
 def sidebar_item(text: str, icon: str, url: str) -> rx.Component:
     """Sidebar item with icon support."""
     active = (rx.State.router.page.path == url.lower()) | (
-        (rx.State.router.page.path == routes.OVERVIEW_ROUTE) & (text == "Overview")
+        (rx.State.router.page.path == routes.get_route("overview"))
+        & (text == "Overview")
     )
 
     return rx.link(
@@ -153,8 +154,8 @@ def sidebar_bottom_profile() -> rx.Component:
     return rx.vstack(
         rx.divider(),
         rx.vstack(
-            sidebar_item("Settings", "settings", routes.SETTINGS_ROUTE),
-            sidebar_item("Profile", "user-round-pen", routes.PROFILE_ROUTE),
+            sidebar_item("Settings", "settings", routes.get_route("settings")),
+            sidebar_item("Profile", "user-round-pen", routes.get_route("profile")),
             sidebar_item_with_onclick("Log out", "log-out", LogoutState.toggle_dialog),
             spacing="1",
             width="100%",
@@ -195,27 +196,53 @@ def sidebar_bottom_profile() -> rx.Component:
     )
 
 
-def sidebar() -> rx.Component:
-    """The sidebar."""
-    from reflex.page import get_decorated_pages
+# Sidebar navigation configuration using your routes.py structure
+SIDEBAR_NAVIGATION_CONFIG = [
+    {
+        "route_name": "overview",
+        "title": "Overview",
+        "icon": "home",
+        "show_for_all": True,
+    },
+    {
+        "route_name": "table",
+        "title": "Table",
+        "icon": "table-2",
+        "show_for_all": True,
+    },
+    {
+        "route_name": "about",
+        "title": "About",
+        "icon": "book-open",
+        "show_for_all": True,
+    },
+    {
+        "route_name": "admin",
+        "title": "Admin Dashboard",
+        "icon": "shield",
+        "show_for_all": False,  # Only show for users with admin permissions
+        "required_permission": "manage_users",
+    },
+]
 
-    ordered_page_routes = [
-        routes.OVERVIEW_ROUTE,
-        routes.TABLE_ROUTE,
-        routes.ABOUT_ROUTE,
-        routes.ADMIN_ROUTE,
+
+def get_sidebar_navigation_pages():
+    """Get sidebar navigation pages using the routes configuration."""
+    return [
+        {
+            "route": routes.get_route(config["route_name"]),
+            "title": config["title"],
+            "icon": config["icon"],
+            "show_for_all": config.get("show_for_all", True),
+            "required_permission": config.get("required_permission"),
+        }
+        for config in SIDEBAR_NAVIGATION_CONFIG
     ]
 
-    pages = get_decorated_pages()
-    filtered_pages = [page for page in pages if page["route"] in ordered_page_routes]
-    ordered_pages = sorted(
-        filtered_pages,
-        key=lambda page: (
-            ordered_page_routes.index(page["route"])
-            if page["route"] in ordered_page_routes
-            else len(ordered_page_routes)
-        ),
-    )
+
+def sidebar() -> rx.Component:
+    """The sidebar."""
+    pages = get_sidebar_navigation_pages()
 
     return rx.flex(
         rx.vstack(
@@ -223,32 +250,29 @@ def sidebar() -> rx.Component:
             rx.vstack(
                 *[
                     rx.cond(
-                        (
-                            AuthState.permissions.contains("manage_users")
-                            & (page["route"] == routes.ADMIN_ROUTE)
-                        ),
-                        sidebar_item(
-                            text=page.get("title", "Admin Dashboard"),
-                            icon="shield",  # Add icon for Admin Dashboard
-                            url=page["route"],
-                        ),
+                        # Show admin pages only if user has required permissions
+                        page.get("required_permission") is not None,
                         rx.cond(
-                            page["route"] != routes.ADMIN_ROUTE,
+                            AuthState.permissions.contains(page["required_permission"]),
                             sidebar_item(
-                                text=page.get(
-                                    "title", page["route"].strip("/").capitalize()
-                                ),
-                                icon={
-                                    routes.OVERVIEW_ROUTE: "home",
-                                    routes.TABLE_ROUTE: "table-2",
-                                    routes.ABOUT_ROUTE: "book-open",
-                                }.get(page["route"], "layout-dashboard"),
+                                text=page["title"],
+                                icon=page["icon"],
+                                url=page["route"],
+                            ),
+                            rx.fragment(),
+                        ),
+                        # Show regular pages for everyone
+                        rx.cond(
+                            page["show_for_all"],
+                            sidebar_item(
+                                text=page["title"],
+                                icon=page["icon"],
                                 url=page["route"],
                             ),
                             rx.fragment(),
                         ),
                     )
-                    for page in ordered_pages
+                    for page in pages
                 ],
                 spacing="1",
                 width="100%",

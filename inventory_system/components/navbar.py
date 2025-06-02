@@ -14,7 +14,7 @@ def menu_item_icon(icon: str) -> rx.Component:
 def menu_item(text: str, url: str) -> rx.Component:
     """Menu item."""
     active = (rx.State.router.page.path == url.lower()) | (
-        (rx.State.router.page.path == routes.OVERVIEW_ROUTE) & text == "Overview"
+        (rx.State.router.page.path == routes.get_route("overview")) & text == "Overview"
     )
 
     return rx.link(
@@ -94,27 +94,53 @@ def navbar_footer() -> rx.Component:
     )
 
 
-def menu_button() -> rx.Component:
-    """Menu button with drawer for navigation."""
-    from reflex.page import get_decorated_pages
+# Navigation configuration using your routes.py structure
+NAVIGATION_CONFIG = [
+    {
+        "route_name": "overview",
+        "title": "Overview",
+        "icon": "home",
+        "show_for_all": True,
+    },
+    {
+        "route_name": "table",
+        "title": "Table",
+        "icon": "table-2",
+        "show_for_all": True,
+    },
+    {
+        "route_name": "about",
+        "title": "About",
+        "icon": "book-open",
+        "show_for_all": True,
+    },
+    {
+        "route_name": "admin",
+        "title": "Admin Dashboard",
+        "icon": "shield",
+        "show_for_all": False,  # Only show for users with admin permissions
+        "required_permission": "manage_users",
+    },
+]
 
-    ordered_page_routes = [
-        routes.OVERVIEW_ROUTE,
-        routes.TABLE_ROUTE,
-        routes.ABOUT_ROUTE,
-        routes.ADMIN_ROUTE,
+
+def get_navigation_pages():
+    """Get navigation pages using the routes configuration."""
+    return [
+        {
+            "route": routes.get_route(config["route_name"]),
+            "title": config["title"],
+            "icon": config.get("icon", "layout-dashboard"),
+            "show_for_all": config.get("show_for_all", True),
+            "required_permission": config.get("required_permission"),
+        }
+        for config in NAVIGATION_CONFIG
     ]
 
-    pages = get_decorated_pages()
-    filtered_pages = [page for page in pages if page["route"] in ordered_page_routes]
-    ordered_pages = sorted(
-        filtered_pages,
-        key=lambda page: (
-            ordered_page_routes.index(page["route"])
-            if page["route"] in ordered_page_routes
-            else len(ordered_page_routes)
-        ),
-    )
+
+def menu_button() -> rx.Component:
+    """Menu button with drawer for navigation."""
+    pages = get_navigation_pages()
 
     return rx.drawer.root(
         rx.drawer.trigger(
@@ -133,26 +159,29 @@ def menu_button() -> rx.Component:
                     rx.divider(),
                     *[
                         rx.cond(
-                            (
-                                AuthState.permissions.contains("manage_users")
-                                & (page["route"] == routes.ADMIN_ROUTE)
-                            ),
-                            menu_item(
-                                text=page.get("title", "Admin Dashboard"),
-                                url=page["route"],
-                            ),
+                            # Show admin pages only if user has required permissions
+                            page.get("required_permission") is not None,
                             rx.cond(
-                                page["route"] != routes.ADMIN_ROUTE,
+                                AuthState.permissions.contains(
+                                    page["required_permission"]
+                                ),
                                 menu_item(
-                                    text=page.get(
-                                        "title", page["route"].strip("/").capitalize()
-                                    ),
+                                    text=page["title"],
+                                    url=page["route"],
+                                ),
+                                rx.fragment(),
+                            ),
+                            # Show regular pages for everyone
+                            rx.cond(
+                                page["show_for_all"],
+                                menu_item(
+                                    text=page["title"],
                                     url=page["route"],
                                 ),
                                 rx.fragment(),
                             ),
                         )
-                        for page in ordered_pages
+                        for page in pages
                     ],
                     rx.spacer(),
                     navbar_footer(),
