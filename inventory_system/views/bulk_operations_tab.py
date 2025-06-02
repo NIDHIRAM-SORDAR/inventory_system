@@ -58,9 +58,6 @@ def _role_card(role: rx.Var) -> rx.Component:
                 # Improved permission count display with context
                 rx.hstack(
                     rx.icon("key", size=14),
-                    rx.text(
-                        f"{role['permissions'].to(list).length()} permissions", size="2"
-                    ),
                     _permission_count_badge(
                         f"{role['permissions'].to(list).length()}", role["name"].to(str)
                     ),
@@ -1316,10 +1313,6 @@ def bulk_operations_tab() -> rx.Component:
                                                 rx.table.cell(
                                                     rx.hstack(
                                                         rx.icon("key", size=14),
-                                                        rx.text(
-                                                            f"{role['permissions'].to(list).length()}",
-                                                            size="2",
-                                                        ),
                                                         _permission_count_badge(
                                                             f"{role['permissions'].to(list).length()}",
                                                             role["name"].to(str),
