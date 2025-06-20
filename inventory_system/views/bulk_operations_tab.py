@@ -997,7 +997,7 @@ def bulk_operations_tab() -> rx.Component:
                         color_scheme="gray",
                         variant="outline",
                         size="2",
-                        on_click=UserManagementState.check_auth_and_load,
+                        on_click=BulkOperationsState.refresh_users_with_toast,
                         width=rx.breakpoints(initial="100%", sm="auto"),
                     ),
                     direction=rx.breakpoints(initial="column", sm="row"),
