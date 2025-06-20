@@ -71,6 +71,7 @@ class BulkOperationsState(AuthState):
     role_page_size: int = 10  # Items per page
     role_mobile_displayed_count: int = 5  # Number of roles shown on mobile
     _roles_data: List[Dict[str, Any]] = []
+    _users_data: List[Dict[str, Any]] = []
 
     user_section_open: bool = False
     role_section_open: bool = False
@@ -88,8 +89,7 @@ class BulkOperationsState(AuthState):
     # Added computed var for filtered users based on search and sort
     @rx.var
     def filtered_users(self) -> List[Dict[str, Any]]:
-        current_user_id = self.user_id if self.is_authenticated_and_ready else None
-        users_data = UserDataService.load_users_data(exclude_user_id=current_user_id)
+        users_data = self._users_data
 
         return UserDataService.filter_users(
             users_data=users_data,
@@ -163,13 +163,34 @@ class BulkOperationsState(AuthState):
     @rx.event
     def on_mount(self):
         self._roles_data = RoleDataService.load_roles_data()
+        current_user_id = self.user_id if self.is_authenticated_and_ready else None
+        self._users_data = UserDataService.load_users_data(
+            exclude_user_id=current_user_id
+        )
+
+    @rx.event
+    def refresh_user_data(self):
+        """Force refresh of role data by triggering re-computation."""
+        # Reset pagination and search to ensure clean state
+        self.user_page_number = 1
+        self.user_mobile_displayed_count = 5
+        self._users_data = UserDataService.load_users_data(
+            exclude_user_id=self.user_id if self.is_authenticated_and_ready else None
+        )
+        # The computed vars will automatically re-evaluate on next access
+
+    @rx.event
+    async def refresh_users_with_toast(self):
+        """Refresh users and show confirmation."""
+        self.refresh_user_data()
+        yield rx.toast.info("User data refreshed")
 
     @rx.event
     def refresh_role_data(self):
         """Force refresh of role data by triggering re-computation."""
         # Reset pagination and search to ensure clean state
         self.role_page_number = 1
-        self.role_mobile_displayed_count = 10
+        self.role_mobile_displayed_count = 5
         self._roles_data = RoleDataService.load_roles_data()
         # The computed vars will automatically re-evaluate on next access
 
@@ -183,15 +204,15 @@ class BulkOperationsState(AuthState):
     def set_user_search_value(self, value: str):
         self.user_search_value = value
         self.user_page_number = 1  # Reset to first page
-        self.user_mobile_displayed_count = 10  # Reset mobile display count
+        self.user_mobile_displayed_count = 5  # Reset mobile display count
 
     def set_user_sort_value(self, value: str):
         self.user_sort_value = value
-        self.user_mobile_displayed_count = 10  # Reset mobile display count
+        self.user_mobile_displayed_count = 5  # Reset mobile display count
 
     def toggle_user_sort(self):
         self.user_sort_reverse = not self.user_sort_reverse
-        self.user_mobile_displayed_count = 10  # Reset mobile display count
+        self.user_mobile_displayed_count = 5  # Reset mobile display count
 
     def user_first_page(self):
         self.user_page_number = 1
@@ -220,15 +241,15 @@ class BulkOperationsState(AuthState):
     def set_role_search_value(self, value: str):
         self.role_search_value = value
         self.role_page_number = 1  # Reset to first page
-        self.role_mobile_displayed_count = 10  # Reset mobile display count
+        self.role_mobile_displayed_count = 5  # Reset mobile display count
 
     def set_role_sort_value(self, value: str):
         self.role_sort_value = value
-        self.role_mobile_displayed_count = 10  # Reset mobile display count
+        self.role_mobile_displayed_count = 5  # Reset mobile display count
 
     def toggle_role_sort(self):
         self.role_sort_reverse = not self.role_sort_reverse
-        self.role_mobile_displayed_count = 10  # Reset mobile display count
+        self.role_mobile_displayed_count = 5  # Reset mobile display count
 
     def role_first_page(self):
         self.role_page_number = 1
@@ -453,13 +474,10 @@ class BulkOperationsState(AuthState):
                     acting_user=self.username,
                 )
 
-                from inventory_system.state.user_mgmt_state import UserManagementState
+                yield type(self).refresh_users_with_toast()
 
-                user_mgmt_state = await self.get_state(UserManagementState)
-                user_mgmt_state.check_auth_and_load()
-
-                self.close_bulk_roles_modal()
-                self.deselect_all_users()
+                yield self.close_bulk_roles_modal()
+                yield self.deselect_all_users()
 
         except Exception as e:
             audit_logger.error(
@@ -567,13 +585,9 @@ class BulkOperationsState(AuthState):
                     acting_user=self.username,
                 )
 
-                from inventory_system.state.role_state import RoleManagementState
-
-                role_mgmt_state = await self.get_state(RoleManagementState)
-                role_mgmt_state.load_roles()
-
-                self.close_bulk_permissions_modal()
-                self.deselect_all_roles()
+                yield type(self).refresh_roles_with_toast()
+                yield self.close_bulk_permissions_modal()
+                yield self.deselect_all_roles()
 
         except Exception as e:
             audit_logger.error(
