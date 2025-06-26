@@ -1,6 +1,6 @@
 # inventory_system/logging/audit.py
 import contextvars
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import reflex as rx
 import reflex_local_auth
@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapper
 from sqlmodel import select
 
 from inventory_system.logging.logging import audit_logger
+from inventory_system.models.audit import AuditTrail, OperationType
 
 # Context variable to store current user info during operations
 current_user_context = contextvars.ContextVar("current_user", default=None)
@@ -161,3 +162,71 @@ def enable_audit_logging_for_models(*model_classes):
     """Enable audit logging for multiple model classes at once."""
     for model_class in model_classes:
         attach_audit_logging(model_class)
+
+
+# Add this helper function
+def create_audit_entry(
+    operation_type: OperationType,
+    operation_name: str,
+    entity_type: str,
+    entity_id: Optional[str] = None,
+    changes: Optional[Dict[str, Any]] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+    success: bool = True,
+    error_message: Optional[str] = None,
+    requires_approval: bool = False,
+    **kwargs,
+) -> AuditTrail:
+    """Create and save an audit trail entry to the database."""
+
+    # Get user context
+    user_id, username = get_user_info_for_audit_context(kwargs.get("target"))
+
+    # Create audit entry
+    audit_entry = AuditTrail.create_audit_entry(
+        operation_type=operation_type,
+        operation_name=operation_name,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        user_id=user_id,
+        username=username,
+        changes=changes,
+        metadata=metadata,
+        success=success,
+        error_message=error_message,
+        requires_approval=requires_approval,
+        **kwargs,
+    )
+
+    # Save to database
+    try:
+        with rx.session() as session:
+            session.add(audit_entry)
+            session.commit()
+            session.refresh(audit_entry)
+    except Exception as e:
+        audit_logger.error(f"Failed to save audit entry: {str(e)}")
+
+    return audit_entry
+
+
+def get_user_info_for_audit_context(target=None):
+    """Enhanced version that works with context or target."""
+    # Strategy 1: Use current user context
+    current_user = get_current_user_context()
+    if current_user:
+        return current_user.user_id, current_user.username
+
+    # Strategy 2: Check if target has user_id (for user-owned entities)
+    if target and hasattr(target, "user_id") and target.user_id:
+        username = get_username_by_user_id(target.user_id)
+        return target.user_id, username
+
+    # Strategy 3: For association tables
+    if target and hasattr(target, "__tablename__"):
+        if target.__tablename__ == "userrole":
+            username = get_username_by_user_id(target.user_id)
+            return target.user_id, username
+
+    # Strategy 4: System operation
+    return None, "system"
