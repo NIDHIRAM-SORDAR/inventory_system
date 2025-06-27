@@ -1,6 +1,7 @@
 # inventory_system/logging/audit.py
 import contextvars
 from typing import Any, Dict, Optional
+from datetime import datetime, timezone
 
 import reflex as rx
 import reflex_local_auth
@@ -230,3 +231,7 @@ def get_user_info_for_audit_context(target=None):
 
     # Strategy 4: System operation
     return None, "system"
+
+def get_utc_now() -> datetime:
+    """Return the current UTC timestamp."""
+    return datetime.now(timezone.utc)
