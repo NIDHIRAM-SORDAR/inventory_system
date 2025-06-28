@@ -1,7 +1,7 @@
 # inventory_system/logging/audit.py
 import contextvars
-from typing import Any, Dict, Optional
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
 import reflex as rx
 import reflex_local_auth
@@ -172,7 +172,7 @@ def create_audit_entry(
     entity_type: str,
     entity_id: Optional[str] = None,
     changes: Optional[Dict[str, Any]] = None,
-    metadata: Optional[Dict[str, Any]] = None,
+    audit_metadata: Optional[Dict[str, Any]] = None,
     success: bool = True,
     error_message: Optional[str] = None,
     requires_approval: bool = False,
@@ -191,13 +191,15 @@ def create_audit_entry(
         entity_id=entity_id,
         user_id=user_id,
         username=username,
-        changes=changes,
-        metadata=metadata,
         success=success,
         error_message=error_message,
         requires_approval=requires_approval,
         **kwargs,
     )
+    if changes:
+        audit_entry.set_changes(changes)
+    if audit_metadata:
+        audit_entry.set_audit_metadata(audit_metadata)
 
     # Save to database
     try:
@@ -231,6 +233,7 @@ def get_user_info_for_audit_context(target=None):
 
     # Strategy 4: System operation
     return None, "system"
+
 
 def get_utc_now() -> datetime:
     """Return the current UTC timestamp."""

@@ -176,7 +176,7 @@ def _edit_dialog(user: rx.Var) -> rx.Component:
                         "Update Roles",
                         color_scheme="blue",
                         size="3",
-                        on_click=lambda: UserManagementState.change_user_roles(
+                        on_click=lambda: UserManagementState.change_user_roles_new(
                             user["id"], UserManagementState.selected_roles
                         ),
                         width=rx.breakpoints(initial="100%", sm="auto"),

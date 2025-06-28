@@ -3,10 +3,9 @@ from enum import Enum
 from typing import Any, Dict, Optional
 
 import reflex as rx
-from sqlalchemy import JSON, Column, Integer, Text
+from sqlalchemy import Column, Integer
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field
-
-from rxconfig import config
 
 
 def get_utc_now() -> datetime:
@@ -62,19 +61,9 @@ class AuditTrail(rx.Model, table=True):
     entity_type: str = Field(index=True, max_length=100)
     entity_id: Optional[str] = Field(default=None, index=True, max_length=255)
 
-    # Change details - JSON for PostgreSQL, Text for SQLite with JSON serialization
-    changes: Dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(
-            JSON if config.db_url and "postgresql" in config.db_url else Text
-        ),
-    )
-    audit_metadata: Dict[str, Any] = Field(
-        default_factory=dict,
-        sa_column=Column(
-            JSON if config.db_url and "postgresql" in config.db_url else Text
-        ),
-    )
+    # Change details - Always use Text for SQLite compatibility
+    changes: Dict[str, Any] = Field(sa_column=Column(JSONB), default={})
+    audit_metadata: Dict[str, Any] = Field(sa_column=Column(JSONB), default={})
 
     # Approval workflow fields
     requires_approval: bool = Field(default=False, index=True)
@@ -110,46 +99,26 @@ class AuditTrail(rx.Model, table=True):
         self.updated_at = get_utc_now()
 
     def set_changes(self, changes_dict: Dict[str, Any]) -> None:
-        """Set changes data with JSON serialization for SQLite compatibility."""
-        import json
-
-        if isinstance(self.changes, str):  # SQLite Text column
-            self.changes = json.dumps(changes_dict) if changes_dict else "{}"
-        else:  # PostgreSQL JSON column
-            self.changes = changes_dict
+        self.changes = changes_dict or {}
 
     def get_changes(self) -> Dict[str, Any]:
-        """Get changes data with JSON deserialization for SQLite compatibility."""
-        import json
-
-        if isinstance(self.changes, str):  # SQLite Text column
-            try:
-                return json.loads(self.changes) if self.changes else {}
-            except (json.JSONDecodeError, TypeError):
-                return {}
-        else:  # PostgreSQL JSON column
-            return self.changes or {}
+        return self.changes or {}
 
     def set_audit_metadata(self, metadata_dict: Dict[str, Any]) -> None:
-        """Set audit_metadata with JSON serialization for SQLite compatibility."""
-        import json
-
-        if isinstance(self.audit_metadata, str):  # SQLite Text column
-            self.audit_metadata = json.dumps(metadata_dict) if metadata_dict else "{}"
-        else:  # PostgreSQL JSON column
-            self.audit_metadata = metadata_dict
+        self.audit_metadata = metadata_dict or {}
 
     def get_audit_metadata(self) -> Dict[str, Any]:
-        """Get audit_metadata with JSON deserialization for SQLite compatibility."""
-        import json
+        return self.audit_metadata or {}
 
-        if isinstance(self.audit_metadata, str):  # SQLite Text column
-            try:
-                return json.loads(self.audit_metadata) if self.audit_metadata else {}
-            except (json.JSONDecodeError, TypeError):
-                return {}
-        else:  # PostgreSQL JSON column
-            return self.audit_metadata or {}
+    @staticmethod
+    def _json_serializer(obj):
+        """Custom JSON serializer for complex objects."""
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        elif hasattr(obj, "__dict__"):
+            return str(obj)
+        else:
+            return str(obj)
 
     @classmethod
     def create_audit_entry(
@@ -181,9 +150,8 @@ class AuditTrail(rx.Model, table=True):
             **kwargs,
         )
 
-        if changes:
-            audit_entry.set_changes(changes)
-        if audit_metadata:
-            audit_entry.set_audit_metadata(audit_metadata)
+        # Set JSON fields using the helper methods
+        audit_entry.set_changes(changes or {})
+        audit_entry.set_audit_metadata(audit_metadata or {})
 
         return audit_entry

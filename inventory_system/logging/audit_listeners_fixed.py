@@ -7,7 +7,7 @@ from sqlalchemy import event
 from sqlalchemy.inspection import inspect
 
 from inventory_system.logging.logging import audit_logger
-from inventory_system.models.audit import AuditTrail, OperationType  # Updated import
+from inventory_system.models.audit import AuditTrail, OperationType
 
 
 class EnhancedAuditEventListener:
