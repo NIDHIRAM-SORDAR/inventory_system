@@ -166,6 +166,9 @@ def enable_audit_logging_for_models(*model_classes):
 
 
 # Add this helper function
+# Changes for audit.py
+
+
 def create_audit_entry(
     operation_type: OperationType,
     operation_name: str,
@@ -183,7 +186,7 @@ def create_audit_entry(
     # Get user context
     user_id, username = get_user_info_for_audit_context(kwargs.get("target"))
 
-    # Create audit entry
+    # Create audit entry - no need for JSON serialization with PostgreSQL
     audit_entry = AuditTrail.create_audit_entry(
         operation_type=operation_type,
         operation_name=operation_name,
@@ -196,10 +199,12 @@ def create_audit_entry(
         requires_approval=requires_approval,
         **kwargs,
     )
+
+    # Directly assign JSON data - PostgreSQL will handle it natively
     if changes:
-        audit_entry.set_changes(changes)
+        audit_entry.changes = changes
     if audit_metadata:
-        audit_entry.set_audit_metadata(audit_metadata)
+        audit_entry.audit_metadata = audit_metadata
 
     # Save to database
     try:

@@ -106,14 +106,20 @@ class EnhancedAuditEventListener:
         return changes
 
     def _serialize_value(self, value: Any) -> Any:
-        """Serialize a value for JSON storage."""
+        """Serialize a value for JSON storage in PostgreSQL."""
         if isinstance(value, (str, int, float, bool, type(None))):
             return value
         elif isinstance(value, datetime):
             return value.isoformat()
+        elif isinstance(value, (list, dict)):
+            # PostgreSQL can handle complex JSON structures directly
+            return value
         elif hasattr(value, "__dict__"):
-            # For complex objects, use string representation
-            return str(value)
+            # For complex objects, convert to dict when possible
+            try:
+                return value.__dict__
+            except Exception:
+                return str(value)
         else:
             return str(value)
 
@@ -238,7 +244,7 @@ class EnhancedAuditEventListener:
 
         for audit_data in pending_audits:
             try:
-                # Create audit entry with proper JSON serialization
+                # Create audit entry - PostgreSQL handles JSON natively
                 audit_entry = AuditTrail.create_audit_entry(
                     operation_type=audit_data["operation_type"],
                     operation_name=audit_data["operation_name"],
@@ -252,9 +258,11 @@ class EnhancedAuditEventListener:
                     request_path=audit_data["request_path"],
                     user_agent=audit_data["user_agent"],
                     success=audit_data["success"],
-                    changes=audit_data["changes"],
-                    audit_metadata=audit_data["audit_metadata"],
                 )
+
+                # Directly assign JSON data to PostgreSQL JSONB fields
+                audit_entry.changes = audit_data["changes"]
+                audit_entry.audit_metadata = audit_data["audit_metadata"]
 
                 # Save to database with a separate session
                 with rx.session() as session:
@@ -404,32 +412,3 @@ def with_async_audit_context(
 def flush_audit_entries() -> None:
     """Manually flush all pending audit entries to the database."""
     enhanced_audit_listener.flush_pending_audits()
-
-
-# Helper function to test audit trail creation
-def test_audit_creation():
-    """Test function to verify audit trail creation works."""
-    try:
-        # Create a test audit entry
-        audit_entry = AuditTrail.create_audit_entry(
-            operation_type=OperationType.CUSTOM,
-            operation_name="test_operation",
-            entity_type="test_entity",
-            entity_id="test_123",
-            user_id=1,
-            username="test_user",
-            changes={"test_field": {"old": "old_value", "new": "new_value"}},
-            audit_metadata={"test": True, "timestamp": datetime.now().isoformat()},
-        )
-
-        with rx.session() as session:
-            session.add(audit_entry)
-            session.commit()
-            session.refresh(audit_entry)
-
-        print(f"✓ Test audit entry created successfully with ID: {audit_entry.id}")
-        return True
-
-    except Exception as e:
-        print(f"✗ Test audit entry creation failed: {e}")
-        return False

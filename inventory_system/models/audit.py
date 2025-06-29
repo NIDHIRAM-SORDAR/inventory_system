@@ -149,9 +149,9 @@ class AuditTrail(rx.Model, table=True):
             transaction_id=transaction_id,
             **kwargs,
         )
-
-        # Set JSON fields using the helper methods
-        audit_entry.set_changes(changes or {})
-        audit_entry.set_audit_metadata(audit_metadata or {})
+        if changes:
+            audit_entry.changes = changes
+        if audit_metadata:
+            audit_entry.audit_metadata = audit_metadata
 
         return audit_entry
