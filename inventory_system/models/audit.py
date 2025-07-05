@@ -22,6 +22,7 @@ class OperationType(str, Enum):
     LOGIN = "login"
     LOGOUT = "logout"
     BULK = "bulk"
+    REGISTER = "register"
     ROLE_CHANGE = "role_change"
     PERMISSION_CHANGE = "permission_change"
     CUSTOM = "custom"

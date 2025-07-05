@@ -398,32 +398,57 @@ class AsyncAuditContextManager:
 
     async def __aenter__(self):
         auth_state = await self.state.get_state(AuthState) if self.state else None
-        self.context.update(
-            {
-                "user_id": auth_state.user_id
-                if auth_state and auth_state.is_authenticated_and_ready
-                else None,
-                "username": auth_state.username
-                if auth_state and auth_state.is_authenticated_and_ready
+        if auth_state:
+            self.context.setdefault(
+                "user_id",
+                auth_state.user_id if auth_state.is_authenticated_and_ready else None,
+            )
+            self.context.setdefault(
+                "username",
+                auth_state.username
+                if auth_state.is_authenticated_and_ready
                 else "system",
-                "ip_address": auth_state.router.session.client_ip
-                if auth_state
-                else None,
-                "session_id": getattr(auth_state, "session_id", None)
-                if auth_state
-                else None,
-                "request_path": getattr(auth_state.router.page, "path", None)
-                if auth_state
-                else None,
-                "user_agent": getattr(auth_state.router.session, "user_agent", None)
-                if auth_state
-                else None,
-            }
-        )
+            )
+            self.context.setdefault("ip_address", auth_state.router.session.client_ip)
+            self.context.setdefault(
+                "session_id", getattr(auth_state, "session_id", None)
+            )
+            self.context.setdefault(
+                "request_path", getattr(auth_state.router.page, "path", None)
+            )
+            self.context.setdefault(
+                "user_agent", getattr(auth_state.router.session, "user_agent", None)
+            )
         enhanced_audit_listener.set_audit_context(self.context)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        # Create audit entry for the operation itself
+        operation_type = self.context.get("operation_type")
+        operation_name = self.context.get("operation_name")
+        if (
+            operation_type in [OperationType.LOGIN, OperationType.LOGOUT]
+            and operation_name
+        ):
+            success = exc_type is None
+            error_message = str(exc_val) if exc_val else None
+            audit_entry = AuditTrail.create_audit_entry(
+                operation_type=operation_type,
+                operation_name=operation_name,
+                entity_type="session",
+                entity_id=None,
+                user_id=self.context.get("user_id"),
+                username=self.context.get("username", "system"),
+                ip_address=self.context.get("ip_address"),
+                success=success,
+                error_message=error_message,
+            )
+            with rx.session() as session:
+                session.add(audit_entry)
+                session.commit()
+                audit_logger.debug(
+                    f"Audit entry created successfully: {audit_entry.id}"
+                )
         enhanced_audit_listener.clear_audit_context()
         enhanced_audit_listener.flush_pending_audits()
 
