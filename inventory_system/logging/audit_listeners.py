@@ -1,4 +1,4 @@
-# inventory_system/logging/audit_listeners.py - Enhanced version
+# inventory_system/logging/audit_listeners.py - Enhanced version with context preservation
 
 import threading
 import uuid
@@ -194,7 +194,7 @@ class EnhancedAuditEventListener:
             )
             return
 
-        # Regular single-entity audit logic (existing code)
+        # Extract context information
         user_id = context.get("user_id")
         username = context.get("username", "system")
         ip_address = context.get("ip_address")
@@ -203,7 +203,33 @@ class EnhancedAuditEventListener:
         user_agent = context.get("user_agent")
         transaction_id = context.get("transaction_id")
 
-        operation_name = f"{operation_type.value}_{entity_type}"
+        # **FIXED: Use custom operation_name from context if provided**
+        custom_operation_name = context.get("operation_name")
+        if custom_operation_name:
+            operation_name = custom_operation_name
+        else:
+            operation_name = f"{operation_type.value}_{entity_type}"
+
+        # **FIXED: Extract all additional context for audit metadata**
+        # Filter out standard context keys to get additional context
+        standard_keys = {
+            "user_id",
+            "username",
+            "ip_address",
+            "session_id",
+            "request_path",
+            "user_agent",
+            "transaction_id",
+            "operation_name",
+            "operation_type",
+        }
+        additional_context = {
+            k: v
+            for k, v in context.items()
+            if k not in standard_keys and not k.startswith("_")
+        }
+
+        # **FIXED: Only include additional context in audit_metadata, not everywhere**
         audit_metadata = {
             "table_name": instance.__table__.name,
             "model_class": instance.__class__.__name__,
@@ -211,8 +237,10 @@ class EnhancedAuditEventListener:
             "request_path": request_path,
             "user_agent": user_agent,
             "change_count": len(changes) if changes else 0,
+            **additional_context,  # Include additional context here only
         }
 
+        # **FIXED: Simplified log_data without redundant additional_context**
         log_data = {
             "operation": operation_name,
             "entity_type": entity_type,
@@ -224,15 +252,37 @@ class EnhancedAuditEventListener:
             "metadata": audit_metadata,
         }
 
-        audit_logger.info(
-            f"database_{operation_type.value}",
-            extra={
-                "audit_data": log_data,
-                "entity_type": entity_type,
-                "entity_id": entity_id,
-                "operation": operation_name,
-            },
-        )
+        # **FIXED: Use custom operation_name in log message**
+        log_message = f"database_{operation_type.value}"
+        if custom_operation_name:
+            log_message = f"{custom_operation_name}_{operation_type.value}"
+
+        # **FIXED: Only include essential fields in log extra, no duplication**
+        log_extra = {
+            "audit_data": log_data,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "operation": operation_name,
+        }
+
+        # **FIXED: Only add key additional context fields to log extra for filtering/searching**
+        # Add only the most important additional context fields directly to log extra
+        # This allows for easy log filtering while avoiding duplication
+        important_context_keys = {
+            "target_user_id",
+            "risk_level",
+            "entity_type",
+            "submitted_username",
+            "submitted_email",
+            "new_roles",
+            "old_roles",
+        }
+
+        for key in important_context_keys:
+            if key in additional_context:
+                log_extra[key] = additional_context[key]
+
+        audit_logger.info(log_message, extra=log_extra)
 
         audit_data = {
             "operation_type": operation_type,
