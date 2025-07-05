@@ -181,12 +181,15 @@ def create_audit_entry(
     requires_approval: bool = False,
     **kwargs,
 ) -> AuditTrail:
-    """Create and save an audit trail entry to the database."""
+    """Create and save an audit trail entry with context from the context manager."""
+    user_id = kwargs.get("user_id")
+    username = kwargs.get("username", "system")
+    ip_address = kwargs.get("ip_address")
+    transaction_id = kwargs.get("transaction_id")
+    session_id = kwargs.get("session_id")
+    request_path = kwargs.get("request_path")
+    user_agent = kwargs.get("user_agent")
 
-    # Get user context
-    user_id, username = get_user_info_for_audit_context(kwargs.get("target"))
-
-    # Create audit entry - no need for JSON serialization with PostgreSQL
     audit_entry = AuditTrail.create_audit_entry(
         operation_type=operation_type,
         operation_name=operation_name,
@@ -194,19 +197,21 @@ def create_audit_entry(
         entity_id=entity_id,
         user_id=user_id,
         username=username,
+        ip_address=ip_address,
+        transaction_id=transaction_id,
+        session_id=session_id,
+        request_path=request_path,
+        user_agent=user_agent,
         success=success,
         error_message=error_message,
         requires_approval=requires_approval,
-        **kwargs,
     )
 
-    # Directly assign JSON data - PostgreSQL will handle it natively
     if changes:
         audit_entry.changes = changes
     if audit_metadata:
         audit_entry.audit_metadata = audit_metadata
 
-    # Save to database
     try:
         with rx.session() as session:
             session.add(audit_entry)
@@ -216,28 +221,6 @@ def create_audit_entry(
         audit_logger.error(f"Failed to save audit entry: {str(e)}")
 
     return audit_entry
-
-
-def get_user_info_for_audit_context(target=None):
-    """Enhanced version that works with context or target."""
-    # Strategy 1: Use current user context
-    current_user = get_current_user_context()
-    if current_user:
-        return current_user.user_id, current_user.username
-
-    # Strategy 2: Check if target has user_id (for user-owned entities)
-    if target and hasattr(target, "user_id") and target.user_id:
-        username = get_username_by_user_id(target.user_id)
-        return target.user_id, username
-
-    # Strategy 3: For association tables
-    if target and hasattr(target, "__tablename__"):
-        if target.__tablename__ == "userrole":
-            username = get_username_by_user_id(target.user_id)
-            return target.user_id, username
-
-    # Strategy 4: System operation
-    return None, "system"
 
 
 def get_utc_now() -> datetime:

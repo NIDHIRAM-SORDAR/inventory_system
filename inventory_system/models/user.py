@@ -717,6 +717,4 @@ class Supplier(rx.Model, table=True):
         self.updated_at = get_utc_now()
 
 
-enable_audit_logging_for_models(
-    UserInfo, Supplier, Permission, Role, UserRole, RolePermission
-)
+enable_audit_logging_for_models(Supplier, Permission, Role, UserRole, RolePermission)

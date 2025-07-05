@@ -6,9 +6,9 @@ import os
 import reflex as rx
 
 from inventory_system.logging.logging import setup_loguru
-from .logging.audit_setup import initialize_audit_system
 
 from . import styles
+from .logging.audit_setup import initialize_audit_system
 from .pages import *
 
 # Set the environment variable

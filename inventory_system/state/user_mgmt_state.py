@@ -76,138 +76,6 @@ class UserManagementState(AuthState):
         return color_map
 
     @rx.event
-    async def change_user_roles(self, user_id: int, selected_roles: List[str]):
-        """Updated to handle multiple roles assignment"""
-        if "edit_user" not in self.permissions:
-            yield rx.toast.error(
-                "Permission denied: Cannot change user roles", position="bottom-right"
-            )
-            return
-
-        if not selected_roles:
-            yield rx.toast.error(
-                "Please select at least one role", position="bottom-right"
-            )
-            return
-
-        self.is_loading = True
-        self.setvar("admin_error_message", "")
-        self.setvar("admin_success_message", "")
-        acting_user_id = self.authenticated_user.id if self.authenticated_user else None
-        acting_username = (
-            self.authenticated_user.username if self.authenticated_user else "Unknown"
-        )
-        ip_address = self.router.session.client_ip
-
-        audit_logger.info(
-            "attempt_change_roles",
-            acting_user_id=acting_user_id,
-            acting_username=acting_username,
-            target_user_id=user_id,
-            target_roles=selected_roles,
-            ip_address=ip_address,
-        )
-        with rx.session() as session:
-            try:
-                user_info = session.exec(
-                    select(UserInfo)
-                    .where(UserInfo.user_id == user_id)
-                    .with_for_update()
-                ).one_or_none()
-                if not user_info:
-                    self.setvar("admin_error_message", "User info not found.")
-                    audit_logger.error(
-                        "fail_change_roles",
-                        acting_user_id=acting_user_id,
-                        acting_username=acting_username,
-                        target_user_id=user_id,
-                        reason="User info not found",
-                        ip_address=ip_address,
-                    )
-                    self.setvar("is_loading", False)
-                    yield rx.toast.error(
-                        self.admin_error_message, position="bottom-right", duration=5000
-                    )
-                    return
-
-                local_user = session.exec(
-                    select(reflex_local_auth.LocalUser).where(
-                        reflex_local_auth.LocalUser.id == user_id
-                    )
-                ).one_or_none()
-                if not local_user:
-                    self.setvar("admin_error_message", "User not found.")
-                    audit_logger.error(
-                        "fail_change_roles",
-                        acting_user_id=acting_user_id,
-                        acting_username=acting_username,
-                        target_user_id=user_id,
-                        reason="Local user not found",
-                        ip_address=ip_address,
-                    )
-                    self.setvar("is_loading", False)
-                    yield rx.toast.error(
-                        self.admin_error_message, position="bottom-right", duration=5000
-                    )
-                    return
-
-                target_username = local_user.username
-                original_roles = user_info.get_roles()
-
-                # Check if roles are actually changing
-                if set(selected_roles) == set(original_roles):
-                    self.setvar("is_loading", False)
-                    yield rx.toast.info(
-                        f"No change: User {target_username} already has these roles.",
-                        position="bottom-right",
-                        duration=5000,
-                    )
-                    return
-
-                session.add(user_info)
-                session.refresh(user_info)
-                user_info.set_roles(selected_roles, session)
-                session.commit()
-
-                audit_logger.info(
-                    "success_change_roles",
-                    acting_user_id=acting_user_id,
-                    acting_username=acting_username,
-                    target_user_id=user_id,
-                    original_roles=original_roles,
-                    new_roles=selected_roles,
-                    ip_address=ip_address,
-                )
-                roles_str = ", ".join(selected_roles)
-                self.setvar(
-                    "admin_success_message",
-                    f"User {target_username} roles updated to: {roles_str}.",
-                )
-                self.check_auth_and_load()
-                self.setvar("is_loading", False)
-                self.setvar("show_edit_dialog", False)
-                self.setvar("target_user_id", None)
-                yield rx.toast.success(
-                    self.admin_success_message, position="bottom-right", duration=5000
-                )
-
-            except Exception as e:
-                session.rollback()
-                self.setvar("admin_error_message", f"Failed to change roles: {str(e)}")
-                audit_logger.error(
-                    "fail_change_roles",
-                    acting_user_id=acting_user_id,
-                    acting_username=acting_username,
-                    target_user_id=user_id,
-                    reason=f"Database error: {str(e)}",
-                    ip_address=ip_address,
-                )
-                self.setvar("is_loading", False)
-                yield rx.toast.error(
-                    self.admin_error_message, position="bottom-right", duration=5000
-                )
-
-    @rx.event
     async def delete_user(self):
         if "delete_user" not in self.permissions:
             yield rx.toast.error(
@@ -423,7 +291,7 @@ class UserManagementState(AuthState):
         self.active_tab = tab
 
     @rx.event
-    async def change_user_roles_new(self, user_id: int, selected_roles: List[str]):
+    async def change_user_roles(self, user_id: int, selected_roles: List[str]):
         """Updated to handle multiple roles assignment"""
         if "edit_user" not in self.permissions:
             yield rx.toast.error(
@@ -440,11 +308,6 @@ class UserManagementState(AuthState):
         self.is_loading = True
         self.setvar("admin_error_message", "")
         self.setvar("admin_success_message", "")
-        acting_user_id = self.authenticated_user.id if self.authenticated_user else None
-        acting_username = (
-            self.authenticated_user.username if self.authenticated_user else "Unknown"
-        )
-        ip_address = self.router.session.client_ip
 
         async with with_async_audit_context(
             state=self,  # Automatically extracts user_info and request context

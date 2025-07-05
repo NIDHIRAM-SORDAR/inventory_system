@@ -21,6 +21,7 @@ class OperationType(str, Enum):
     DELETE = "delete"
     LOGIN = "login"
     LOGOUT = "logout"
+    BULK = "bulk"
     ROLE_CHANGE = "role_change"
     PERMISSION_CHANGE = "permission_change"
     CUSTOM = "custom"

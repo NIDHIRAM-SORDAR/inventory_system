@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Set
 import reflex as rx
 from sqlmodel import select
 
+from inventory_system.logging.audit_listeners import with_async_bulk_audit_context
 from inventory_system.logging.logging import audit_logger
 from inventory_system.models.user import Permission, Role, UserInfo
 from inventory_system.state.auth import AuthState
@@ -418,7 +419,7 @@ class BulkOperationsState(AuthState):
 
     @rx.event
     async def execute_bulk_role_assignment(self):
-        """Execute bulk role assignment."""
+        """Execute bulk role assignment with comprehensive audit logging."""
         if "edit_user" not in self.permissions:
             yield rx.toast.error("Permission denied: Cannot modify user roles")
             return
@@ -433,64 +434,87 @@ class BulkOperationsState(AuthState):
 
         self.bulk_is_loading = True
 
-        try:
-            with rx.session() as session:
-                user_ids = list(self.selected_user_ids)
-                results = UserInfo.bulk_set_roles(
-                    user_ids=user_ids,
-                    role_names=self.bulk_selected_roles,
-                    session=session,
-                    operation=self.bulk_operation_type,
-                )
-                session.commit()
+        # Use the new bulk audit context manager
+        async with with_async_bulk_audit_context(
+            state=self,
+            operation_name="bulk_role_assignment",
+            selected_user_ids=list(self.selected_user_ids),
+            selected_roles=self.bulk_selected_roles,
+            user_count=len(self.selected_user_ids),
+            risk_level="medium",  # For future approval workflows
+        ) as bulk_context:
+            try:
+                with rx.session() as session:
+                    user_ids = list(self.selected_user_ids)
+                    results = UserInfo.bulk_set_roles(
+                        user_ids=user_ids,
+                        role_names=self.bulk_selected_roles,
+                        session=session,
+                        operation=self.bulk_operation_type,
+                    )
+                    session.commit()
 
-                success_count = len(results["success"])
-                failed_count = len(results["failed"])
-                unchanged_count = len(results["unchanged"])
-
-                operation_text = {
-                    "replace": "assigned to",
-                    "add": "added to",
-                    "remove": "removed from",
-                }[self.bulk_operation_type]
-
-                if success_count > 0:
-                    yield rx.toast.success(
-                        f"Roles {operation_text} {success_count} user(s) successfully"
+                    # Set operation summary in bulk context
+                    bulk_context.set_summary(
+                        {
+                            "roles_modified": self.bulk_selected_roles,
+                            "success_count": len(results["success"]),
+                            "failed_count": len(results["failed"]),
+                            "unchanged_count": len(results["unchanged"]),
+                            "total_users": len(user_ids),
+                            "results": results,
+                        }
                     )
 
-                if failed_count > 0:
-                    yield rx.toast.warning(f"Failed to update {failed_count} user(s)")
+                    success_count = len(results["success"])
+                    failed_count = len(results["failed"])
+                    unchanged_count = len(results["unchanged"])
 
-                if unchanged_count > 0:
-                    yield rx.toast.info(f"{unchanged_count} user(s) had no changes")
+                    operation_text = {
+                        "replace": "assigned to",
+                        "add": "added to",
+                        "remove": "removed from",
+                    }[self.bulk_operation_type]
 
-                audit_logger.info(
-                    "bulk_role_assignment_completed",
-                    operation=self.bulk_operation_type,
-                    user_count=len(user_ids),
-                    roles=self.bulk_selected_roles,
-                    results=results,
-                    acting_user=self.username,
+                    if success_count > 0:
+                        yield rx.toast.success(
+                            f"Roles {operation_text} {success_count} user(s) successfully"
+                        )
+
+                    if failed_count > 0:
+                        yield rx.toast.warning(
+                            f"Failed to update {failed_count} user(s)"
+                        )
+
+                    if unchanged_count > 0:
+                        yield rx.toast.info(f"{unchanged_count} user(s) had no changes")
+
+                    # The bulk audit logging is handled automatically by the context manager
+                    # No need for manual audit_logger calls here
+
+                    yield type(self).refresh_users_with_toast()
+                    yield self.close_bulk_roles_modal()
+                    yield self.deselect_all_users()
+
+            except Exception as e:
+                # Set error summary in bulk context
+                bulk_context.set_summary(
+                    {
+                        "roles_modified": self.bulk_selected_roles,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "success_count": 0,
+                        "failed_count": len(list(self.selected_user_ids)),
+                        "unchanged_count": 0,
+                        "total_users": len(list(self.selected_user_ids)),
+                    }
                 )
 
-                yield type(self).refresh_users_with_toast()
+                yield rx.toast.error(f"Bulk operation failed: {str(e)}")
+                raise  # Re-raise to ensure the context manager handles the error
 
-                yield self.close_bulk_roles_modal()
-                yield self.deselect_all_users()
-
-        except Exception as e:
-            audit_logger.error(
-                "bulk_role_assignment_failed",
-                error=str(e),
-                user_ids=list(self.selected_user_ids),
-                roles=self.bulk_selected_roles,
-                acting_user=self.username,
-            )
-            yield rx.toast.error(f"Bulk operation failed: {str(e)}")
-
-        finally:
-            self.bulk_is_loading = False
+            finally:
+                self.bulk_is_loading = False
 
     # Bulk permission assignment for roles
     @rx.event
