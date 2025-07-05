@@ -78,6 +78,13 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
                 self.registration_error = f"Username {username} is already taken"
                 return False
 
+            # Check if email is already taken
+            if session.exec(
+                select(UserInfo).where(UserInfo.email == email.lower())
+            ).one_or_none():
+                self.registration_error = f"Email {email} is already registered"
+                return False
+
         # Password validation
         if not password:
             self.registration_error = "Password cannot be empty"
@@ -350,6 +357,7 @@ class CustomRegisterState(reflex_local_auth.RegistrationState):
             yield rx.toast.error("Permission denied: Cannot create users")
             return
 
+        self.registration_error = ""
         self.is_submitting = True
         yield
 
