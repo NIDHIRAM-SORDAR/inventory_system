@@ -566,65 +566,79 @@ class BulkOperationsState(AuthState):
             return
 
         self.bulk_role_is_loading = True
-
-        try:
-            with rx.session() as session:
-                role_ids = list(self.selected_role_ids)
-                results = Role.bulk_set_permissions(
-                    role_ids=role_ids,
-                    permission_names=self.bulk_selected_permissions,
-                    session=session,
-                    operation=self.bulk_role_operation_type,
-                )
-                session.commit()
-
-                success_count = len(results["success"])
-                failed_count = len(results["failed"])
-                unchanged_count = len(results["unchanged"])
-
-                operation_text = {
-                    "replace": "assigned to",
-                    "add": "added to",
-                    "remove": "removed from",
-                }[self.bulk_role_operation_type]
-
-                if success_count > 0:
-                    yield rx.toast.success(
-                        f"Permissions {operation_text} "
-                        f"{success_count} role(s) successfully"
+        async with with_async_bulk_audit_context(
+            state=self,
+            operation_name="bulk_permission_assignment",
+            selected_role_ids=list(self.selected_role_ids),
+            selected_permissions=self.bulk_selected_permissions,
+            role_count=len(self.selected_role_ids),
+            risk_level="medium",  # For future approval workflows
+        ) as bulk_context:
+            try:
+                with rx.session() as session:
+                    role_ids = list(self.selected_role_ids)
+                    results = Role.bulk_set_permissions(
+                        role_ids=role_ids,
+                        permission_names=self.bulk_selected_permissions,
+                        session=session,
+                        operation=self.bulk_role_operation_type,
+                    )
+                    session.commit()
+                    bulk_context.set_summary(
+                        {
+                            "permissions_modified": self.bulk_selected_permissions,
+                            "success_count": len(results["success"]),
+                            "failed_count": len(results["failed"]),
+                            "unchanged_count": len(results["unchanged"]),
+                            "total_roles": len(role_ids),
+                            "results": results,
+                        }
                     )
 
-                if failed_count > 0:
-                    yield rx.toast.warning(f"Failed to update {failed_count} role(s)")
+                    success_count = len(results["success"])
+                    failed_count = len(results["failed"])
+                    unchanged_count = len(results["unchanged"])
 
-                if unchanged_count > 0:
-                    yield rx.toast.info(f"{unchanged_count} role(s) had no changes")
+                    operation_text = {
+                        "replace": "assigned to",
+                        "add": "added to",
+                        "remove": "removed from",
+                    }[self.bulk_role_operation_type]
 
-                audit_logger.info(
-                    "bulk_permission_assignment_completed",
-                    operation=self.bulk_role_operation_type,
-                    role_count=len(role_ids),
-                    permissions=self.bulk_selected_permissions,
-                    results=results,
-                    acting_user=self.username,
+                    if success_count > 0:
+                        yield rx.toast.success(
+                            f"Permissions {operation_text} "
+                            f"{success_count} role(s) successfully"
+                        )
+
+                    if failed_count > 0:
+                        yield rx.toast.warning(
+                            f"Failed to update {failed_count} role(s)"
+                        )
+
+                    if unchanged_count > 0:
+                        yield rx.toast.info(f"{unchanged_count} role(s) had no changes")
+
+                    yield type(self).refresh_roles_with_toast()
+                    yield self.close_bulk_permissions_modal()
+                    yield self.deselect_all_roles()
+
+            except Exception as e:
+                bulk_context.set_summary(
+                    {
+                        "permissions_modified": self.bulk_selected_permissions,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "success_count": 0,
+                        "failed_count": len(list(self.selected_role_ids)),
+                        "unchanged_count": 0,
+                        "total_roles": len(list(self.selected_role_ids)),
+                    }
                 )
+                yield rx.toast.error(f"Bulk operation failed: {str(e)}")
 
-                yield type(self).refresh_roles_with_toast()
-                yield self.close_bulk_permissions_modal()
-                yield self.deselect_all_roles()
-
-        except Exception as e:
-            audit_logger.error(
-                "bulk_permission_assignment_failed",
-                error=str(e),
-                role_ids=list(self.selected_role_ids),
-                permissions=self.bulk_selected_permissions,
-                acting_user=self.username,
-            )
-            yield rx.toast.error(f"Bulk operation failed: {str(e)}")
-
-        finally:
-            self.bulk_role_is_loading = False
+            finally:
+                self.bulk_role_is_loading = False
 
     # Export Methods
     @rx.event

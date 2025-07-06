@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 import reflex as rx
 from sqlmodel import select
 
-from inventory_system.logging.logging import audit_logger
+from inventory_system.logging.audit_listeners import with_async_audit_context
 from inventory_system.models.user import Permission, Role, RolePermission, UserRole
 from inventory_system.state.auth import AuthState
 from inventory_system.state.bulk_roles_state import BulkOperationsState
@@ -225,13 +225,12 @@ class RoleManagementState(rx.State):
 
         self.role_is_loading = True
         try:
-            auth_state = await self.get_state(AuthState)
-            with auth_state.audit_context():
-                audit_logger.info(
-                    f"{auth_state.username} is attempting to add a new role",
-                    name=self.role_form_name,
-                    description=self.role_form_description,
-                )
+            async with with_async_audit_context(
+                state=self,
+                operation_name="create_role",
+                submitted_role_name=self.role_form_name,
+                submitted_role_description=self.role_form_description,
+            ):
                 with rx.session() as session:
                     Role.create_role(
                         name=self.role_form_name,
@@ -249,12 +248,7 @@ class RoleManagementState(rx.State):
                         f"Role '{self.role_form_name}' created successfully"
                     )
         except Exception as e:
-            audit_logger.error(
-                "add_role_failed",
-                name=self.role_form_name,
-                description=self.role_form_description,
-                error=str(e),
-            )
+            session.rollback()
             yield rx.toast.error(f"Failed to create role: {str(e)}")
         finally:
             self.role_is_loading = False
@@ -268,18 +262,17 @@ class RoleManagementState(rx.State):
 
         self.role_is_loading = True
         try:
-            auth_state = await self.get_state(AuthState)
-            with auth_state.audit_context():
+            async with with_async_audit_context(
+                state=self,
+                operation_name="update_role",
+                submitted_role_name=self.role_form_name,
+                submitted_role_description=self.role_form_description,
+            ):
                 with rx.session() as session:
                     role = session.exec(
                         select(Role).where(Role.id == self.role_editing_id)
                     ).one_or_none()
                     if role:
-                        audit_logger.info(
-                            f"{auth_state.username} is attempting to update a role",
-                            role_id=role.id,
-                            name=role.name,
-                        )
                         role.update_role(
                             session=session,
                             name=self.role_form_name,
@@ -297,11 +290,7 @@ class RoleManagementState(rx.State):
                             f"Role '{self.role_form_name}' updated successfully"
                         )
         except Exception as e:
-            audit_logger.error(
-                "update_role_failed",
-                role_id=self.role_editing_id,
-                error=str(e),
-            )
+            session.rollback()
             yield rx.toast.error(f"Failed to update role: {str(e)}")
         finally:
             self.role_is_loading = False
@@ -311,8 +300,11 @@ class RoleManagementState(rx.State):
         """Delete a role."""
         self.role_is_loading = True
         try:
-            auth_state = await self.get_state(AuthState)
-            with auth_state.audit_context():
+            async with with_async_audit_context(
+                state=self,
+                operation_name="delete_role",
+                selected_role_id_for_deletion=self.role_deleting_id,
+            ):
                 with rx.session() as session:
                     role = session.exec(
                         select(Role).where(Role.id == self.role_deleting_id)
@@ -328,12 +320,6 @@ class RoleManagementState(rx.State):
                                 f"Remove users first."
                             )
                             return
-
-                        audit_logger.info(
-                            f"{auth_state.username} is attempting to delete a role",
-                            role_id=role.id,
-                            name=role.name,
-                        )
                         Role.delete_role(name=role.name, session=session)
                         session.commit()
                         self.load_roles()
@@ -341,15 +327,12 @@ class RoleManagementState(rx.State):
                         bulk_state = await self.get_state(BulkOperationsState)
                         async for event in bulk_state.refresh_roles_with_toast():
                             yield event
+                        self.close_role_modals()
                         yield rx.toast.success(
                             f"Role '{role.name}' deleted successfully"
                         )
         except Exception as e:
-            audit_logger.error(
-                "delete_role_failed",
-                role_id=self.role_deleting_id,
-                error=str(e),
-            )
+            session.rollback()
             yield rx.toast.error(f"Failed to delete role: {str(e)}")
         finally:
             self.role_is_loading = False
@@ -359,19 +342,17 @@ class RoleManagementState(rx.State):
         """Update permissions for a role."""
         self.permissions_loading = True
         try:
-            auth_state = await self.get_state(AuthState)
-            with auth_state.audit_context():
+            async with with_async_audit_context(
+                state=self,
+                operation_name="update_permission_for_role",
+                selected_role_id=self.role_permissions_id,
+                selected_permissions=self.selected_permissions,
+            ):
                 with rx.session() as session:
                     role = session.exec(
                         select(Role).where(Role.id == self.role_permissions_id)
                     ).one_or_none()
                     if role:
-                        audit_logger.info(
-                            f"{auth_state.username} is updating permissions for role",
-                            role_id=role.id,
-                            role_name=role.name,
-                            permissions=self.selected_permissions,
-                        )
                         role.set_permissions(self.selected_permissions, session)
                         session.commit()
                         self.load_roles()
@@ -384,11 +365,7 @@ class RoleManagementState(rx.State):
                             f"Permissions updated for role '{role.name}'"
                         )
         except Exception as e:
-            audit_logger.error(
-                "update_role_permissions_failed",
-                role_id=self.role_permissions_id,
-                error=str(e),
-            )
+            session.rollback()
             yield rx.toast.error(f"Failed to update permissions: {str(e)}")
         finally:
             self.permissions_loading = False

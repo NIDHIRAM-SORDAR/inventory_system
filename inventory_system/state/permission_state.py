@@ -4,7 +4,7 @@ import reflex as rx
 from sqlmodel import select
 
 from inventory_system.constants import available_colors
-from inventory_system.logging.logging import audit_logger
+from inventory_system.logging.audit_listeners import with_async_audit_context
 from inventory_system.models.user import Permission, Role, RolePermission
 from inventory_system.state.auth import AuthState
 
@@ -180,15 +180,13 @@ class PermissionsManagementState(rx.State):
         self.perm_is_loading = True
         try:
             # Get the AuthState instance from the current state
-            auth_state = await self.get_state(AuthState)
-
-            with auth_state.audit_context():
-                audit_logger.info(
-                    f"{auth_state.username} is attempting to add a new permission",
-                    name=self.perm_form_name,
-                    description=self.perm_form_description,
-                    category=self.perm_form_category,
-                )
+            async with with_async_audit_context(
+                state=self,
+                operation_name="create_permission",
+                submitted_permission_name=self.perm_form_name,
+                submitted_permission_description=self.perm_form_description,
+                submitted_permission_category=self.perm_form_category,
+            ):
                 with rx.session() as session:
                     Permission.create_permission(
                         name=self.perm_form_name,
@@ -202,26 +200,12 @@ class PermissionsManagementState(rx.State):
                     new_perm = session.exec(
                         select(Permission).where(Permission.name == self.perm_form_name)
                     ).one()
-                    audit_logger.info(
-                        "add_permission_success",
-                        permission_id=new_perm.id,
-                        name=new_perm.name,
-                        description=new_perm.description,
-                        category=new_perm.category,
-                    )
                     yield AuthState.load_user_data()
                     yield rx.toast.success(
                         f"Permission '{self.perm_form_name}' added successfully"
                     )
         except Exception as e:
             session.rollback()
-            audit_logger.error(
-                "add_permission_failed",
-                name=self.perm_form_name,
-                description=self.perm_form_description,
-                category=self.perm_form_category,
-                error=str(e),
-            )
             yield rx.toast.error(f"Failed to add permission: {str(e)}")
         finally:
             self.perm_is_loading = False
@@ -234,20 +218,18 @@ class PermissionsManagementState(rx.State):
             return
         self.perm_is_loading = True
         try:
-            auth_state = await self.get_state(AuthState)
-            with auth_state.audit_context():
+            async with with_async_audit_context(
+                state=self,
+                operation_name="update_permission",
+                submitted_permission_name=self.perm_form_name,
+                submitted_permission_description=self.perm_form_description,
+                submitted_permission_category=self.perm_form_category,
+            ):
                 with rx.session() as session:
                     perm = session.exec(
                         select(Permission).where(Permission.id == self.perm_editing_id)
                     ).one_or_none()
                     if perm:
-                        audit_logger.info(
-                            f"{auth_state.username} is attempting to update a permission",
-                            permission_id=perm.id,
-                            name=perm.name,
-                            description=perm.description,
-                            category=perm.category,
-                        )
                         perm.update_permission(
                             session=session,
                             name=self.perm_form_name,
@@ -263,13 +245,6 @@ class PermissionsManagementState(rx.State):
                         )
         except Exception as e:
             session.rollback()
-            audit_logger.error(
-                "update_permission_failed",
-                name=self.perm_form_name,
-                description=self.perm_form_description,
-                category=self.perm_form_category,
-                error=str(e),
-            )
             yield rx.toast.error(f"Failed to update permission: {str(e)}")
         finally:
             self.perm_is_loading = False
@@ -279,8 +254,11 @@ class PermissionsManagementState(rx.State):
         """Delete a permission."""
         self.perm_is_loading = True
         try:
-            auth_state = await self.get_state(AuthState)
-            with auth_state.audit_context():
+            async with with_async_audit_context(
+                state=self,
+                operation_name="delete_permission",
+                selected_permission_id=self.perm_deleting_id,
+            ):
                 with rx.session() as session:
                     perm = session.exec(
                         select(Permission).where(Permission.id == self.perm_deleting_id)
@@ -301,31 +279,14 @@ class PermissionsManagementState(rx.State):
                             return
 
                         # NEW: Log before state
-                        audit_logger.info(
-                            f"{auth_state.username} is attempting to delete a permission",
-                            permission_id=perm.id,
-                            name=perm.name,
-                            description=perm.description,
-                            category=perm.category,
-                        )
                         Permission.delete_permission(name=perm.name, session=session)
                         session.commit()
                         self.load_permissions()
                         yield AuthState.load_user_data()
                         self.close_perm_modals()
-                        audit_logger.info(
-                            "delete_permission_success",
-                            permission_id=perm.id,
-                            name=perm.name,
-                        )
                         yield rx.toast.success("Permission deleted successfully")
         except Exception as e:
             session.rollback()
-            audit_logger.error(
-                "delete_permission_failed",
-                name=perm.name,
-                error=str(e),
-            )
             yield rx.toast.error(f"Failed to delete permission: {str(e)}")
         finally:
             self.perm_is_loading = False
