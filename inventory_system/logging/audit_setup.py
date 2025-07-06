@@ -7,6 +7,7 @@ This file should be imported early in your application startup.
 from typing import List, Type
 
 import reflex as rx
+from reflex_local_auth import LocalUser
 
 from inventory_system.models.user import (
     Permission,
@@ -38,6 +39,7 @@ def setup_audit_system(models_to_track: List[Type] = None):
             Role,
             UserRole,
             RolePermission,
+            LocalUser,
         ]
 
     # Register models for audit tracking
@@ -105,6 +107,8 @@ def initialize_audit_system():
     ensure_audit_table_exists()
 
     # 2. Setup audit tracking (add your models here)
-    setup_audit_system([UserInfo, Supplier, Permission, Role, UserRole, RolePermission])
+    setup_audit_system(
+        [UserInfo, Supplier, Permission, Role, UserRole, RolePermission, LocalUser]
+    )
 
     print("✓ Enhanced audit system fully initialized")

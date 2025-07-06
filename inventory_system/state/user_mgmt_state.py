@@ -87,114 +87,83 @@ class UserManagementState(AuthState):
         self.is_loading = True
         self.setvar("admin_error_message", "")
         self.setvar("admin_success_message", "")
-        acting_user_id = self.authenticated_user.id if self.authenticated_user else None
-        acting_username = (
-            self.authenticated_user.username if self.authenticated_user else "Unknown"
-        )
-        target_user_id = self.user_to_delete
-        ip_address = self.router.session.client_ip
 
-        audit_logger.info(
-            "attempt_delete_user",
-            acting_user_id=acting_user_id,
-            acting_username=acting_username,
-            target_user_id=target_user_id,
-            ip_address=ip_address,
-        )
-        with rx.session() as session:
-            try:
-                user_info = session.exec(
-                    select(UserInfo)
-                    .where(UserInfo.user_id == self.user_to_delete)
-                    .with_for_update()
-                ).one_or_none()
-                if not user_info:
-                    self.setvar("admin_error_message", "User not found.")
-                    audit_logger.error(
-                        "fail_delete_user",
-                        acting_user_id=acting_user_id,
-                        acting_username=acting_username,
-                        target_user_id=target_user_id,
-                        reason="User not found",
-                        ip_address=ip_address,
+        async with with_async_audit_context(
+            state=self,  # Automatically extracts user_info and request context
+            operation_name="user_deletion",
+            target_user_id=self.user_to_delete,
+            risk_level="medium",  # Additional context for future approval workflows
+        ):
+            with rx.session() as session:
+                try:
+                    user_info = session.exec(
+                        select(UserInfo)
+                        .where(UserInfo.user_id == self.user_to_delete)
+                        .with_for_update()
+                    ).one_or_none()
+                    if not user_info:
+                        self.setvar("admin_error_message", "User not found.")
+                        self.setvar("is_loading", False)
+                        yield rx.toast.error(
+                            self.admin_error_message,
+                            position="bottom-right",
+                            duration=5000,
+                        )
+                        return
+
+                    local_user = session.exec(
+                        select(reflex_local_auth.LocalUser).where(
+                            reflex_local_auth.LocalUser.id == user_info.user_id
+                        )
+                    ).one_or_none()
+                    if not local_user:
+                        self.setvar("admin_error_message", "Local user not found.")
+                        self.setvar("is_loading", False)
+                        yield rx.toast.error(
+                            self.admin_error_message,
+                            position="bottom-right",
+                            duration=5000,
+                        )
+                        return
+
+                    target_username = local_user.username
+
+                    # CRITICAL: Delete UserRole records first to prevent orphaned records
+                    # This handles the case where UserRole.user_id references userinfo.user_id
+                    session.exec(
+                        UserRole.__table__.delete().where(
+                            UserRole.user_id == user_info.user_id
+                        )
+                    )
+
+                    # Then delete UserInfo and LocalUser
+                    if local_user:
+                        session.delete(local_user)
+                    session.commit()
+                    self.setvar(
+                        "admin_success_message",
+                        f"User {target_username} deleted successfully.",
+                    )
+                    self.check_auth_and_load()
+                    self.setvar("is_loading", False)
+                    self.setvar("show_delete_dialog", False)
+                    self.setvar("user_to_delete", None)
+                    audit_logger.info(f"User {target_username} deleted successfully.")
+                    yield rx.toast.success(
+                        self.admin_success_message,
+                        position="bottom-right",
+                        duration=5000,
+                    )
+
+                except Exception as e:
+                    session.rollback()
+                    self.setvar(
+                        "admin_error_message", f"Failed to delete user: {str(e)}"
                     )
                     self.setvar("is_loading", False)
                     yield rx.toast.error(
                         self.admin_error_message, position="bottom-right", duration=5000
                     )
-                    return
-
-                local_user = session.exec(
-                    select(reflex_local_auth.LocalUser).where(
-                        reflex_local_auth.LocalUser.id == user_info.user_id
-                    )
-                ).one_or_none()
-                if not local_user:
-                    self.setvar("admin_error_message", "Local user not found.")
-                    audit_logger.error(
-                        "fail_delete_user",
-                        acting_user_id=acting_user_id,
-                        acting_username=acting_username,
-                        target_user_id=target_user_id,
-                        reason="Local user not found",
-                        ip_address=ip_address,
-                    )
-                    self.setvar("is_loading", False)
-                    yield rx.toast.error(
-                        self.admin_error_message, position="bottom-right", duration=5000
-                    )
-                    return
-
-                target_username = local_user.username
-
-                # CRITICAL: Delete UserRole records first to prevent orphaned records
-                # This handles the case where UserRole.user_id references userinfo.user_id
-                session.exec(
-                    UserRole.__table__.delete().where(
-                        UserRole.user_id == user_info.user_id
-                    )
-                )
-
-                # Then delete UserInfo and LocalUser
-                if local_user:
-                    session.delete(local_user)
-                session.delete(user_info)
-                session.commit()
-
-                audit_logger.info(
-                    "success_delete_user",
-                    acting_user_id=acting_user_id,
-                    acting_username=acting_username,
-                    target_user_id=target_user_id,
-                    ip_address=ip_address,
-                )
-                self.setvar(
-                    "admin_success_message",
-                    f"User {target_username} deleted successfully.",
-                )
-                self.check_auth_and_load()
-                self.setvar("is_loading", False)
-                self.setvar("show_delete_dialog", False)
-                self.setvar("user_to_delete", None)
-                yield rx.toast.success(
-                    self.admin_success_message, position="bottom-right", duration=5000
-                )
-
-            except Exception as e:
-                session.rollback()
-                self.setvar("admin_error_message", f"Failed to delete user: {str(e)}")
-                audit_logger.error(
-                    "fail_delete_user",
-                    acting_user_id=acting_user_id,
-                    acting_username=acting_username,
-                    target_user_id=target_user_id,
-                    reason=f"Database error: {str(e)}",
-                    ip_address=ip_address,
-                )
-                self.setvar("is_loading", False)
-                yield rx.toast.error(
-                    self.admin_error_message, position="bottom-right", duration=5000
-                )
 
     @rx.var
     def total_pages(self) -> int:
