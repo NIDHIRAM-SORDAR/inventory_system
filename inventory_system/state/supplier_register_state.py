@@ -1,10 +1,14 @@
 # inventory_system/pages/supplier_register.py
 import re
+import uuid
 
 import reflex as rx
 from email_validator import EmailNotValidError, validate_email
 from sqlmodel import select
 
+from inventory_system.logging.audit_listeners import (
+    with_async_audit_context,
+)
 from inventory_system.logging.logging import audit_logger
 from inventory_system.models.user import Supplier
 
@@ -84,7 +88,7 @@ class SupplierRegisterState(rx.State):
         self.clear_messages()
         self.is_submitting = True
         ip_address = self.router.session.client_ip
-
+        transaction_id = str(uuid.uuid4())
         audit_logger.info(
             "attempt_supplier_registration",
             company_name=self.company_name,
@@ -103,86 +107,82 @@ class SupplierRegisterState(rx.State):
             )
             self.is_submitting = False
             return
+        async with with_async_audit_context(
+            state=self,
+            operation_name="supplier_registration",
+            transaction_id=transaction_id,
+            submitted_company_name=self.company_name,
+            submitted_contact_email=self.contact_email,
+        ):
+            try:
+                with rx.session() as session:
+                    # Check for existing supplier with the same company_name
+                    existing_supplier_by_name = session.exec(
+                        select(Supplier).where(
+                            Supplier.company_name == self.company_name
+                        )
+                    ).first()
+                    if existing_supplier_by_name:
+                        self.error_message = "This company name is already registered."
+                        self.is_submitting = False
+                        return
+                    # Check for existing supplier with the same contact_email
+                    existing_supplier = session.exec(
+                        select(Supplier).where(
+                            Supplier.contact_email == self.contact_email
+                        )
+                    ).first()
+                    if existing_supplier:
+                        self.error_message = "This email is already registered."
+                        self.is_submitting = False
+                        return
 
-        try:
-            with rx.session() as session:
-                # Check for existing supplier with the same company_name
-                existing_supplier_by_name = session.exec(
-                    select(Supplier).where(Supplier.company_name == self.company_name)
-                ).first()
-                if existing_supplier_by_name:
-                    self.error_message = "This company name is already registered."
-                    audit_logger.warning(
-                        "supplier_registration_failed",
-                        reason="Duplicate company name",
+                    supplier = Supplier(
                         company_name=self.company_name,
-                        existing_supplier_id=existing_supplier_by_name.id,
-                        ip_address=ip_address,
-                    )
-                    self.is_submitting = False
-                    return
-                # Check for existing supplier with the same contact_email
-                existing_supplier = session.exec(
-                    select(Supplier).where(Supplier.contact_email == self.contact_email)
-                ).first()
-                if existing_supplier:
-                    self.error_message = "This email is already registered."
-                    audit_logger.warning(
-                        "supplier_registration_failed",
-                        reason="Duplicate email",
+                        description=self.description,
                         contact_email=self.contact_email,
-                        existing_supplier_id=existing_supplier.id,
+                        contact_phone=self.contact_phone,
+                        status="pending",
+                    )
+                    session.add(supplier)
+                    session.commit()
+                    session.refresh(supplier)
+                    supplier_id = supplier.id
+
+                    audit_logger.info(
+                        "supplier_created",
+                        company_name=self.company_name,
+                        supplier_id=supplier_id,
+                        contact_email=self.contact_email,
+                        status=supplier.status,
                         ip_address=ip_address,
                     )
-                    self.is_submitting = False
-                    return
 
-                supplier = Supplier(
-                    company_name=self.company_name,
-                    description=self.description,
-                    contact_email=self.contact_email,
-                    contact_phone=self.contact_phone,
-                    status="pending",
-                )
-                session.add(supplier)
-                session.commit()
-                session.refresh(supplier)
-                supplier_id = supplier.id
+                    self.company_name = ""
+                    self.description = ""
+                    self.contact_email = ""
+                    self.contact_phone = ""
+                    self.success_message = (
+                        "Registration successful! Please wait for admin approval."
+                    )
+                    audit_logger.info(
+                        "success_supplier_registration",
+                        company_name=supplier.company_name,
+                        supplier_id=supplier_id,
+                        contact_email=supplier.contact_email,
+                        ip_address=ip_address,
+                    )
 
-                audit_logger.info(
-                    "supplier_created",
+            except Exception as e:
+                self.error_message = "An unexpected error occurred during registration."
+                audit_logger.critical(
+                    "supplier_registration_failed_unexpected",
+                    reason=str(e),
                     company_name=self.company_name,
-                    supplier_id=supplier_id,
                     contact_email=self.contact_email,
-                    status=supplier.status,
+                    exception_type=type(e).__name__,
                     ip_address=ip_address,
                 )
-
-                self.company_name = ""
-                self.description = ""
-                self.contact_email = ""
-                self.contact_phone = ""
-                self.success_message = (
-                    "Registration successful! Please wait for admin approval."
-                )
-                audit_logger.info(
-                    "success_supplier_registration",
-                    company_name=supplier.company_name,
-                    supplier_id=supplier_id,
-                    contact_email=supplier.contact_email,
-                    ip_address=ip_address,
-                )
-
-        except Exception as e:
-            self.error_message = "An unexpected error occurred during registration."
-            audit_logger.critical(
-                "supplier_registration_failed_unexpected",
-                reason=str(e),
-                company_name=self.company_name,
-                contact_email=self.contact_email,
-                exception_type=type(e).__name__,
-                ip_address=ip_address,
-            )
-            session.rollback()
-        finally:
-            self.is_submitting = False
+                session.rollback()
+            finally:
+                self.is_submitting = False
